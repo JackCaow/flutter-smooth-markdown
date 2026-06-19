@@ -109,6 +109,14 @@ autocomplete, formatted block editing, code-block language selection, Mermaid
 preview/source toggling, block math editing, copy-as-Markdown/plain-text/HTML,
 Markdown import/export callbacks, focus mode, and source, preview, or split layouts.
 
+File-oriented editor actions are intentionally callback-based so apps can choose
+their own desktop, mobile, or web integrations. When callbacks are omitted,
+`Export Markdown` copies Markdown to the clipboard, `Print as PDF` copies the
+generated HTML fallback, `Import Markdown` is hidden, and image insertion uses
+the built-in URL dialog. Provide `onExportMarkdown`, `onExportPdf`,
+`onImportMarkdown`, and `onPickImage` to connect file pickers, print/PDF
+packages, asset uploads, or platform share sheets.
+
 ### Programmatic Selection
 
 When `selectable: true`, the content is wrapped in a `SmoothSelectionRegion` (a thin `SelectableRegion` adapter). Pass a `selectionController` to drive selection programmatically:

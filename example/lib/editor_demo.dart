@@ -73,6 +73,37 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
                         ),
                       );
                     },
+                    onExportPdf: (markdown, _) {
+                      setState(
+                        () => _lastExport =
+                            'PDF export requested for ${markdown.length} characters',
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('PDF export callback requested'),
+                        ),
+                      );
+                    },
+                    onImportMarkdown: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Markdown import callback requested'),
+                        ),
+                      );
+                      return '## Imported markdown\n\nThis came from the host callback.';
+                    },
+                    onPickImage: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Image picker callback requested'),
+                        ),
+                      );
+                      return const MarkdownEditorImageSelection(
+                        url: 'https://picsum.photos/640/360',
+                        alt: 'Sample image',
+                        title: 'Demo image',
+                      );
+                    },
                     height: editorHeight,
                   );
                 },

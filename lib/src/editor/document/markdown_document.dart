@@ -107,6 +107,25 @@ class MarkdownDocument {
     return MarkdownDocument(blocks: nextBlocks);
   }
 
+  /// Moves the top-level block containing [blockId] up or down.
+  MarkdownDocument moveTopLevelBlock(
+    String blockId, {
+    required bool upward,
+  }) {
+    final fromIndex = blocks.indexWhere(
+      (block) => block.findBlock(blockId) != null,
+    );
+    if (fromIndex == -1) return this;
+
+    final toIndex = upward ? fromIndex - 1 : fromIndex + 1;
+    if (toIndex < 0 || toIndex >= blocks.length) return this;
+
+    final nextBlocks = [...blocks];
+    final moved = nextBlocks.removeAt(fromIndex);
+    nextBlocks.insert(toIndex, moved);
+    return MarkdownDocument(blocks: nextBlocks);
+  }
+
   /// Removes the block with [blockId].
   MarkdownDocument removeBlock(String blockId) {
     return MarkdownDocument(

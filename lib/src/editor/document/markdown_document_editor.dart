@@ -373,6 +373,51 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     _replaceDocument(_document.removeBlock(blockId));
   }
 
+  /// Whether the top-level block containing [blockId] can move up or down.
+  bool canMoveBlock({
+    required String blockId,
+    required bool upward,
+  }) {
+    final topLevelIndex = _topLevelBlockIndexContaining(blockId);
+    if (topLevelIndex == -1) return false;
+
+    final block = _document.blocks[topLevelIndex];
+    if (block is MarkdownFrontmatterBlock ||
+        _isGeneratedScratchTrailingParagraph(block)) {
+      return false;
+    }
+
+    final targetIndex = upward ? topLevelIndex - 1 : topLevelIndex + 1;
+    if (targetIndex < 0 || targetIndex >= _document.blocks.length) {
+      return false;
+    }
+
+    final target = _document.blocks[targetIndex];
+    return target is! MarkdownFrontmatterBlock &&
+        !_isGeneratedScratchTrailingParagraph(target);
+  }
+
+  /// Moves the top-level block containing [blockId] up or down.
+  MarkdownSelectionTransactionResult? moveBlock({
+    required String blockId,
+    required bool upward,
+    required int selectionOffset,
+  }) {
+    final block = _document.blockById(blockId);
+    if (block == null) return null;
+
+    if (!canMoveBlock(blockId: blockId, upward: upward)) return null;
+
+    final nextDocument = _document.moveTopLevelBlock(blockId, upward: upward);
+    if (!_replaceDocument(nextDocument)) return null;
+
+    return MarkdownSelectionTransactionResult(
+      document: _document,
+      activeBlockId: blockId,
+      selectionOffset: selectionOffset.clamp(0, block.plainText.length).toInt(),
+    );
+  }
+
   /// Applies a toolbar command to a whole text block.
   ///
   /// This is intentionally document-model based. It avoids Markdown source
@@ -4150,6 +4195,14 @@ class MarkdownDocumentEditor extends ChangeNotifier {
       }
     }
     return -1;
+  }
+
+  bool _isGeneratedScratchTrailingParagraph(MarkdownBlock block) {
+    return block is MarkdownParagraphBlock &&
+        block.children.length == 1 &&
+        block.children.single is MarkdownText &&
+        (block.children.single as MarkdownText).text.isEmpty &&
+        block.id.contains('scratch-trailing');
   }
 
   String _uniqueListItemId(String base) {

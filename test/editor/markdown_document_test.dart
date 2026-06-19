@@ -1722,6 +1722,65 @@ E = mc^2
       );
     });
 
+    test('moves the top-level block containing an active block', () {
+      const document = MarkdownDocument(
+        blocks: [
+          MarkdownParagraphBlock(
+            id: 'before',
+            children: [MarkdownText('Before')],
+          ),
+          MarkdownBlockquoteBlock(
+            id: 'quote',
+            blocks: [
+              MarkdownParagraphBlock(
+                id: 'inside',
+                children: [MarkdownText('Inside')],
+              ),
+            ],
+          ),
+          MarkdownParagraphBlock(
+            id: 'after',
+            children: [MarkdownText('After')],
+          ),
+        ],
+      );
+      final editor = MarkdownDocumentEditor(document);
+      addTearDown(editor.dispose);
+
+      expect(
+        editor.canMoveBlock(blockId: 'before', upward: true),
+        isFalse,
+      );
+      expect(
+        editor.canMoveBlock(blockId: 'inside', upward: false),
+        isTrue,
+      );
+
+      final result = editor.moveBlock(
+        blockId: 'inside',
+        upward: false,
+        selectionOffset: 3,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.activeBlockId, 'inside');
+      expect(result.selectionOffset, 3);
+      expect(
+        editor.document.toMarkdown(),
+        'Before\n\n'
+        'After\n\n'
+        '> Inside',
+      );
+
+      expect(editor.undo(), isTrue);
+      expect(
+        editor.document.toMarkdown(),
+        'Before\n\n'
+        '> Inside\n\n'
+        'After',
+      );
+    });
+
     test('splits a top-level paragraph at the caret', () {
       const document = MarkdownDocument(
         blocks: [

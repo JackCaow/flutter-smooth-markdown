@@ -96,8 +96,17 @@ typedef MarkdownEditorPdfExportCallback = FutureOr<void> Function(
   String html,
 );
 
+/// Called when the export menu requests a Markdown file export.
+typedef MarkdownEditorMarkdownExportCallback = FutureOr<void> Function(
+  String markdown,
+);
+
 /// Called when the editor should import Markdown from a host-provided file.
 typedef MarkdownEditorMarkdownImportCallback = FutureOr<String?> Function();
+
+/// Called when the image command should pick/import an image.
+typedef MarkdownEditorImagePickerCallback
+    = FutureOr<MarkdownEditorImageSelection?> Function();
 
 /// A Markdown source editor with formatted editing, live preview, and
 /// Scratch-inspired commands.
@@ -179,7 +188,7 @@ class SmoothMarkdownEditor extends StatefulWidget {
   ///
   /// This lets host apps provide Scratch-style local file picking and asset
   /// copying. If omitted, the editor falls back to the built-in URL dialog.
-  final FutureOr<MarkdownEditorImageSelection?> Function()? onPickImage;
+  final MarkdownEditorImagePickerCallback? onPickImage;
 
   /// Image builder forwarded to [SmoothMarkdown].
   final Widget Function(String url, String? alt, String? title)? imageBuilder;
@@ -226,7 +235,7 @@ class SmoothMarkdownEditor extends StatefulWidget {
   /// Called when the export menu requests a Markdown file export.
   ///
   /// If omitted, the export action copies the Markdown source to the clipboard.
-  final FutureOr<void> Function(String markdown)? onExportMarkdown;
+  final MarkdownEditorMarkdownExportCallback? onExportMarkdown;
 
   /// Called when the export menu or Cmd/Ctrl+Shift+P requests PDF/print export.
   ///
@@ -560,6 +569,21 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
               tooltip: 'Redo ($_redoShortcutLabel)',
               enabled: _controller.canRedo,
               onPressed: _redo,
+            ),
+            _historyButton(
+              key: const ValueKey('smooth_markdown_editor_move_block_up'),
+              icon: Icons.keyboard_arrow_up,
+              tooltip: 'Move block up ($_shortcutModifierLabel+Alt+ArrowUp)',
+              enabled: _canMoveActiveTopLevelBlock(upward: true),
+              onPressed: () => _moveActiveTopLevelBlock(upward: true),
+            ),
+            _historyButton(
+              key: const ValueKey('smooth_markdown_editor_move_block_down'),
+              icon: Icons.keyboard_arrow_down,
+              tooltip:
+                  'Move block down ($_shortcutModifierLabel+Alt+ArrowDown)',
+              enabled: _canMoveActiveTopLevelBlock(upward: false),
+              onPressed: () => _moveActiveTopLevelBlock(upward: false),
             ),
             _separator(color),
             _commandButton(
@@ -3307,6 +3331,13 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       return KeyEventResult.ignored;
     }
 
+    final moveUpward = _blockMoveShortcutUpward(event);
+    if (moveUpward != null) {
+      return _moveActiveTopLevelBlock(upward: moveUpward)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
     final isModifierPressed = HardwareKeyboard.instance.isMetaPressed ||
         HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isAltPressed;
@@ -5203,6 +5234,13 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final shift = HardwareKeyboard.instance.isShiftPressed;
     final alt = HardwareKeyboard.instance.isAltPressed;
 
+    final moveUpward = _blockMoveShortcutUpward(event);
+    if (moveUpward != null) {
+      return _moveActiveTopLevelBlock(upward: moveUpward)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
     if (!alt && key == LogicalKeyboardKey.keyZ) {
       if (shift) {
         _redo();
@@ -5488,6 +5526,23 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     };
   }
 
+  bool? _blockMoveShortcutUpward(KeyEvent event) {
+    final keyboard = HardwareKeyboard.instance;
+    final hasShortcutModifier =
+        keyboard.isMetaPressed || keyboard.isControlPressed;
+    if (!hasShortcutModifier ||
+        !keyboard.isAltPressed ||
+        keyboard.isShiftPressed) {
+      return null;
+    }
+
+    return switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowUp => true,
+      LogicalKeyboardKey.arrowDown => false,
+      _ => null,
+    };
+  }
+
   KeyEventResult _handleFormattedBlockKeyEvent(
     FocusNode node,
     KeyEvent event,
@@ -5505,6 +5560,13 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isAltPressed;
     final shift = HardwareKeyboard.instance.isShiftPressed;
+    final moveUpward = _blockMoveShortcutUpward(event);
+    if (moveUpward != null) {
+      return _moveActiveTopLevelBlock(upward: moveUpward)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
     if (isModifierPressed) {
       return KeyEventResult.ignored;
     }
@@ -6003,6 +6065,74 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final blockId = _activeFormattedBlockId;
     if (blockId == null) return false;
     return _topLevelBlockContaining(blockId) is MarkdownListBlock;
+  }
+
+  String? _activeBlockIdForTopLevelMove() {
+    final activeTableCell = _activeTableCell;
+    if (activeTableCell != null) return activeTableCell.tableId;
+    if (_activeFormattedPlainText && _activeFormattedBlockId != null) {
+      return _activeFormattedBlockId;
+    }
+    return _activeTopLevelBlock()?.id;
+  }
+
+  bool _canMoveActiveTopLevelBlock({required bool upward}) {
+    final blockId = _activeBlockIdForTopLevelMove();
+    return blockId != null && _controller.canMoveBlock(blockId, upward: upward);
+  }
+
+  bool _moveActiveTopLevelBlock({required bool upward}) {
+    if (!widget.enabled || _mode != MarkdownEditorMode.formatted) {
+      return false;
+    }
+
+    final activeTableCell = _activeTableCell;
+    if (activeTableCell != null) {
+      final selection = _tableCellController.selection;
+      final selectionOffset = selection.isValid
+          ? selection.extentOffset
+          : _tableCellController.text.length;
+      final result = _controller.moveBlock(
+        activeTableCell.tableId,
+        upward: upward,
+        selectionOffset: selectionOffset,
+      );
+      if (result == null) return false;
+
+      _syncActiveTableCell(selectionOffset: result.selectionOffset);
+      return true;
+    }
+
+    final blockId = _activeFormattedBlockId;
+    if (_activeFormattedPlainText && blockId != null) {
+      final selection = _formattedBlockController.selection;
+      final selectionOffset = selection.isValid
+          ? selection.extentOffset
+          : _formattedBlockController.text.length;
+      final result = _controller.moveBlock(
+        blockId,
+        upward: upward,
+        selectionOffset: selectionOffset,
+      );
+      if (result == null) return false;
+
+      _syncActiveFormattedBlock(
+        result.activeBlockId,
+        selectionOffset: result.selectionOffset,
+      );
+      return true;
+    }
+
+    final topLevelBlockId = _activeTopLevelBlock()?.id;
+    if (topLevelBlockId == null) return false;
+    final result = _controller.moveBlock(
+      topLevelBlockId,
+      upward: upward,
+      selectionOffset: 0,
+    );
+    if (result == null) return false;
+    setState(_clearActiveFormattedBlock);
+    return true;
   }
 
   void _undo() {

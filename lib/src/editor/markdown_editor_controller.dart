@@ -153,6 +153,29 @@ class MarkdownEditorController extends ChangeNotifier {
     documentEditor.applyBlockCommand(blockId, command);
   }
 
+  /// Whether the top-level block containing [blockId] can move up or down.
+  bool canMoveBlock(
+    String blockId, {
+    required bool upward,
+  }) {
+    return documentEditor.canMoveBlock(blockId: blockId, upward: upward);
+  }
+
+  /// Moves the top-level block containing [blockId] up or down.
+  MarkdownSelectionTransactionResult? moveBlock(
+    String blockId, {
+    required bool upward,
+    int selectionOffset = 0,
+  }) {
+    final result = documentEditor.moveBlock(
+      blockId: blockId,
+      upward: upward,
+      selectionOffset: selectionOffset,
+    );
+    _syncSourceSelectionFromDocumentResult(result);
+    return result;
+  }
+
   /// Applies a semantic inline command to [range] inside [blockId].
   void applyInlineCommand(
     String blockId,

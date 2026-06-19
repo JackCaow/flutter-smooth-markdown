@@ -1818,6 +1818,76 @@ void main() {
       expect(find.text('Export PDF'), findsNothing);
     });
 
+    testWidgets('export markdown menu delegates to host callback',
+        (tester) async {
+      final controller = MarkdownEditorController(text: '# Export me');
+      addTearDown(controller.dispose);
+      String? exportedMarkdown;
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+            onExportMarkdown: (markdown) {
+              exportedMarkdown = markdown;
+            },
+          ),
+        ),
+      );
+
+      await tester.drag(find.byType(ListView).first, const Offset(-700, 0));
+      await tester.pump();
+      await tester.tap(find.byTooltip('Export (Ctrl+Shift+C)'));
+      await tester.pump();
+
+      await tester.tap(find.text('Export Markdown'));
+      await tester.pump();
+
+      expect(exportedMarkdown, '# Export me');
+    });
+
+    testWidgets('export markdown falls back to clipboard', (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final controller = MarkdownEditorController(text: '# Export me');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.drag(find.byType(ListView).first, const Offset(-700, 0));
+      await tester.pump();
+      await tester.tap(find.byTooltip('Export (Ctrl+Shift+C)'));
+      await tester.pump();
+
+      await tester.tap(find.text('Export Markdown'));
+      await tester.pump();
+
+      expect(clipboardText, '# Export me');
+    });
+
     testWidgets('import menu inserts host provided markdown', (tester) async {
       final controller = MarkdownEditorController(text: 'Intro');
       addTearDown(controller.dispose);
@@ -3498,6 +3568,71 @@ void main() {
       final updated =
           _singleScratchContentBlock(controller) as MarkdownListBlock;
       expect(updated.items, hasLength(2));
+    });
+
+    testWidgets('formatted shortcut and toolbar move active blocks',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: 'One\n\nTwo\n\nThree',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_5')),
+      );
+      await tester.pump();
+
+      var activeField = tester.widget<TextField>(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_active_5')),
+      );
+      activeField.controller!.selection = const TextSelection.collapsed(
+        offset: 2,
+      );
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+
+      expect(controller.text, 'Two\n\nOne\n\nThree');
+      activeField = tester.widget<TextField>(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_active_0')),
+      );
+      expect(activeField.controller!.text, 'Two');
+      expect(activeField.controller!.selection.extentOffset, 2);
+
+      final moveUpButton = tester.widget<IconButton>(
+        find.byKey(const ValueKey('smooth_markdown_editor_move_block_up')),
+      );
+      final moveDownButton = tester.widget<IconButton>(
+        find.byKey(const ValueKey('smooth_markdown_editor_move_block_down')),
+      );
+      expect(moveUpButton.onPressed, isNull);
+      expect(moveDownButton.onPressed, isNotNull);
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_move_block_down')),
+      );
+      await tester.pump();
+
+      expect(controller.text, 'One\n\nTwo\n\nThree');
+      activeField = tester.widget<TextField>(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_active_5')),
+      );
+      expect(activeField.controller!.text, 'Two');
+      expect(activeField.controller!.selection.extentOffset, 2);
     });
 
     testWidgets('formatted Enter splits a paragraph block', (tester) async {
