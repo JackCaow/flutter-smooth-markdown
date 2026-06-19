@@ -17,6 +17,7 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 | Category | Features |
 |----------|----------|
 | **Rendering** | AST-based parsing, syntax highlighting, real-time streaming, text selection |
+| **Editing** | Formatted/source/preview/split editor, formatting toolbar, slash commands, wikilinks, find |
 | **Markdown** | Headers (with inline formatting), lists, tables, code blocks, blockquotes, links, images |
 | **Math & Charts** | LaTeX formulas, Mermaid diagrams (flowcharts, Gantt, Kanban, Timeline, Radar, XY Chart, pie, sequence) |
 | **Extras** | Footnotes, SVG support, collapsible sections, task lists |
@@ -41,6 +42,10 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 <img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/streaming.gif" width="600" alt="Real-time Streaming">
 
 > Run the example app: `cd example && flutter run`
+>
+> Run the editor preview directly in Chrome: `cd example && flutter run -d chrome -t lib/editor_preview_main.dart`
+>
+> The full example app also exposes the editor from the sidebar in `example/lib/editor_demo.dart`.
 
 ## Quick Start
 
@@ -80,6 +85,29 @@ SmoothMarkdown(
 ```
 
 Selection handles work across text and non-text blocks (images, tables, etc.). Copied content is automatically cleaned.
+
+### Markdown Editor
+
+```dart
+final editorController = MarkdownEditorController(text: '# Scratch note');
+
+SmoothMarkdownEditor(
+  controller: editorController,
+  initialMode: MarkdownEditorMode.formatted,
+  wikilinkSuggestions: const ['Daily Notes', 'Project Plan'],
+  onChanged: (markdown) => saveDraft(markdown),
+  onTapWikilink: (target) => openNote(target),
+  onExportMarkdown: (markdown) => saveMarkdownFile(markdown),
+)
+```
+
+`SmoothMarkdownEditor` keeps Markdown source as the document of record and renders
+the preview with `SmoothMarkdown`. It includes Scratch-inspired editor controls:
+formatting commands, `Cmd/Ctrl+B`, `Cmd/Ctrl+I`, `Cmd/Ctrl+K`, `Cmd/Ctrl+F`,
+`Cmd/Ctrl+Shift+M`, `Cmd/Ctrl+Shift+Enter`, `/` commands, `[[wikilink]]`
+autocomplete, formatted block editing, code-block language selection, Mermaid
+preview/source toggling, block math editing, copy-as-Markdown/plain-text/HTML,
+Markdown import/export callbacks, focus mode, and source, preview, or split layouts.
 
 ### Programmatic Selection
 

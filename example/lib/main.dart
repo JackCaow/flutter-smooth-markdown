@@ -8,6 +8,7 @@ import 'chat_list_demo.dart';
 import 'footnote_demo.dart';
 import 'l10n/app_localizations.dart';
 import 'conversation_list_demo.dart';
+import 'editor_demo.dart';
 import 'math_demo.dart';
 import 'mermaid_demo.dart';
 import 'plugin_demo.dart';
@@ -1145,6 +1146,29 @@ gantt
                   ],
                 ),
               ),
+              ListTile(
+                leading: Icon(
+                  Icons.edit_note,
+                  color: isDark ? Colors.white70 : null,
+                ),
+                title: Text(
+                  'Markdown Editor',
+                  style: TextStyle(color: isDark ? Colors.white : null),
+                ),
+                subtitle: Text(
+                  'Scratch-style editing preview',
+                  style: TextStyle(color: isDark ? Colors.white54 : null),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const EditorDemoPage(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
               ...List.generate(_examples.length, (index) {
                 return ListTile(
                   leading: Icon(

@@ -29,6 +29,46 @@ void main() {
       });
     });
 
+    group('Code Fence Parsing', () {
+      test('should preserve longer backtick fence through serialization', () {
+        const markdown = '````dart title=main.dart\n'
+            'before\n'
+            '```\n'
+            'after\n'
+            '````';
+
+        final result = parser.parse(markdown);
+        expect(result, hasLength(1));
+        final codeBlock = result.single as CodeBlockNode;
+        expect(codeBlock.language, 'dart');
+        expect(codeBlock.info, 'dart title=main.dart');
+        expect(codeBlock.fence, '````');
+        expect(codeBlock.code, 'before\n```\nafter');
+
+        final codec = MarkdownDocumentCodec();
+        expect(codec.serialize(codec.parse(markdown)), markdown);
+      });
+
+      test('should preserve longer tilde fence through serialization', () {
+        const markdown = '~~~~dart title=main.dart\n'
+            'before\n'
+            '~~~\n'
+            'after\n'
+            '~~~~';
+
+        final result = parser.parse(markdown);
+        expect(result, hasLength(1));
+        final codeBlock = result.single as CodeBlockNode;
+        expect(codeBlock.language, 'dart');
+        expect(codeBlock.info, 'dart title=main.dart');
+        expect(codeBlock.fence, '~~~~');
+        expect(codeBlock.code, 'before\n~~~\nafter');
+
+        final codec = MarkdownDocumentCodec();
+        expect(codec.serialize(codec.parse(markdown)), markdown);
+      });
+    });
+
     group('Inline Elements in Blocks', () {
       test('should parse bold in paragraph', () {
         final result = parser.parse('This is **bold** text');
@@ -58,6 +98,18 @@ void main() {
 
         final para = result[0] as ParagraphNode;
         expect(para.children[1], isA<InlineCodeNode>());
+      });
+
+      test('should parse hard break in paragraph', () {
+        final result = parser.parse('First\\\nSecond');
+        expect(result.length, 1);
+        expect(result[0], isA<ParagraphNode>());
+
+        final para = result[0] as ParagraphNode;
+        expect(para.children, hasLength(3));
+        expect(para.children[0], isA<TextNode>());
+        expect(para.children[1], isA<HardBreakNode>());
+        expect(para.children[2], isA<TextNode>());
       });
 
       test('should parse link in paragraph', () {
@@ -103,7 +155,7 @@ void main() {
       });
 
       test('should parse mixed inline in list', () {
-        final markdown = '''
+        const markdown = '''
 - Item with **bold** and *italic*
 - Item with `code` and [link](url)
 ''';
@@ -131,7 +183,7 @@ void main() {
       });
 
       test('should parse nested elements in blockquote', () {
-        final markdown = '''
+        const markdown = '''
 > # Header
 >
 > Paragraph with *italic* and **bold**
@@ -149,7 +201,7 @@ void main() {
 
     group('Complex Documents', () {
       test('should parse mixed block and inline elements', () {
-        final markdown = '''
+        const markdown = '''
 # Title with **bold**
 
 This is a paragraph with *italic*, `code`, and [link](url).
@@ -227,7 +279,7 @@ Final paragraph with ~~strikethrough~~.
       });
 
       test('should handle multiple empty lines', () {
-        final markdown = '''
+        const markdown = '''
 Paragraph one
 
 

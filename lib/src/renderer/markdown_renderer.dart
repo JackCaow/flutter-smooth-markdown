@@ -2,23 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../config/style_sheet.dart';
 import '../parser/ast/markdown_node.dart';
-import 'builders/block_math_builder.dart';
-import 'builders/blockquote_builder.dart';
-import 'builders/code_block_builder.dart';
-import 'builders/details_builder.dart';
-import 'builders/footnote_definition_builder.dart';
-import 'builders/footnote_reference_builder.dart';
-import 'builders/header_builder.dart';
-import 'builders/horizontal_rule_builder.dart';
-import 'builders/image_builder.dart';
-import 'builders/inline_code_builder.dart';
-import 'builders/inline_math_builder.dart';
-import 'builders/link_builder.dart';
-import 'builders/list_builder.dart';
-import 'builders/paragraph_builder.dart';
-import 'builders/table_builder.dart';
-import 'builders/text_builder.dart';
-import 'builders/text_style_builder.dart';
 import 'widget_builder.dart';
 
 /// Main renderer that converts Markdown AST nodes to Flutter widgets.
@@ -38,7 +21,7 @@ import 'widget_builder.dart';
 ///
 /// ## Basic Usage
 ///
-/// Most users won't interact with this class directly - [SmoothMarkdown] handles
+/// Most users won't interact with this class directly - `SmoothMarkdown` handles
 /// it automatically. However, for advanced use cases:
 ///
 /// ```dart
@@ -92,10 +75,10 @@ import 'widget_builder.dart';
 ///
 /// See also:
 ///
-/// - [MarkdownParser], which creates the AST nodes that this renderer processes
+/// - `MarkdownParser`, which creates the AST nodes that this renderer processes
 /// - [MarkdownWidgetBuilder], the base class for custom builders
 /// - [BuilderRegistry], which manages builder registration and lookup
-/// - [SmoothMarkdown], the high-level widget that uses this renderer
+/// - `SmoothMarkdown`, the high-level widget that uses this renderer
 class MarkdownRenderer {
   /// Creates a new Markdown renderer with the specified configuration.
   ///
@@ -129,37 +112,13 @@ class MarkdownRenderer {
     MarkdownStyleSheet? styleSheet,
     BuilderRegistry? builderRegistry,
   })  : styleSheet = styleSheet ?? MarkdownStyleSheet.light(),
-        _builderRegistry = builderRegistry ?? _createDefaultRegistry();
+        _builderRegistry = builderRegistry ?? BuilderRegistry.defaults();
 
   /// The style sheet to use for rendering
   final MarkdownStyleSheet styleSheet;
 
   /// The builder registry
   final BuilderRegistry _builderRegistry;
-
-  /// Creates the default builder registry
-  static BuilderRegistry _createDefaultRegistry() {
-    return BuilderRegistry()
-      ..register('text', const TextBuilder())
-      ..register('header', const HeaderBuilder())
-      ..register('paragraph', const ParagraphBuilder())
-      ..register('code_block', const CodeBlockBuilder())
-      ..register('blockquote', const BlockquoteBuilder())
-      ..register('list', const ListBuilder())
-      ..register('table', const TableBuilder())
-      ..register('horizontal_rule', const HorizontalRuleBuilder())
-      ..register('inline_code', const InlineCodeBuilder())
-      ..register('inline_math', const InlineMathBuilder())
-      ..register('block_math', const BlockMathBuilder())
-      ..register('footnote_reference', const FootnoteReferenceBuilder())
-      ..register('footnote_definition', const FootnoteDefinitionBuilder())
-      ..register('details', const DetailsBuilder())
-      ..register('bold', const BoldBuilder())
-      ..register('italic', const ItalicBuilder())
-      ..register('strikethrough', const StrikethroughBuilder())
-      ..register('link', const LinkBuilder())
-      ..register('image', const ImageBuilder());
-  }
 
   /// Renders a list of Markdown AST nodes into a Flutter widget tree.
   ///
@@ -168,7 +127,7 @@ class MarkdownRenderer {
   /// appropriate spacing.
   ///
   /// Parameters:
-  /// - [nodes]: The AST nodes to render (typically from [MarkdownParser.parse])
+  /// - [nodes]: The AST nodes to render (typically from `MarkdownParser.parse`)
   /// - [context]: Optional rendering context containing callbacks and custom builders
   ///
   /// Returns a [Widget] (usually a [Column]) containing all rendered elements.
@@ -192,8 +151,7 @@ class MarkdownRenderer {
     final renderContext = baseContext.copyWith(
       inlineRenderer: (childNodes, baseStyle) =>
           renderInline(childNodes, baseStyle, baseContext),
-      blockRenderer: (childNodes) =>
-          render(childNodes, context: baseContext),
+      blockRenderer: (childNodes) => render(childNodes, context: baseContext),
       styleSheet: styleSheet,
     );
 
@@ -218,7 +176,12 @@ class MarkdownRenderer {
   ///
   /// When inside a [SelectionArea], these are wrapped with an invisible
   /// [Text] overlay so that selection handles can anchor on them.
-  static const _nonTextBlockTypes = {'image', 'horizontal_rule', 'table'};
+  static const _nonTextBlockTypes = {
+    'image',
+    'horizontal_rule',
+    'table',
+    'block_math',
+  };
 
   /// Renders a single node
   Widget? _renderNode(MarkdownNode node, MarkdownRenderContext context) {

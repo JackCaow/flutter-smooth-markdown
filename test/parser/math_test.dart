@@ -56,12 +56,11 @@ void main() {
 
     test('should parse multiple inline math in same text', () {
       final result = parser.parse(r'Given $x=1$ and $y=2$ then $z=3$');
-      final mathNodes =
-          result.where((n) => n is InlineMathNode).toList();
+      final mathNodes = result.whereType<InlineMathNode>().toList();
       expect(mathNodes.length, 3);
-      expect((mathNodes[0] as InlineMathNode).latex, 'x=1');
-      expect((mathNodes[1] as InlineMathNode).latex, 'y=2');
-      expect((mathNodes[2] as InlineMathNode).latex, 'z=3');
+      expect(mathNodes[0].latex, 'x=1');
+      expect(mathNodes[1].latex, 'y=2');
+      expect(mathNodes[2].latex, 'z=3');
     });
   });
 
@@ -79,9 +78,17 @@ void main() {
       expect((result[0] as BlockMathNode).latex, 'x^2 + y^2 = z^2');
     });
 
+    test(r'should parse single-line block math', () {
+      final result = parser.parse('\$\$E = mc^2\$\$');
+      expect(result.length, 1);
+      expect(result[0], isA<BlockMathNode>());
+      expect((result[0] as BlockMathNode).latex, 'E = mc^2');
+    });
+
     test('should parse multi-line block math', () {
-      final input = '\$\$\n'
-          r'\sum_{i=1}^{n} x_i' '\n'
+      const input = '\$\$\n'
+          r'\sum_{i=1}^{n} x_i'
+          '\n'
           '= x_1 + x_2 + \\cdots + x_n\n'
           '\$\$';
       final result = parser.parse(input);
@@ -91,6 +98,18 @@ void main() {
       final latex = (result[0] as BlockMathNode).latex;
       expect(latex, contains(r'\sum_{i=1}^{n} x_i'));
       expect(latex, contains('x_n'));
+    });
+
+    test('should parse block math after paragraph without blank line', () {
+      final result = parser.parse('Intro\n\$\$\nE = mc^2\n\$\$');
+      expect(result.length, 2);
+      expect(result[0], isA<ParagraphNode>());
+      final paragraph = result[0] as ParagraphNode;
+      expect(paragraph.children, hasLength(1));
+      expect(paragraph.children.single, isA<TextNode>());
+      expect((paragraph.children.single as TextNode).content, 'Intro');
+      expect(result[1], isA<BlockMathNode>());
+      expect((result[1] as BlockMathNode).latex, 'E = mc^2');
     });
 
     test(r'should parse block math without closing $$', () {

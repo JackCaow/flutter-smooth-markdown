@@ -89,6 +89,40 @@ void main() {
       expect(findRichTextContaining('var x = 1;'), findsOneWidget);
     });
 
+    testWidgets('should render hard line breaks', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: SmoothMarkdown(
+            data: 'First\\\nSecond',
+            useRepaintBoundary: false,
+            enableCache: false,
+          ),
+        ),
+      );
+
+      expect(findRichTextContaining('First\nSecond'), findsOneWidget);
+    });
+
+    testWidgets('enhanced components should render math nodes', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: SmoothMarkdown(
+            data: r'Inline $x^2$.'
+                '\n\n'
+                r'$$'
+                '\nE = mc^2\n'
+                r'$$',
+            useEnhancedComponents: true,
+            useRepaintBoundary: false,
+            enableCache: false,
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Unknown node type'), findsNothing);
+    });
+
     testWidgets('should render code block', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -259,7 +293,8 @@ Text below
       );
 
       expect(findRichTextContaining('Big Header'), findsOneWidget);
-      final richTextWidget = tester.widget<RichText>(findRichTextContaining('Big Header'));
+      final richTextWidget =
+          tester.widget<RichText>(findRichTextContaining('Big Header'));
       final textSpan = richTextWidget.text as TextSpan;
       expect(textSpan.style?.fontSize, 48);
     });
@@ -315,6 +350,24 @@ void main() {
       );
 
       expect(find.textContaining('Custom: code'), findsOneWidget);
+    });
+
+    testWidgets('should expose only the first code info token as language',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SmoothMarkdown(
+            data: '```dart title=main.dart\ncode\n```',
+            useRepaintBoundary: false,
+            enableCache: false,
+            codeBuilder: (code, language) {
+              return Text('Custom: $code ($language)');
+            },
+          ),
+        ),
+      );
+
+      expect(find.text('Custom: code (dart)'), findsOneWidget);
     });
 
     testWidgets('should use custom image builder', (tester) async {

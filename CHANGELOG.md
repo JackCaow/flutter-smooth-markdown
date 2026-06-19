@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- ✨ **Markdown editor** - Added `SmoothMarkdownEditor` with formatted/source/preview/split modes, formatting commands, slash commands, wikilinks, search, Markdown import/export callbacks, and Scratch-style example entry points.
+- 🧪 **Editor coverage** - Added document, controller, and widget tests for Markdown editing workflows.
+
 ## [0.7.4] - 2026-06-17
 
 ### Added

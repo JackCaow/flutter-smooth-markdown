@@ -7,6 +7,8 @@ class MermaidDiagramNode extends MarkdownNode {
   const MermaidDiagramNode({
     required this.code,
     this.theme,
+    this.fence = '```',
+    this.info,
   });
 
   /// The Mermaid diagram code
@@ -14,6 +16,12 @@ class MermaidDiagramNode extends MarkdownNode {
 
   /// Optional theme name (light, dark, forest, neutral)
   final String? theme;
+
+  /// The fence marker used for this Mermaid block.
+  final String fence;
+
+  /// Full Mermaid fence info string, including `mermaid`.
+  final String? info;
 
   @override
   String get type => 'mermaid';
@@ -23,13 +31,22 @@ class MermaidDiagramNode extends MarkdownNode {
         'type': type,
         'code': code,
         if (theme != null) 'theme': theme,
+        'fence': fence,
+        if (info != null) 'info': info,
       };
 
   @override
-  MermaidDiagramNode copyWith({String? code, String? theme}) {
+  MermaidDiagramNode copyWith({
+    String? code,
+    String? theme,
+    String? fence,
+    String? info,
+  }) {
     return MermaidDiagramNode(
       code: code ?? this.code,
       theme: theme ?? this.theme,
+      fence: fence ?? this.fence,
+      info: info ?? this.info,
     );
   }
 
@@ -77,10 +94,11 @@ class MermaidPlugin extends BlockParserPlugin {
 
     // Determine fence character (``` or ~~~)
     final fenceChar = startLine.startsWith('```') ? '```' : '~~~';
+    final info = startLine.substring(fenceChar.length).trim();
 
     // Extract theme if specified: ```mermaid theme=dark
     String? theme;
-    final themeMatch = RegExp(r'theme\s*=\s*(\w+)').firstMatch(startLine);
+    final themeMatch = RegExp(r'theme\s*=\s*(\w+)').firstMatch(info);
     if (themeMatch != null) {
       theme = themeMatch.group(1);
     }
@@ -111,6 +129,8 @@ class MermaidPlugin extends BlockParserPlugin {
       node: MermaidDiagramNode(
         code: code,
         theme: theme,
+        fence: fenceChar,
+        info: info.isEmpty ? null : info,
       ),
       linesConsumed: linesConsumed,
     );

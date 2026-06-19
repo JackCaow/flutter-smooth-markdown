@@ -42,8 +42,16 @@ class InlineParser {
     var i = 0;
 
     while (i < text.length) {
+      final hardBreak = _tryParseHardBreak(text, i);
+      if (hardBreak != null) {
+        nodes.add(hardBreak.node);
+        i += hardBreak.consumed;
+        continue;
+      }
+
       // Handle backslash escapes first
-      if (text[i] == r'\' && i + 1 < text.length &&
+      if (text[i] == r'\' &&
+          i + 1 < text.length &&
           _escapableChars.contains(text[i + 1])) {
         nodes.add(TextNode(text[i + 1]));
         i += 2;
@@ -112,8 +120,10 @@ class InlineParser {
       }
 
       // Try strikethrough
-      if (node == null && i + 1 < text.length &&
-          text[i] == '~' && text[i + 1] == '~') {
+      if (node == null &&
+          i + 1 < text.length &&
+          text[i] == '~' &&
+          text[i + 1] == '~') {
         final result = _tryParseStrikethrough(text, i, depth);
         if (result != null) {
           node = result.node;
@@ -122,9 +132,10 @@ class InlineParser {
       }
 
       // Try bold (** or __)
-      if (node == null && i + 1 < text.length &&
+      if (node == null &&
+          i + 1 < text.length &&
           ((text[i] == '*' && text[i + 1] == '*') ||
-           (text[i] == '_' && text[i + 1] == '_'))) {
+              (text[i] == '_' && text[i + 1] == '_'))) {
         final result = _tryParseBold(text, i, depth);
         if (result != null) {
           node = result.node;
@@ -133,7 +144,8 @@ class InlineParser {
       }
 
       // Try italic (* or _)
-      if (node == null && i < text.length &&
+      if (node == null &&
+          i < text.length &&
           (text[i] == '*' || text[i] == '_')) {
         final result = _tryParseItalic(text, i, depth);
         if (result != null) {
@@ -154,6 +166,47 @@ class InlineParser {
     }
 
     return _mergeTextNodes(nodes);
+  }
+
+  /// Tries to parse a hard line break.
+  ///
+  /// CommonMark supports either a backslash before the line ending or at least
+  /// two trailing spaces before the line ending.
+  _InlineParseResult? _tryParseHardBreak(String text, int start) {
+    if (start >= text.length) return null;
+
+    if (text[start] == r'\') {
+      final newlineLength = _newlineLengthAt(text, start + 1);
+      if (newlineLength == 0) return null;
+      return _InlineParseResult(
+        node: const HardBreakNode(),
+        consumed: 1 + newlineLength,
+      );
+    }
+
+    if (text[start] != ' ') return null;
+
+    var index = start;
+    while (index < text.length && text[index] == ' ') {
+      index++;
+    }
+    if (index - start < 2) return null;
+
+    final newlineLength = _newlineLengthAt(text, index);
+    if (newlineLength == 0) return null;
+    return _InlineParseResult(
+      node: const HardBreakNode(),
+      consumed: index - start + newlineLength,
+    );
+  }
+
+  int _newlineLengthAt(String text, int index) {
+    if (index >= text.length) return 0;
+    if (text[index] == '\n') return 1;
+    if (text[index] == '\r') {
+      return index + 1 < text.length && text[index + 1] == '\n' ? 2 : 1;
+    }
+    return 0;
   }
 
   /// Tries to parse an image
@@ -281,7 +334,8 @@ class InlineParser {
     final trimmed = urlPart.trim();
 
     // Check for title in quotes: url "title" or url 'title'
-    final titleMatch = RegExp(r'^(.+?)\s+["' "'" r'](.+)["' "'" r']$').firstMatch(trimmed);
+    final titleMatch =
+        RegExp(r'^(.+?)\s+["' "'" r'](.+)["' "'" r']$').firstMatch(trimmed);
 
     if (titleMatch != null) {
       return _UrlAndTitle(
@@ -440,7 +494,8 @@ class InlineParser {
   }
 
   /// Tries to parse strikethrough text
-  _InlineParseResult? _tryParseStrikethrough(String text, int start, int depth) {
+  _InlineParseResult? _tryParseStrikethrough(
+      String text, int start, int depth) {
     if (start + 1 >= text.length) return null;
     if (text.substring(start, start + 2) != '~~') return null;
 
@@ -472,6 +527,10 @@ class InlineParser {
 
     while (i < text.length) {
       final char = text[i];
+
+      if (char == ' ' && _tryParseHardBreak(text, i) != null) {
+        break;
+      }
 
       // Stop at special characters (including backslash for escape handling)
       if (char == r'\' ||

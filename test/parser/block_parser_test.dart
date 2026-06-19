@@ -21,7 +21,7 @@ void main() {
       });
 
       test('should parse H2-H6 headers', () {
-        final markdown = '''
+        const markdown = '''
 ## H2 Header
 ### H3 Header
 #### H4 Header
@@ -56,7 +56,7 @@ void main() {
       });
 
       test('should parse multi-line paragraph', () {
-        final markdown = '''
+        const markdown = '''
 This is line one.
 This is line two.
 This is line three.
@@ -67,7 +67,7 @@ This is line three.
       });
 
       test('should split paragraphs on empty lines', () {
-        final markdown = '''
+        const markdown = '''
 First paragraph.
 
 Second paragraph.
@@ -81,7 +81,7 @@ Second paragraph.
 
     group('Code Block Parsing', () {
       test('should parse code block without language', () {
-        final markdown = '''
+        const markdown = '''
 ```
 const x = 10;
 console.log(x);
@@ -92,11 +92,12 @@ console.log(x);
         expect(result[0], isA<CodeBlockNode>());
         final codeBlock = result[0] as CodeBlockNode;
         expect(codeBlock.language, null);
+        expect(codeBlock.fence, '```');
         expect(codeBlock.code, 'const x = 10;\nconsole.log(x);');
       });
 
       test('should parse code block with language', () {
-        final markdown = '''
+        const markdown = '''
 ```dart
 void main() {
   print('Hello');
@@ -108,17 +109,91 @@ void main() {
         expect(result[0], isA<CodeBlockNode>());
         final codeBlock = result[0] as CodeBlockNode;
         expect(codeBlock.language, 'dart');
+        expect(codeBlock.fence, '```');
         expect(codeBlock.code, "void main() {\n  print('Hello');\n}");
       });
 
+      test('should preserve code fence info while exposing language token', () {
+        const markdown = '''
+```dart title=main.dart linenos
+void main() {}
+```
+''';
+        final result = parser.parse(markdown);
+        expect(result.length, 1);
+        expect(result[0], isA<CodeBlockNode>());
+        final codeBlock = result[0] as CodeBlockNode;
+        expect(codeBlock.language, 'dart');
+        expect(codeBlock.info, 'dart title=main.dart linenos');
+        expect(codeBlock.fence, '```');
+        expect(codeBlock.code, 'void main() {}');
+      });
+
+      test('should keep shorter backtick fence inside longer code block', () {
+        const markdown = '''
+````dart title=main.dart
+before
+```
+after
+````
+''';
+        final result = parser.parse(markdown);
+        expect(result.length, 1);
+        expect(result[0], isA<CodeBlockNode>());
+        final codeBlock = result[0] as CodeBlockNode;
+        expect(codeBlock.language, 'dart');
+        expect(codeBlock.info, 'dart title=main.dart');
+        expect(codeBlock.fence, '````');
+        expect(codeBlock.code, 'before\n```\nafter');
+        expect(codeBlock.toJson()['fence'], '````');
+        expect(codeBlock.toJson()['info'], 'dart title=main.dart');
+      });
+
+      test('should parse tilde code block with language', () {
+        const markdown = '''
+~~~dart
+void main() {}
+~~~
+''';
+        final result = parser.parse(markdown);
+        expect(result.length, 1);
+        expect(result[0], isA<CodeBlockNode>());
+        final codeBlock = result[0] as CodeBlockNode;
+        expect(codeBlock.language, 'dart');
+        expect(codeBlock.fence, '~~~');
+        expect(codeBlock.code, 'void main() {}');
+      });
+
+      test('should keep shorter tilde fence inside longer code block', () {
+        const markdown = '''
+~~~~dart title=main.dart
+before
+~~~
+after
+~~~~
+''';
+        final result = parser.parse(markdown);
+        expect(result.length, 1);
+        expect(result[0], isA<CodeBlockNode>());
+        final codeBlock = result[0] as CodeBlockNode;
+        expect(codeBlock.language, 'dart');
+        expect(codeBlock.info, 'dart title=main.dart');
+        expect(codeBlock.fence, '~~~~');
+        expect(codeBlock.code, 'before\n~~~\nafter');
+        expect(codeBlock.toJson()['fence'], '~~~~');
+        expect(codeBlock.toJson()['info'], 'dart title=main.dart');
+      });
+
       test('should handle unclosed code block', () {
-        final markdown = '''
+        const markdown = '''
 ```javascript
 const x = 10;
 ''';
         final result = parser.parse(markdown);
         expect(result.length, 1);
         expect(result[0], isA<CodeBlockNode>());
+        final codeBlock = result[0] as CodeBlockNode;
+        expect(codeBlock.fence, '```');
       });
     });
 
@@ -132,7 +207,7 @@ const x = 10;
       });
 
       test('should parse multi-line blockquote', () {
-        final markdown = '''
+        const markdown = '''
 > Line one
 > Line two
 > Line three
@@ -143,7 +218,7 @@ const x = 10;
       });
 
       test('should parse nested blockquote elements', () {
-        final markdown = '''
+        const markdown = '''
 > # Header in quote
 >
 > Paragraph in quote
@@ -160,7 +235,7 @@ const x = 10;
 
     group('List Parsing', () {
       test('should parse unordered list with -', () {
-        final markdown = '''
+        const markdown = '''
 - Item 1
 - Item 2
 - Item 3
@@ -174,7 +249,7 @@ const x = 10;
       });
 
       test('should parse unordered list with *', () {
-        final markdown = '''
+        const markdown = '''
 * Item 1
 * Item 2
 ''';
@@ -186,7 +261,7 @@ const x = 10;
       });
 
       test('should parse ordered list', () {
-        final markdown = '''
+        const markdown = '''
 1. First
 2. Second
 3. Third
@@ -201,7 +276,7 @@ const x = 10;
       });
 
       test('should parse task list', () {
-        final markdown = '''
+        const markdown = '''
 - [ ] Unchecked task
 - [x] Checked task
 - [X] Also checked
@@ -215,8 +290,94 @@ const x = 10;
         expect(list.items[2].checked, true);
       });
 
+      test('should split task and bullet list siblings', () {
+        const markdown = '''
+- [x] Done
+- Plain
+''';
+        final result = parser.parse(markdown);
+        expect(result, hasLength(2));
+
+        final taskList = result[0] as ListNode;
+        expect(taskList.items, hasLength(1));
+        expect(taskList.items.single.checked, true);
+        expect(
+          (taskList.items.single.children.single as TextNode).content,
+          'Done',
+        );
+
+        final bulletList = result[1] as ListNode;
+        expect(bulletList.items, hasLength(1));
+        expect(bulletList.items.single.checked, isNull);
+        expect(
+          (bulletList.items.single.children.single as TextNode).content,
+          'Plain',
+        );
+      });
+
+      test('should split bullet and task list siblings', () {
+        const markdown = '''
+- Plain
+- [ ] Todo
+''';
+        final result = parser.parse(markdown);
+        expect(result, hasLength(2));
+
+        final bulletList = result[0] as ListNode;
+        expect(bulletList.items.single.checked, isNull);
+        expect(
+          (bulletList.items.single.children.single as TextNode).content,
+          'Plain',
+        );
+
+        final taskList = result[1] as ListNode;
+        expect(taskList.items.single.checked, false);
+        expect(
+          (taskList.items.single.children.single as TextNode).content,
+          'Todo',
+        );
+      });
+
+      test('should split nested task and bullet child lists', () {
+        const markdown = '''
+- [x] Done
+  - Plain child
+  - [ ] Task child
+- Plain
+''';
+        final result = parser.parse(markdown);
+        expect(result, hasLength(2));
+
+        final taskList = result[0] as ListNode;
+        expect(taskList.items, hasLength(1));
+        final taskItem = taskList.items.single;
+        expect(taskItem.checked, true);
+        expect(taskItem.children, hasLength(3));
+        expect((taskItem.children[0] as TextNode).content, 'Done');
+
+        final nestedBullet = taskItem.children[1] as ListNode;
+        expect(nestedBullet.items.single.checked, isNull);
+        expect(
+          (nestedBullet.items.single.children.single as TextNode).content,
+          'Plain child',
+        );
+
+        final nestedTask = taskItem.children[2] as ListNode;
+        expect(nestedTask.items.single.checked, false);
+        expect(
+          (nestedTask.items.single.children.single as TextNode).content,
+          'Task child',
+        );
+
+        final bulletList = result[1] as ListNode;
+        expect(
+          (bulletList.items.single.children.single as TextNode).content,
+          'Plain',
+        );
+      });
+
       test('should handle list with custom start index', () {
-        final markdown = '''
+        const markdown = '''
 5. Fifth item
 6. Sixth item
 ''';
@@ -225,6 +386,75 @@ const x = 10;
         expect(result[0], isA<ListNode>());
         final list = result[0] as ListNode;
         expect(list.startIndex, 5);
+      });
+
+      test('should parse nested list indentation', () {
+        const markdown = '''
+- Parent
+  - Child
+  - Sibling
+- Next
+''';
+        final result = parser.parse(markdown);
+        expect(result.length, 1);
+        expect(result[0], isA<ListNode>());
+        final list = result[0] as ListNode;
+        expect(list.items, hasLength(2));
+        expect(list.items.first.children.last, isA<ListNode>());
+
+        final nested = list.items.first.children.last as ListNode;
+        expect(nested.items, hasLength(2));
+        expect(
+          (nested.items.first.children.single as TextNode).content,
+          'Child',
+        );
+      });
+
+      test('should parse indented continuation paragraph in list item', () {
+        const markdown = '''
+- First
+  continuation paragraph
+- Next
+''';
+        final result = parser.parse(markdown);
+
+        expect(result, hasLength(1));
+        final list = result.single as ListNode;
+        expect(list.items, hasLength(2));
+
+        final first = list.items.first;
+        expect(first.children, hasLength(2));
+        expect((first.children[0] as TextNode).content, 'First');
+
+        final continuation = first.children[1] as ParagraphNode;
+        expect(
+          (continuation.children.single as TextNode).content,
+          'continuation paragraph',
+        );
+      });
+
+      test('should keep loose indented continuation in list item', () {
+        const markdown = '''
+- First
+
+  second paragraph
+- Next
+''';
+        final result = parser.parse(markdown);
+
+        expect(result, hasLength(1));
+        final list = result.single as ListNode;
+        expect(list.items, hasLength(2));
+
+        final first = list.items.first;
+        expect(first.children, hasLength(2));
+        expect((first.children[0] as TextNode).content, 'First');
+
+        final continuation = first.children[1] as ParagraphNode;
+        expect(
+          (continuation.children.single as TextNode).content,
+          'second paragraph',
+        );
       });
     });
 
@@ -256,7 +486,7 @@ const x = 10;
 
     group('Mixed Content Parsing', () {
       test('should parse mixed block elements', () {
-        final markdown = '''
+        const markdown = '''
 # Title
 
 This is a paragraph.
@@ -291,7 +521,7 @@ Final paragraph.
 
     group('Table Parsing', () {
       test('should parse simple table', () {
-        final markdown = '''
+        const markdown = '''
 | Header 1 | Header 2 |
 |----------|----------|
 | Cell 1   | Cell 2   |
@@ -306,7 +536,7 @@ Final paragraph.
       });
 
       test('should parse table with alignment', () {
-        final markdown = '''
+        const markdown = '''
 | Left | Center | Right |
 |:-----|:------:|------:|
 | L1   | C1     | R1    |
@@ -322,7 +552,7 @@ Final paragraph.
       });
 
       test('should parse table with inline formatting', () {
-        final markdown = '''
+        const markdown = '''
 | Name | Description |
 |------|-------------|
 | **Bold** | *Italic* text |
@@ -337,8 +567,29 @@ Final paragraph.
         expect(table.rows[0].cells[0].length, greaterThan(0));
       });
 
+      test('should keep escaped pipes inside table cells', () {
+        const markdown = r'''
+| Name | Description |
+|------|-------------|
+| A \| B | C \| D |
+''';
+        final result = parser.parse(markdown);
+
+        expect(result.length, 1);
+        final table = result.single as TableNode;
+        expect(table.rows.single.cells, hasLength(2));
+        expect(
+          (table.rows.single.cells[0].single as TextNode).content,
+          'A | B',
+        );
+        expect(
+          (table.rows.single.cells[1].single as TextNode).content,
+          'C | D',
+        );
+      });
+
       test('should parse table with empty cells', () {
-        final markdown = '''
+        const markdown = '''
 | Col1 | Col2 |
 |------|------|
 |      | Data |
@@ -352,7 +603,7 @@ Final paragraph.
       });
 
       test('should parse table without outer pipes', () {
-        final markdown = '''
+        const markdown = '''
 Header 1 | Header 2
 ---------|----------
 Cell 1   | Cell 2
@@ -366,7 +617,7 @@ Cell 1   | Cell 2
       });
 
       test('should stop table at empty line', () {
-        final markdown = '''
+        const markdown = '''
 | Header |
 |--------|
 | Cell   |
@@ -380,7 +631,7 @@ Not a table
       });
 
       test('should handle default alignment', () {
-        final markdown = '''
+        const markdown = '''
 | Col1 | Col2 |
 |------|------|
 | Data | Data |

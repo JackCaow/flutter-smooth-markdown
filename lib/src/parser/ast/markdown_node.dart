@@ -126,6 +126,8 @@ class CodeBlockNode extends MarkdownNode {
   const CodeBlockNode({
     required this.code,
     this.language,
+    this.fence = '```',
+    this.info,
   });
 
   /// The code content
@@ -133,6 +135,12 @@ class CodeBlockNode extends MarkdownNode {
 
   /// The programming language (optional)
   final String? language;
+
+  /// The fence marker used for this code block.
+  final String fence;
+
+  /// Full code fence info string, including the language.
+  final String? info;
 
   @override
   String get type => 'code_block';
@@ -142,13 +150,22 @@ class CodeBlockNode extends MarkdownNode {
         'type': type,
         'code': code,
         if (language != null) 'language': language,
+        'fence': fence,
+        if (info != null) 'info': info,
       };
 
   @override
-  CodeBlockNode copyWith({String? code, String? language}) {
+  CodeBlockNode copyWith({
+    String? code,
+    String? language,
+    String? fence,
+    String? info,
+  }) {
     return CodeBlockNode(
       code: code ?? this.code,
       language: language ?? this.language,
+      fence: fence ?? this.fence,
+      info: info ?? this.info,
     );
   }
 
@@ -200,8 +217,7 @@ class ListNode extends MarkdownNode {
   }
 
   @override
-  String toString() =>
-      'ListNode(ordered: $ordered, items: ${items.length})';
+  String toString() => 'ListNode(ordered: $ordered, items: ${items.length})';
 }
 
 /// Represents a list item node
@@ -240,7 +256,8 @@ class ListItemNode extends MarkdownNode {
   }
 
   @override
-  String toString() => 'ListItemNode(checked: $checked, children: ${children.length})';
+  String toString() =>
+      'ListItemNode(checked: $checked, children: ${children.length})';
 }
 
 /// Represents a blockquote node
@@ -311,6 +328,24 @@ class InlineCodeNode extends MarkdownNode {
 
   @override
   String toString() => 'InlineCodeNode(code: $code)';
+}
+
+/// Represents a hard line break inside inline content.
+class HardBreakNode extends MarkdownNode {
+  /// Creates a new hard break node.
+  const HardBreakNode();
+
+  @override
+  String get type => 'hard_break';
+
+  @override
+  Map<String, dynamic> toJson() => {'type': type};
+
+  @override
+  HardBreakNode copyWith() => const HardBreakNode();
+
+  @override
+  String toString() => 'HardBreakNode()';
 }
 
 /// Represents a bold (strong) text node
@@ -503,7 +538,9 @@ class TableNode extends MarkdownNode {
   @override
   Map<String, dynamic> toJson() => {
         'type': type,
-        'headers': headers.map((row) => row.map((cell) => cell.toJson()).toList()).toList(),
+        'headers': headers
+            .map((row) => row.map((cell) => cell.toJson()).toList())
+            .toList(),
         'alignments': alignments.map((a) => a?.name).toList(),
         'rows': rows.map((row) => row.toJson()).toList(),
       };
@@ -522,7 +559,8 @@ class TableNode extends MarkdownNode {
   }
 
   @override
-  String toString() => 'TableNode(headers: ${headers.length}, rows: ${rows.length})';
+  String toString() =>
+      'TableNode(headers: ${headers.length}, rows: ${rows.length})';
 }
 
 /// Table column alignment options
@@ -551,7 +589,9 @@ class TableRowNode extends MarkdownNode {
   @override
   Map<String, dynamic> toJson() => {
         'type': type,
-        'cells': cells.map((cell) => cell.map((node) => node.toJson()).toList()).toList(),
+        'cells': cells
+            .map((cell) => cell.map((node) => node.toJson()).toList())
+            .toList(),
       };
 
   @override
@@ -685,7 +725,8 @@ class FootnoteDefinitionNode extends MarkdownNode {
   }
 
   @override
-  String toString() => 'FootnoteDefinitionNode(label: $label, children: ${children.length})';
+  String toString() =>
+      'FootnoteDefinitionNode(label: $label, children: ${children.length})';
 }
 
 /// Represents a details/summary collapsible block
@@ -739,5 +780,6 @@ class DetailsNode extends MarkdownNode {
   }
 
   @override
-  String toString() => 'DetailsNode(summary: ${summary.length}, children: ${children.length}, isOpen: $isOpen)';
+  String toString() =>
+      'DetailsNode(summary: ${summary.length}, children: ${children.length}, isOpen: $isOpen)';
 }

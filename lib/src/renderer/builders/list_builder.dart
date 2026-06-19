@@ -73,16 +73,39 @@ class ListBuilder extends MarkdownWidgetBuilder {
       );
     }
 
+    final inlineChildren = <MarkdownNode>[];
+    final nestedLists = <ListNode>[];
+    for (final child in item.children) {
+      if (child is ListNode) {
+        nestedLists.add(child);
+      } else {
+        inlineChildren.add(child);
+      }
+    }
+
     // Render item content using inlineRenderer from context
     final inlineRenderer = context.inlineRenderer;
-    Widget content;
-    if (inlineRenderer != null) {
-      content = inlineRenderer(item.children, styleSheet.textStyle);
-    } else {
+    Widget? content;
+    if (inlineChildren.isNotEmpty && inlineRenderer != null) {
+      content = inlineRenderer(inlineChildren, styleSheet.textStyle);
+    } else if (inlineChildren.isNotEmpty) {
       // Fallback
-      final text = _extractText(item.children);
+      final text = _extractText(inlineChildren);
       content = Text(text, style: styleSheet.textStyle);
     }
+
+    final contentChildren = <Widget>[
+      if (content != null) content,
+      for (final nestedList in nestedLists)
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: build(
+            nestedList,
+            styleSheet,
+            context.copyWith(listLevel: context.listLevel + 1),
+          ),
+        ),
+    ];
 
     return Padding(
       padding: EdgeInsets.only(left: context.listLevel * indent),
@@ -91,7 +114,14 @@ class ListBuilder extends MarkdownWidgetBuilder {
         children: [
           marker,
           const SizedBox(width: 4),
-          Expanded(child: content),
+          Expanded(
+            child: contentChildren.length == 1
+                ? contentChildren.single
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: contentChildren,
+                  ),
+          ),
         ],
       ),
     );
@@ -102,6 +132,8 @@ class ListBuilder extends MarkdownWidgetBuilder {
     for (final node in nodes) {
       if (node is TextNode) {
         buffer.write(node.content);
+      } else if (node is HardBreakNode) {
+        buffer.write('\n');
       }
     }
     return buffer.toString();

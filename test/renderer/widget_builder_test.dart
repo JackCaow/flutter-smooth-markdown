@@ -3,6 +3,7 @@ import 'package:flutter_smooth_markdown/src/config/style_sheet.dart';
 import 'package:flutter_smooth_markdown/src/parser/ast/markdown_node.dart';
 import 'package:flutter_smooth_markdown/src/renderer/builders/blockquote_builder.dart';
 import 'package:flutter_smooth_markdown/src/renderer/builders/code_block_builder.dart';
+import 'package:flutter_smooth_markdown/src/renderer/builders/hard_break_builder.dart';
 import 'package:flutter_smooth_markdown/src/renderer/builders/header_builder.dart';
 import 'package:flutter_smooth_markdown/src/renderer/builders/horizontal_rule_builder.dart';
 import 'package:flutter_smooth_markdown/src/renderer/builders/image_builder.dart';
@@ -12,8 +13,21 @@ import 'package:flutter_smooth_markdown/src/renderer/builders/list_builder.dart'
 import 'package:flutter_smooth_markdown/src/renderer/builders/paragraph_builder.dart';
 import 'package:flutter_smooth_markdown/src/renderer/builders/text_builder.dart';
 import 'package:flutter_smooth_markdown/src/renderer/builders/text_style_builder.dart';
+import 'package:flutter_smooth_markdown/src/renderer/markdown_renderer.dart';
 import 'package:flutter_smooth_markdown/src/renderer/widget_builder.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+Finder findRichTextContaining(String text) {
+  return find.byWidgetPredicate(
+    (widget) {
+      if (widget is RichText) {
+        return widget.text.toPlainText().contains(text);
+      }
+      return false;
+    },
+    description: 'RichText containing "$text"',
+  );
+}
 
 void main() {
   group('Widget Builder Tests', () {
@@ -22,7 +36,7 @@ void main() {
 
     setUp(() {
       styleSheet = MarkdownStyleSheet.light();
-      context = MarkdownRenderContext();
+      context = const MarkdownRenderContext();
     });
 
     group('TextBuilder', () {
@@ -186,6 +200,27 @@ void main() {
       });
     });
 
+    group('HardBreakBuilder', () {
+      test('should accept HardBreakNode', () {
+        const builder = HardBreakBuilder();
+        const node = HardBreakNode();
+        expect(builder.canBuild(node), true);
+      });
+
+      testWidgets('should build newline text widget', (tester) async {
+        const builder = HardBreakBuilder();
+        const node = HardBreakNode();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: builder.build(node, styleSheet, context),
+          ),
+        );
+
+        expect(find.text('\n'), findsOneWidget);
+      });
+    });
+
     group('CodeBlockBuilder', () {
       test('should accept CodeBlockNode', () {
         const builder = CodeBlockBuilder();
@@ -297,8 +332,10 @@ void main() {
       testWidgets('should build task list', (tester) async {
         const builder = ListBuilder();
         const node = ListNode(items: <ListItemNode>[
-          ListItemNode(children: <MarkdownNode>[TextNode('Task 1')], checked: true),
-          ListItemNode(children: <MarkdownNode>[TextNode('Task 2')], checked: false),
+          ListItemNode(
+              children: <MarkdownNode>[TextNode('Task 1')], checked: true),
+          ListItemNode(
+              children: <MarkdownNode>[TextNode('Task 2')], checked: false),
         ]);
 
         await tester.pumpWidget(
@@ -311,6 +348,34 @@ void main() {
         expect(find.text('Task 2'), findsOneWidget);
         expect(find.byIcon(Icons.check_box), findsOneWidget);
         expect(find.byIcon(Icons.check_box_outline_blank), findsOneWidget);
+      });
+
+      testWidgets('should build nested unordered list', (tester) async {
+        const builder = ListBuilder();
+        const node = ListNode(items: <ListItemNode>[
+          ListItemNode(
+            children: <MarkdownNode>[
+              TextNode('Parent'),
+              ListNode(
+                items: <ListItemNode>[
+                  ListItemNode(children: <MarkdownNode>[TextNode('Child')]),
+                  ListItemNode(children: <MarkdownNode>[TextNode('Sibling')]),
+                ],
+              ),
+            ],
+          ),
+        ]);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: builder.build(node, styleSheet, context),
+          ),
+        );
+
+        expect(find.text('Parent'), findsOneWidget);
+        expect(find.text('Child'), findsOneWidget);
+        expect(find.text('Sibling'), findsOneWidget);
+        expect(find.text('• '), findsNWidgets(3));
       });
     });
 
@@ -338,7 +403,8 @@ void main() {
     group('LinkBuilder', () {
       test('should accept LinkNode', () {
         const builder = LinkBuilder();
-        const node = LinkNode(url: 'https://example.com', children: <MarkdownNode>[]);
+        const node =
+            LinkNode(url: 'https://example.com', children: <MarkdownNode>[]);
         expect(builder.canBuild(node), true);
       });
 
@@ -408,6 +474,100 @@ void main() {
     });
 
     group('BuilderRegistry', () {
+      test('defaults should register core builders', () {
+        final registry = BuilderRegistry.defaults();
+        const coreNodeTypes = [
+          'text',
+          'header',
+          'paragraph',
+          'code_block',
+          'blockquote',
+          'list',
+          'table',
+          'horizontal_rule',
+          'inline_code',
+          'hard_break',
+          'inline_math',
+          'block_math',
+          'footnote_reference',
+          'footnote_definition',
+          'details',
+          'bold',
+          'italic',
+          'strikethrough',
+          'link',
+          'image',
+        ];
+
+        for (final nodeType in coreNodeTypes) {
+          expect(
+            registry.hasBuilder(nodeType),
+            isTrue,
+            reason: 'Expected a default builder for $nodeType',
+          );
+        }
+      });
+
+      testWidgets('defaults should render core nodes without unknown fallback',
+          (tester) async {
+        final renderer = MarkdownRenderer(
+          builderRegistry: BuilderRegistry.defaults(),
+        );
+        const nodes = <MarkdownNode>[
+          HeaderNode(level: 1, content: 'Registry heading'),
+          ParagraphNode(<MarkdownNode>[
+            TextNode('Registry paragraph with '),
+            InlineMathNode('x^2'),
+          ]),
+          ListNode(
+            items: <ListItemNode>[
+              ListItemNode(
+                children: <MarkdownNode>[TextNode('Registry list item')],
+              ),
+            ],
+          ),
+          CodeBlockNode(code: 'final answer = 42;', language: 'dart'),
+          BlockMathNode('E = mc^2'),
+          TableNode(
+            headers: <List<MarkdownNode>>[
+              <MarkdownNode>[TextNode('Registry column')],
+            ],
+            alignments: <TableAlignment?>[TableAlignment.left],
+            rows: <TableRowNode>[
+              TableRowNode(
+                <List<MarkdownNode>>[
+                  <MarkdownNode>[TextNode('Registry cell')],
+                ],
+              ),
+            ],
+          ),
+        ];
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: renderer.render(nodes),
+              ),
+            ),
+          ),
+        );
+
+        expect(tester.takeException(), isNull);
+        expect(find.textContaining('Unknown node type'), findsNothing);
+        expect(findRichTextContaining('Unknown:'), findsNothing);
+        expect(find.text('Registry heading'), findsOneWidget);
+        expect(
+          findRichTextContaining('Registry paragraph with '),
+          findsOneWidget,
+        );
+        expect(findRichTextContaining('Registry list item'), findsOneWidget);
+        expect(find.text('final answer = 42;'), findsOneWidget);
+        expect(find.byType(Table), findsOneWidget);
+        expect(findRichTextContaining('Registry column'), findsOneWidget);
+        expect(findRichTextContaining('Registry cell'), findsOneWidget);
+      });
+
       test('should register and retrieve builders', () {
         final registry = BuilderRegistry();
         const builder = TextBuilder();
@@ -422,12 +582,11 @@ void main() {
       });
 
       test('should find builder for node type', () {
-        final registry = BuilderRegistry();
+        final registry = BuilderRegistry()
+          ..register('text', const TextBuilder())
+          ..register('header', const HeaderBuilder());
         const textBuilder = TextBuilder();
         const headerBuilder = HeaderBuilder();
-
-        registry.register('text', textBuilder);
-        registry.register('header', headerBuilder);
 
         const textNode = TextNode('test');
         expect(registry.findBuilder(textNode), textBuilder);

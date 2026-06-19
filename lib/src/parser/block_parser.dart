@@ -38,8 +38,7 @@ class BlockParser {
   static final _orderedListPattern = RegExp(r'^\d+\.\s+');
   static final _orderedListStartPattern = RegExp(r'^(\d+)\.');
   static final _footnotePattern = RegExp(r'^\[\^[^\]]+\]:\s+.+');
-  static final _footnoteCapturePattern =
-      RegExp(r'^\[\^([^\]]+)\]:\s+(.+)$');
+  static final _footnoteCapturePattern = RegExp(r'^\[\^([^\]]+)\]:\s+(.+)$');
   static final _tableSeparatorPattern = RegExp(r'^\s*:?-+:?\s*$');
 
   /// Parses a markdown text into a list of block-level nodes
@@ -178,28 +177,34 @@ class BlockParser {
 
   /// Checks if a line starts a code block
   bool _isCodeBlockStart(String line) {
-    return line.trim().startsWith('```');
+    return _parseCodeFenceStart(line) != null;
   }
 
   /// Parses a code block
   _ParseResult _parseCodeBlock(List<String> lines, int startIndex) {
-    final firstLine = lines[startIndex].trim();
-    final language = firstLine.length > 3
-        ? firstLine.substring(3).trim()
-        : null;
+    final openingFence = _parseCodeFenceStart(lines[startIndex]);
+    if (openingFence == null) {
+      throw FormatException('Invalid code fence: ${lines[startIndex]}');
+    }
+
+    final fence = openingFence.literal;
+    final info = openingFence.info;
+    final language = info.isEmpty ? null : info.split(RegExp(r'\s+')).first;
 
     final codeLines = <String>[];
     var i = startIndex + 1;
 
-    // Collect code lines until closing ```
+    // Collect code lines until the matching closing fence.
     while (i < lines.length) {
       final line = lines[i];
-      if (line.trim().startsWith('```')) {
+      if (_isCodeFenceClose(line, openingFence)) {
         // Found closing fence
         return _ParseResult(
           node: CodeBlockNode(
             code: codeLines.join('\n'),
-            language: language?.isEmpty ?? true ? null : language,
+            language: language,
+            fence: fence,
+            info: info.isEmpty ? null : info,
           ),
           linesConsumed: i - startIndex + 1,
         );
@@ -212,10 +217,41 @@ class BlockParser {
     return _ParseResult(
       node: CodeBlockNode(
         code: codeLines.join('\n'),
-        language: language?.isEmpty ?? true ? null : language,
+        language: language,
+        fence: fence,
+        info: info.isEmpty ? null : info,
       ),
       linesConsumed: i - startIndex,
     );
+  }
+
+  _CodeFence? _parseCodeFenceStart(String line) {
+    final trimmed = line.trim();
+    if (trimmed.length < 3) return null;
+
+    final marker = trimmed[0];
+    if (marker != '`' && marker != '~') return null;
+
+    var length = 0;
+    while (length < trimmed.length && trimmed[length] == marker) {
+      length++;
+    }
+    if (length < 3) return null;
+
+    return _CodeFence(
+      marker: marker,
+      literal: trimmed.substring(0, length),
+      info: trimmed.substring(length).trim(),
+    );
+  }
+
+  bool _isCodeFenceClose(String line, _CodeFence openingFence) {
+    final trimmed = line.trim();
+    var length = 0;
+    while (length < trimmed.length && trimmed[length] == openingFence.marker) {
+      length++;
+    }
+    return length >= openingFence.literal.length && length == trimmed.length;
   }
 
   /// Checks if a line starts a block math
@@ -225,7 +261,21 @@ class BlockParser {
 
   /// Parses a block math
   _ParseResult _parseBlockMath(List<String> lines, int startIndex) {
+    final opening = lines[startIndex].trim();
+    final openingContent = opening.substring(2);
+    if (openingContent.endsWith('\$\$')) {
+      return _ParseResult(
+        node: BlockMathNode(
+          openingContent.substring(0, openingContent.length - 2).trim(),
+        ),
+        linesConsumed: 1,
+      );
+    }
+
     final mathLines = <String>[];
+    if (openingContent.isNotEmpty) {
+      mathLines.add(openingContent);
+    }
     var i = startIndex + 1;
 
     // Collect math lines until closing $$
@@ -263,9 +313,8 @@ class BlockParser {
     while (i < lines.length && _isBlockquote(lines[i])) {
       // Remove the > prefix and optional space
       final line = lines[i].trim();
-      final content = line.startsWith('> ')
-          ? line.substring(2)
-          : line.substring(1);
+      final content =
+          line.startsWith('> ') ? line.substring(2) : line.substring(1);
       quoteLines.add(content);
       i++;
     }
@@ -297,19 +346,24 @@ class BlockParser {
   /// Parses a list (ordered or unordered)
   _ParseResult _parseList(List<String> lines, int startIndex) {
     final firstLine = lines[startIndex].trim();
+    final baseIndent = _leadingIndent(lines[startIndex]);
     final isOrdered = _orderedListStartPattern.hasMatch(firstLine);
+    final isTaskList = !isOrdered && _isTaskListItem(firstLine);
 
     final items = <ListItemNode>[];
     var i = startIndex;
 
     // Collect all consecutive list items
     while (i < lines.length) {
-      final line = lines[i].trim();
+      final rawLine = lines[i];
+      final line = rawLine.trim();
 
       if (line.isEmpty) {
         i++;
         // Check if next line is still a list item
-        if (i < lines.length && _isListItem(lines[i])) {
+        if (i < lines.length &&
+            _isListItem(lines[i]) &&
+            _leadingIndent(lines[i]) >= baseIndent) {
           continue;
         } else {
           break;
@@ -320,21 +374,59 @@ class BlockParser {
         break;
       }
 
+      final indent = _leadingIndent(rawLine);
+      if (indent < baseIndent) {
+        break;
+      }
+
+      if (indent > baseIndent) {
+        if (items.isEmpty) break;
+        final nested = _parseList(lines, i);
+        final previous = items.removeLast();
+        items.add(
+          previous.copyWith(
+            children: [
+              ...previous.children,
+              nested.node,
+            ],
+          ),
+        );
+        i += nested.linesConsumed;
+        continue;
+      }
+
       // Check if list type matches
       final lineIsOrdered = _orderedListStartPattern.hasMatch(line);
       if (lineIsOrdered != isOrdered) {
         break;
       }
+      if (!isOrdered && _isTaskListItem(line) != isTaskList) {
+        break;
+      }
 
       // Parse list item
-      final item = _parseListItem(line);
+      var item = _parseListItem(line);
+      final contentIndent = _listContentIndent(rawLine);
+      final continuation = _parseListItemContinuation(
+        lines,
+        i + 1,
+        baseIndent: baseIndent,
+        contentIndent: contentIndent ?? indent + 2,
+      );
+      if (continuation.children.isNotEmpty) {
+        item = item.copyWith(
+          children: [
+            ...item.children,
+            ...continuation.children,
+          ],
+        );
+      }
       items.add(item);
-      i++;
+      i += 1 + continuation.linesConsumed;
     }
 
-    final startIndex0 = isOrdered
-        ? _extractStartIndex(lines[startIndex].trim())
-        : 1;
+    final startIndex0 =
+        isOrdered ? _extractStartIndex(lines[startIndex].trim()) : 1;
 
     return _ParseResult(
       node: ListNode(
@@ -344,6 +436,133 @@ class BlockParser {
       ),
       linesConsumed: i - startIndex,
     );
+  }
+
+  bool _isTaskListItem(String line) {
+    if (!_unorderedListPattern.hasMatch(line)) {
+      return false;
+    }
+    final content = line.replaceFirst(_unorderedListPattern, '');
+    return content.startsWith('[ ] ') ||
+        content.startsWith('[x] ') ||
+        content.startsWith('[X] ');
+  }
+
+  int _leadingIndent(String line) {
+    var indent = 0;
+    for (final unit in line.codeUnits) {
+      if (unit == 0x20) {
+        indent++;
+      } else if (unit == 0x09) {
+        indent += 4;
+      } else {
+        break;
+      }
+    }
+    return indent;
+  }
+
+  int? _listContentIndent(String line) {
+    final indent = _leadingIndent(line);
+    final trimmed = line.substring(indent.clamp(0, line.length));
+    final marker = _unorderedListPattern.firstMatch(trimmed) ??
+        _orderedListPattern.firstMatch(trimmed);
+    if (marker == null) return null;
+    return indent + marker.end;
+  }
+
+  _ListContinuationResult _parseListItemContinuation(
+    List<String> lines,
+    int startIndex, {
+    required int baseIndent,
+    required int contentIndent,
+  }) {
+    final continuationLines = <String>[];
+    var i = startIndex;
+
+    while (i < lines.length) {
+      final rawLine = lines[i];
+      final trimmed = rawLine.trim();
+
+      if (trimmed.isEmpty) {
+        final nextIndex = _nextNonEmptyLineIndex(lines, i + 1);
+        if (nextIndex == null ||
+            !_isListContinuationLine(
+              lines[nextIndex],
+              baseIndent: baseIndent,
+              contentIndent: contentIndent,
+            )) {
+          break;
+        }
+        continuationLines.add('');
+        i++;
+        continue;
+      }
+
+      if (!_isListContinuationLine(
+        rawLine,
+        baseIndent: baseIndent,
+        contentIndent: contentIndent,
+      )) {
+        break;
+      }
+
+      continuationLines.add(_stripIndent(rawLine, contentIndent));
+      i++;
+    }
+
+    while (
+        continuationLines.isNotEmpty && continuationLines.last.trim().isEmpty) {
+      continuationLines.removeLast();
+    }
+
+    if (continuationLines.isEmpty) {
+      return const _ListContinuationResult(
+        children: [],
+        linesConsumed: 0,
+      );
+    }
+
+    return _ListContinuationResult(
+      children: parse(continuationLines.join('\n')),
+      linesConsumed: i - startIndex,
+    );
+  }
+
+  bool _isListContinuationLine(
+    String line, {
+    required int baseIndent,
+    required int contentIndent,
+  }) {
+    final indent = _leadingIndent(line);
+    if (indent < contentIndent) return false;
+    if (indent <= baseIndent) return false;
+    return true;
+  }
+
+  int? _nextNonEmptyLineIndex(List<String> lines, int startIndex) {
+    for (var i = startIndex; i < lines.length; i++) {
+      if (lines[i].trim().isNotEmpty) return i;
+    }
+    return null;
+  }
+
+  String _stripIndent(String line, int indent) {
+    var offset = 0;
+    var remaining = indent;
+    while (offset < line.length && remaining > 0) {
+      final unit = line.codeUnitAt(offset);
+      if (unit == 0x20) {
+        remaining--;
+        offset++;
+      } else if (unit == 0x09) {
+        remaining -= 4;
+        offset++;
+      } else {
+        break;
+      }
+    }
+    return line.substring(offset);
   }
 
   /// Extracts the start index from an ordered list item
@@ -453,6 +672,7 @@ class BlockParser {
       // Stop at special block markers
       if (_isHeader(line) ||
           _isCodeBlockStart(line) ||
+          _isBlockMathStart(line) ||
           _isBlockquote(line) ||
           _isListItem(line) ||
           _isHorizontalRule(line) ||
@@ -478,7 +698,7 @@ class BlockParser {
     if (index >= lines.length) return false;
 
     final line = lines[index].trim();
-    if (!line.contains('|')) return false;
+    if (!_hasUnescapedPipe(line)) return false;
 
     // Check if next line is a separator line
     if (index + 1 >= lines.length) return false;
@@ -489,14 +709,9 @@ class BlockParser {
 
   /// Checks if a line is a table separator (e.g., |---|---|)
   bool _isTableSeparator(String line) {
-    if (!line.contains('|')) return false;
+    if (!_hasUnescapedPipe(line)) return false;
 
-    // Remove leading/trailing pipes and split
-    var trimmed = line.trim();
-    if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
-    if (trimmed.endsWith('|')) trimmed = trimmed.substring(0, trimmed.length - 1);
-
-    final parts = trimmed.split('|');
+    final parts = _splitTableCells(line);
     if (parts.isEmpty) return false;
 
     // Each part should be a separator like ---, :---, ---:, or :---:
@@ -530,7 +745,7 @@ class BlockParser {
       final line = lines[i].trim();
 
       // Stop at empty line or non-table line
-      if (line.isEmpty || !line.contains('|')) {
+      if (line.isEmpty || !_hasUnescapedPipe(line)) {
         break;
       }
 
@@ -551,18 +766,11 @@ class BlockParser {
 
   /// Parses a table row into cells
   List<List<MarkdownNode>> _parseTableRow(String line) {
-    var trimmed = line.trim();
-
-    // Remove leading/trailing pipes
-    if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
-    if (trimmed.endsWith('|')) trimmed = trimmed.substring(0, trimmed.length - 1);
-
-    // Split by pipe
-    final parts = trimmed.split('|');
+    final parts = _splitTableCells(line);
 
     // Parse each cell's content
     return parts.map((cell) {
-      final content = cell.trim();
+      final content = _unescapeTableCellPipes(cell.trim());
       if (content.isEmpty) {
         return <MarkdownNode>[const TextNode('')];
       }
@@ -573,13 +781,7 @@ class BlockParser {
 
   /// Parses table column alignments from separator row
   List<TableAlignment?> _parseTableAlignments(String line) {
-    var trimmed = line.trim();
-
-    // Remove leading/trailing pipes
-    if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
-    if (trimmed.endsWith('|')) trimmed = trimmed.substring(0, trimmed.length - 1);
-
-    final parts = trimmed.split('|');
+    final parts = _splitTableCells(line);
 
     return parts.map((part) {
       final cleaned = part.trim();
@@ -596,6 +798,70 @@ class BlockParser {
         return null; // Default alignment
       }
     }).toList();
+  }
+
+  bool _hasUnescapedPipe(String line) {
+    for (var index = 0; index < line.length; index++) {
+      if (line[index] == '|' && !_isEscaped(line, index)) return true;
+    }
+    return false;
+  }
+
+  List<String> _splitTableCells(String line) {
+    final trimmed = _trimTableBoundaryPipes(line);
+    final cells = <String>[];
+    final buffer = StringBuffer();
+
+    for (var index = 0; index < trimmed.length; index++) {
+      final char = trimmed[index];
+      if (char == '|' && !_isEscaped(trimmed, index)) {
+        cells.add(buffer.toString());
+        buffer.clear();
+      } else {
+        buffer.write(char);
+      }
+    }
+
+    cells.add(buffer.toString());
+    return cells;
+  }
+
+  String _trimTableBoundaryPipes(String line) {
+    var trimmed = line.trim();
+    if (trimmed.isNotEmpty &&
+        trimmed.startsWith('|') &&
+        !_isEscaped(trimmed, 0)) {
+      trimmed = trimmed.substring(1);
+    }
+    if (trimmed.isNotEmpty &&
+        trimmed.endsWith('|') &&
+        !_isEscaped(trimmed, trimmed.length - 1)) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
+  }
+
+  bool _isEscaped(String text, int index) {
+    var slashCount = 0;
+    for (var i = index - 1; i >= 0 && text[i] == r'\'; i--) {
+      slashCount++;
+    }
+    return slashCount.isOdd;
+  }
+
+  String _unescapeTableCellPipes(String text) {
+    final buffer = StringBuffer();
+    for (var index = 0; index < text.length; index++) {
+      if (text[index] == r'\' &&
+          index + 1 < text.length &&
+          text[index + 1] == '|') {
+        buffer.write('|');
+        index++;
+      } else {
+        buffer.write(text[index]);
+      }
+    }
+    return buffer.toString();
   }
 
   /// Checks if a line starts a details block
@@ -732,4 +998,26 @@ class _ParseResult {
 
   final MarkdownNode node;
   final int linesConsumed;
+}
+
+class _ListContinuationResult {
+  const _ListContinuationResult({
+    required this.children,
+    required this.linesConsumed,
+  });
+
+  final List<MarkdownNode> children;
+  final int linesConsumed;
+}
+
+class _CodeFence {
+  const _CodeFence({
+    required this.marker,
+    required this.literal,
+    required this.info,
+  });
+
+  final String marker;
+  final String literal;
+  final String info;
 }

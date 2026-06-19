@@ -23,6 +23,16 @@ cd example
 flutter run -d chrome
 ```
 
+### Markdown Editor Preview
+
+```bash
+cd example
+flutter run -d chrome -t lib/editor_preview_main.dart
+```
+
+这个入口会直接打开 `SmoothMarkdownEditor` 预览页，适合调试 Scratch-style 编辑态、格式化块编辑、源码/预览切换和复制导出流程。
+主示例应用也在侧边栏提供 Markdown Editor 页面，代码位于 `example/lib/editor_demo.dart`。
+
 ### macOS
 
 ```bash
@@ -50,6 +60,7 @@ flutter run -d android
 - 📱 **响应式设计** - 适配不同屏幕尺寸
 - 🔗 **链接点击** - 点击链接显示提示
 - 📝 **源码查看** - 点击浮动按钮查看 Markdown 源码
+- ✏️ **Markdown 编辑器** - 侧边栏入口和独立预览入口
 - 🎯 **侧边栏导航** - 快速切换不同示例
 
 ## 代码示例
@@ -101,7 +112,9 @@ SmoothMarkdown(
 ```
 example/
 ├── lib/
-│   └── main.dart           # 主应用代码
+│   ├── main.dart                 # 主示例应用和侧边栏入口
+│   ├── editor_demo.dart          # SmoothMarkdownEditor 示例页面
+│   └── editor_preview_main.dart  # 独立编辑器预览入口
 ├── pubspec.yaml            # 依赖配置
 └── README.md               # 本文件
 ```

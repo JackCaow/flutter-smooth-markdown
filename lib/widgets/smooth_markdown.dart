@@ -8,14 +8,18 @@ import '../src/parser/markdown_parser.dart';
 import '../src/parser/parse_cache.dart';
 import '../src/parser/parser_plugin.dart';
 import '../src/renderer/builders/artifact_builder.dart';
+import '../src/renderer/builders/block_math_builder.dart';
 import '../src/renderer/builders/details_builder.dart';
 import '../src/renderer/builders/enhanced_blockquote_builder.dart';
 import '../src/renderer/builders/enhanced_code_block_builder.dart';
 import '../src/renderer/builders/enhanced_header_builder.dart';
 import '../src/renderer/builders/enhanced_link_builder.dart';
+import '../src/renderer/builders/footnote_definition_builder.dart';
+import '../src/renderer/builders/footnote_reference_builder.dart';
 import '../src/renderer/builders/horizontal_rule_builder.dart';
 import '../src/renderer/builders/image_builder.dart';
 import '../src/renderer/builders/inline_code_builder.dart';
+import '../src/renderer/builders/inline_math_builder.dart';
 import '../src/renderer/builders/list_builder.dart';
 import '../src/renderer/builders/paragraph_builder.dart';
 import '../src/renderer/builders/table_builder.dart';
@@ -688,6 +692,10 @@ class SmoothMarkdown extends StatelessWidget {
         ..register('list', const ListBuilder())
         ..register('horizontal_rule', const HorizontalRuleBuilder())
         ..register('inline_code', const InlineCodeBuilder())
+        ..register('inline_math', const InlineMathBuilder())
+        ..register('block_math', const BlockMathBuilder())
+        ..register('footnote_reference', const FootnoteReferenceBuilder())
+        ..register('footnote_definition', const FootnoteDefinitionBuilder())
         ..register('bold', const BoldBuilder())
         ..register('italic', const ItalicBuilder())
         ..register('strikethrough', const StrikethroughBuilder())
