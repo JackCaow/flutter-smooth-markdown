@@ -6527,6 +6527,67 @@ void main() {
       );
     });
 
+    testWidgets('formatted table context menu aligns columns', (tester) async {
+      final controller = MarkdownEditorController(
+        text: '| A | B |\n'
+            '| --- | --- |\n'
+            '| 1 | 2 |',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final table =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_1'),
+        ),
+        buttons: kSecondaryMouseButton,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Align Center'));
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.text,
+        '| A | B |\n'
+        '| --- | :---: |\n'
+        '| 1 | 2 |',
+      );
+      var updated =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      expect(updated.alignments, [null, MarkdownTableAlignment.center]);
+
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_1'),
+        ),
+        buttons: kSecondaryMouseButton,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Default Alignment'));
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.text,
+        '| A | B |\n'
+        '| --- | --- |\n'
+        '| 1 | 2 |',
+      );
+      updated = _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      expect(updated.alignments, [null, null]);
+    });
+
     testWidgets('formatted table context menu follows Scratch row rules',
         (tester) async {
       final controller = MarkdownEditorController(

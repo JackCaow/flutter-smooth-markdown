@@ -1957,6 +1957,18 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     updateTable(blockId, (table) => table.deleteColumn(columnIndex));
   }
 
+  /// Sets table column [columnIndex] alignment.
+  void setTableColumnAlignment({
+    required String blockId,
+    required int columnIndex,
+    required MarkdownTableAlignment? alignment,
+  }) {
+    updateTable(
+      blockId,
+      (table) => table.setColumnAlignment(columnIndex, alignment),
+    );
+  }
+
   /// Toggles the first row between header and body semantics.
   void toggleTableHeaderRow(String blockId) {
     updateTable(blockId, (table) => table.toggleHeaderRow());

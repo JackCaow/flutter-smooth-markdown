@@ -3112,6 +3112,66 @@ E = mc^2
       );
     });
 
+    test('sets table column alignment without string manipulation', () {
+      const table = MarkdownTableBlock(
+        id: 'table',
+        headers: [
+          [MarkdownText('A')],
+          [MarkdownText('B')],
+        ],
+        alignments: [null, null],
+        rows: [
+          [
+            [MarkdownText('1')],
+            [MarkdownText('2')],
+          ],
+        ],
+      );
+      final editor = MarkdownDocumentEditor(
+        const MarkdownDocument(blocks: [table]),
+      );
+      addTearDown(editor.dispose);
+
+      editor
+        ..setTableColumnAlignment(
+          blockId: 'table',
+          columnIndex: 0,
+          alignment: MarkdownTableAlignment.left,
+        )
+        ..setTableColumnAlignment(
+          blockId: 'table',
+          columnIndex: 1,
+          alignment: MarkdownTableAlignment.center,
+        );
+
+      var updated = editor.document.blocks.single as MarkdownTableBlock;
+      expect(
+        updated.alignments,
+        [MarkdownTableAlignment.left, MarkdownTableAlignment.center],
+      );
+      expect(
+        updated.toMarkdown(),
+        '| A | B |\n'
+        '| :--- | :---: |\n'
+        '| 1 | 2 |',
+      );
+
+      editor.setTableColumnAlignment(
+        blockId: 'table',
+        columnIndex: 0,
+        alignment: null,
+      );
+
+      updated = editor.document.blocks.single as MarkdownTableBlock;
+      expect(updated.alignments, [null, MarkdownTableAlignment.center]);
+      expect(
+        updated.toMarkdown(),
+        '| A | B |\n'
+        '| --- | :---: |\n'
+        '| 1 | 2 |',
+      );
+    });
+
     test('toggles table header row and column semantics', () {
       const table = MarkdownTableBlock(
         id: 'table',

@@ -1818,6 +1818,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final cellColor = semanticHeader && !(header && table.headerRow)
         ? theme.colorScheme.surfaceVariant.withOpacity(0.18)
         : null;
+    final textAlign = _tableCellTextAlign(table, columnIndex);
+    final contentAlignment = _tableCellContentAlignment(table, columnIndex);
 
     if (active) {
       return GestureDetector(
@@ -1846,6 +1848,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
               autofocus: true,
               minLines: 1,
               maxLines: null,
+              textAlign: textAlign,
               style: textStyle,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
@@ -1886,11 +1889,14 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             : null,
         child: Container(
           constraints: const BoxConstraints(minWidth: 96),
+          alignment: contentAlignment,
           color: cellColor,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: DefaultTextStyle.merge(
-            style: textStyle,
-            child: _renderMarkdown(_inlineMarkdown(children)),
+          child: _renderFormattedInlineCell(
+            context,
+            children,
+            textStyle,
+            textAlign,
           ),
         ),
       ),
@@ -1929,6 +1935,23 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           value: _TableContextAction.deleteColumn,
           enabled: table.columnCount > 1,
           child: const Text('Delete Column'),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: _TableContextAction.alignColumnDefault,
+          child: Text('Default Alignment'),
+        ),
+        const PopupMenuItem(
+          value: _TableContextAction.alignColumnLeft,
+          child: Text('Align Left'),
+        ),
+        const PopupMenuItem(
+          value: _TableContextAction.alignColumnCenter,
+          child: Text('Align Center'),
+        ),
+        const PopupMenuItem(
+          value: _TableContextAction.alignColumnRight,
+          child: Text('Align Right'),
         ),
         const PopupMenuDivider(),
         if (!header)
@@ -1989,6 +2012,34 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       case _TableContextAction.deleteColumn:
         editor.deleteTableColumn(table.id, columnIndex);
         setState(() => _activeTableCell = null);
+        break;
+      case _TableContextAction.alignColumnDefault:
+        editor.setTableColumnAlignment(
+          blockId: table.id,
+          columnIndex: columnIndex,
+          alignment: null,
+        );
+        break;
+      case _TableContextAction.alignColumnLeft:
+        editor.setTableColumnAlignment(
+          blockId: table.id,
+          columnIndex: columnIndex,
+          alignment: MarkdownTableAlignment.left,
+        );
+        break;
+      case _TableContextAction.alignColumnCenter:
+        editor.setTableColumnAlignment(
+          blockId: table.id,
+          columnIndex: columnIndex,
+          alignment: MarkdownTableAlignment.center,
+        );
+        break;
+      case _TableContextAction.alignColumnRight:
+        editor.setTableColumnAlignment(
+          blockId: table.id,
+          columnIndex: columnIndex,
+          alignment: MarkdownTableAlignment.right,
+        );
         break;
       case _TableContextAction.addRowAbove:
         if (!header) {
@@ -2062,6 +2113,168 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   String _inlinePlainText(List<MarkdownInlineNode> children) {
     return children.map((child) => child.plainText).join();
+  }
+
+  MarkdownTableAlignment? _tableColumnAlignment(
+    MarkdownTableBlock table,
+    int columnIndex,
+  ) {
+    if (columnIndex < 0 || columnIndex >= table.alignments.length) return null;
+    return table.alignments[columnIndex];
+  }
+
+  TextAlign _tableCellTextAlign(
+    MarkdownTableBlock table,
+    int columnIndex,
+  ) {
+    return switch (_tableColumnAlignment(table, columnIndex)) {
+      MarkdownTableAlignment.left => TextAlign.left,
+      MarkdownTableAlignment.center => TextAlign.center,
+      MarkdownTableAlignment.right => TextAlign.right,
+      null => TextAlign.left,
+    };
+  }
+
+  AlignmentGeometry _tableCellContentAlignment(
+    MarkdownTableBlock table,
+    int columnIndex,
+  ) {
+    return switch (_tableColumnAlignment(table, columnIndex)) {
+      MarkdownTableAlignment.left || null => AlignmentDirectional.centerStart,
+      MarkdownTableAlignment.center => Alignment.center,
+      MarkdownTableAlignment.right => AlignmentDirectional.centerEnd,
+    };
+  }
+
+  Widget _renderFormattedInlineCell(
+    BuildContext context,
+    List<MarkdownInlineNode> children,
+    TextStyle? style,
+    TextAlign textAlign,
+  ) {
+    final baseStyle = style ?? DefaultTextStyle.of(context).style;
+    return RichText(
+      textAlign: textAlign,
+      text: TextSpan(
+        style: baseStyle,
+        children: _inlineCellSpans(context, children, baseStyle),
+      ),
+    );
+  }
+
+  List<InlineSpan> _inlineCellSpans(
+    BuildContext context,
+    List<MarkdownInlineNode> nodes,
+    TextStyle style,
+  ) {
+    return [
+      for (final node in nodes)
+        ..._inlineCellSpansForNode(context, node, style),
+    ];
+  }
+
+  List<InlineSpan> _inlineCellSpansForNode(
+    BuildContext context,
+    MarkdownInlineNode node,
+    TextStyle style,
+  ) {
+    switch (node) {
+      case MarkdownText():
+        return [TextSpan(text: node.text, style: style)];
+      case MarkdownStrong():
+        return _inlineCellSpans(
+          context,
+          node.children,
+          style.copyWith(fontWeight: FontWeight.w700),
+        );
+      case MarkdownEmphasis():
+        return _inlineCellSpans(
+          context,
+          node.children,
+          style.copyWith(fontStyle: FontStyle.italic),
+        );
+      case MarkdownStrikethrough():
+        return _inlineCellSpans(
+          context,
+          node.children,
+          style.copyWith(
+            decoration: _mergeTextDecoration(
+              style.decoration,
+              TextDecoration.lineThrough,
+            ),
+          ),
+        );
+      case MarkdownInlineCode():
+        return [
+          TextSpan(
+            text: node.code,
+            style: style.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6),
+            ),
+          ),
+        ];
+      case MarkdownHardBreak():
+        return [TextSpan(text: '\n', style: style)];
+      case MarkdownInlineMath():
+        return [
+          TextSpan(
+            text: node.latex,
+            style: style.copyWith(
+              fontFamily: 'monospace',
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+          ),
+        ];
+      case MarkdownLink():
+        return _inlineCellSpans(
+          context,
+          node.children,
+          style.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+            decoration: _mergeTextDecoration(
+              style.decoration,
+              TextDecoration.underline,
+            ),
+          ),
+        );
+      case MarkdownImage():
+        return [
+          TextSpan(
+            text: node.alt,
+            style: style.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ];
+      case MarkdownWikilink():
+        return [
+          TextSpan(
+            text: node.label,
+            style: style.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              decoration: _mergeTextDecoration(
+                style.decoration,
+                TextDecoration.underline,
+              ),
+            ),
+          ),
+        ];
+      default:
+        return [TextSpan(text: node.plainText, style: style)];
+    }
+  }
+
+  TextDecoration _mergeTextDecoration(
+    TextDecoration? current,
+    TextDecoration added,
+  ) {
+    return TextDecoration.combine([
+      if (current != null && current != TextDecoration.none) current,
+      added,
+    ]);
   }
 
   TextSelection _sourceSelectionForPlainTextSelection(
@@ -8425,6 +8638,10 @@ enum _TableContextAction {
   addColumnBefore,
   addColumnAfter,
   deleteColumn,
+  alignColumnDefault,
+  alignColumnLeft,
+  alignColumnCenter,
+  alignColumnRight,
   addRowAbove,
   addRowBelow,
   deleteRow,

@@ -1144,6 +1144,20 @@ class MarkdownTableBlock extends MarkdownBlock {
     );
   }
 
+  /// Sets the alignment for column [columnIndex].
+  MarkdownTableBlock setColumnAlignment(
+    int columnIndex,
+    MarkdownTableAlignment? alignment,
+  ) {
+    if (columnIndex < 0 || columnIndex >= columnCount) return this;
+    final nextAlignments = List<MarkdownTableAlignment?>.generate(
+      columnCount,
+      (index) => index < alignments.length ? alignments[index] : null,
+    );
+    nextAlignments[columnIndex] = alignment;
+    return copyWith(alignments: nextAlignments);
+  }
+
   /// Toggles whether the first row is semantically a header row.
   MarkdownTableBlock toggleHeaderRow() {
     return copyWith(headerRow: !headerRow);
