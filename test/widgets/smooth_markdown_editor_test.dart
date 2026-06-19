@@ -2017,6 +2017,95 @@ void main() {
       expect(boldButton.color, isNull);
     });
 
+    testWidgets('formatted collapsed inline command stores marks for typing',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Say ');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+
+      final activeFinder = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
+      );
+      final activeField = tester.widget<TextField>(activeFinder);
+      activeField.controller!.selection =
+          const TextSelection.collapsed(offset: 4);
+      await tester.pump();
+
+      await _tapToolbarIcon(tester, Icons.format_bold);
+      await tester.pump();
+
+      final boldButton = tester.widget<IconButton>(
+        find.byKey(const ValueKey('smooth_markdown_editor_command_bold')),
+      );
+      expect(boldButton.color, isNotNull);
+
+      await tester.enterText(activeFinder, 'Say bold');
+      await tester.pump();
+
+      expect(controller.text, 'Say **bold**');
+      final block =
+          _singleScratchContentBlock(controller) as MarkdownParagraphBlock;
+      expect(block.children, contains(isA<MarkdownStrong>()));
+      expect(
+        controller.selection.extentOffset,
+        controller.text.length,
+      );
+    });
+
+    testWidgets('formatted stored marks can disable inherited marks',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Say **bold**');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+
+      final activeFinder = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
+      );
+      final activeField = tester.widget<TextField>(activeFinder);
+      activeField.controller!.selection =
+          const TextSelection.collapsed(offset: 5);
+      await tester.pump();
+
+      await _tapToolbarIcon(tester, Icons.format_bold);
+      await tester.pump();
+
+      final boldButton = tester.widget<IconButton>(
+        find.byKey(const ValueKey('smooth_markdown_editor_command_bold')),
+      );
+      expect(boldButton.color, isNull);
+
+      await tester.enterText(activeFinder, 'Say bXold');
+      await tester.pump();
+
+      expect(controller.text, 'Say **b**X**old**');
+    });
+
     testWidgets('toolbar reflects active list blocks like Scratch',
         (tester) async {
       final controller = MarkdownEditorController(text: '- item');
@@ -5580,6 +5669,66 @@ void main() {
       final unlinkedCell = unlinkedTable.rows.single.single;
       expect(unlinkedCell, contains(isA<MarkdownStrong>()));
       expect(unlinkedCell, isNot(contains(isA<MarkdownLink>())));
+    });
+
+    testWidgets('formatted table cell collapsed command stores marks',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '| A |\n'
+            '| --- |\n'
+            '| hello |',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final table =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_0'),
+        ),
+      );
+      await tester.pump();
+
+      final activeFinder = find.byKey(
+        ValueKey(
+          'smooth_markdown_editor_table_cell_active_${table.id}_row_0_0',
+        ),
+      );
+      final activeField = tester.widget<TextField>(activeFinder);
+      activeField.controller!.selection =
+          const TextSelection.collapsed(offset: 5);
+      await tester.pump();
+
+      await _tapToolbarIcon(tester, Icons.format_italic);
+      await tester.pump();
+
+      final italicButton = tester.widget<IconButton>(
+        find.byKey(const ValueKey('smooth_markdown_editor_command_italic')),
+      );
+      expect(italicButton.color, isNotNull);
+
+      await tester.enterText(activeFinder, 'hellocell');
+      await tester.pump();
+
+      expect(
+        controller.text,
+        '| A |\n'
+        '| --- |\n'
+        '| hello*cell* |',
+      );
+      final updatedTable =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      expect(
+          updatedTable.rows.single.single, contains(isA<MarkdownEmphasis>()));
     });
 
     testWidgets('formatted table cell link clears URL to remove existing link',

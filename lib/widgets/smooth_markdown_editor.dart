@@ -305,6 +305,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   _TableCellSelection? _activeTableCell;
   bool _syncingFormattedBlock = false;
   bool _syncingTableCell = false;
+  _StoredMarkTarget? _storedMarkTarget;
+  Set<MarkdownEditorCommand> _storedMarks = const {};
   final Set<int> _mermaidSourceBlocks = <int>{};
   final MenuController _copyMenuController = MenuController();
   int? _copiedCodeBlockStart;
@@ -817,6 +819,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   bool _isToolbarCommandActive(MarkdownEditorCommand command) {
+    final storedMarkActive = _storedMarkToolbarActive(command);
+    if (storedMarkActive != null) return storedMarkActive;
+
     return switch (command) {
       MarkdownEditorCommand.bold => _activeInlineSelectionContains(
           (node) => node is MarkdownStrong,
@@ -864,6 +869,12 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       MarkdownEditorCommand.wikilink =>
         false,
     };
+  }
+
+  bool? _storedMarkToolbarActive(MarkdownEditorCommand command) {
+    if (!_isStoredMarkCommand(command)) return null;
+    if (!_storedMarkTargetMatchesCurrentSelection()) return null;
+    return _storedMarks.contains(command);
   }
 
   Widget _buildHeadingMenuButton() {
@@ -2533,6 +2544,131 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     };
   }
 
+  bool _isStoredMarkCommand(MarkdownEditorCommand command) {
+    return command == MarkdownEditorCommand.bold ||
+        command == MarkdownEditorCommand.italic ||
+        command == MarkdownEditorCommand.strikethrough ||
+        command == MarkdownEditorCommand.inlineCode;
+  }
+
+  _StoredMarkTarget? _currentStoredMarkTarget() {
+    final cell = _activeTableCell;
+    if (cell != null) {
+      return _StoredMarkTarget.tableCell(
+        tableId: cell.tableId,
+        rowIndex: cell.rowIndex,
+        columnIndex: cell.columnIndex,
+        header: cell.header,
+      );
+    }
+
+    final blockId = _activeFormattedBlockId;
+    if (_activeFormattedPlainText && blockId != null) {
+      return _StoredMarkTarget.formattedBlock(blockId);
+    }
+    return null;
+  }
+
+  bool _storedMarkTargetMatchesCurrentSelection() {
+    final target = _storedMarkTarget;
+    if (target == null) return false;
+    if (target != _currentStoredMarkTarget()) return false;
+    final selection = _activeTableCell != null
+        ? _tableCellController.selection
+        : _formattedBlockController.selection;
+    return selection.isValid && selection.isCollapsed;
+  }
+
+  void _clearStoredMarks() {
+    _storedMarkTarget = null;
+    _storedMarks = const {};
+  }
+
+  void _clearStoredMarksForExpandedSelection() {
+    final target = _currentStoredMarkTarget();
+    if (_storedMarkTarget != target) return;
+    final selection = _activeTableCell != null
+        ? _tableCellController.selection
+        : _formattedBlockController.selection;
+    if (!selection.isValid || !selection.isCollapsed) {
+      _clearStoredMarks();
+    }
+  }
+
+  bool _toggleStoredMarkCommand(MarkdownEditorCommand command) {
+    if (!_isStoredMarkCommand(command)) return false;
+
+    final target = _currentStoredMarkTarget();
+    if (target == null) return false;
+    final selection = _activeTableCell != null
+        ? _tableCellController.selection
+        : _formattedBlockController.selection;
+    if (!selection.isValid || !selection.isCollapsed) return false;
+
+    final nextMarks = target == _storedMarkTarget
+        ? Set<MarkdownEditorCommand>.of(_storedMarks)
+        : _effectiveStoredMarksAtCurrentSelection();
+
+    if (command == MarkdownEditorCommand.inlineCode) {
+      if (nextMarks.contains(command)) {
+        nextMarks.clear();
+      } else {
+        nextMarks
+          ..clear()
+          ..add(command);
+      }
+    } else {
+      nextMarks.remove(MarkdownEditorCommand.inlineCode);
+      if (!nextMarks.add(command)) {
+        nextMarks.remove(command);
+      }
+    }
+
+    setState(() {
+      _storedMarkTarget = target;
+      _storedMarks = Set<MarkdownEditorCommand>.unmodifiable(nextMarks);
+    });
+    _requestActiveEditorFocus();
+    return true;
+  }
+
+  Set<MarkdownEditorCommand> _effectiveStoredMarksAtCurrentSelection() {
+    final marks = <MarkdownEditorCommand>{};
+    if (_activeInlineSelectionContains((node) => node is MarkdownStrong)) {
+      marks.add(MarkdownEditorCommand.bold);
+    }
+    if (_activeInlineSelectionContains((node) => node is MarkdownEmphasis)) {
+      marks.add(MarkdownEditorCommand.italic);
+    }
+    if (_activeInlineSelectionContains(
+      (node) => node is MarkdownStrikethrough,
+    )) {
+      marks.add(MarkdownEditorCommand.strikethrough);
+    }
+    if (_activeInlineSelectionContains((node) => node is MarkdownInlineCode)) {
+      return {MarkdownEditorCommand.inlineCode};
+    }
+    return marks;
+  }
+
+  List<MarkdownInlineNode> _storedMarkedTextNodes(String text) {
+    if (_storedMarks.contains(MarkdownEditorCommand.inlineCode)) {
+      return [MarkdownInlineCode(text)];
+    }
+
+    var nodes = <MarkdownInlineNode>[MarkdownText(text)];
+    if (_storedMarks.contains(MarkdownEditorCommand.bold)) {
+      nodes = [MarkdownStrong(nodes)];
+    }
+    if (_storedMarks.contains(MarkdownEditorCommand.italic)) {
+      nodes = [MarkdownEmphasis(nodes)];
+    }
+    if (_storedMarks.contains(MarkdownEditorCommand.strikethrough)) {
+      nodes = [MarkdownStrikethrough(nodes)];
+    }
+    return nodes;
+  }
+
   String? _inlineSelectionMarkdown(
     List<MarkdownInlineNode> children,
     TextSelection selection,
@@ -2644,6 +2780,16 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     required bool header,
     required List<MarkdownInlineNode> children,
   }) {
+    final nextStoredTarget = _StoredMarkTarget.tableCell(
+      tableId: tableId,
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: header,
+    );
+    if (nextStoredTarget != _storedMarkTarget) {
+      _clearStoredMarks();
+    }
+
     _syncingTableCell = true;
     _tableCellController
       ..inlineNodes = children
@@ -2690,7 +2836,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final currentText = _inlinePlainText(currentChildren);
     final nextText = _tableCellController.text;
 
-    if (currentText == nextText) return;
+    if (currentText == nextText) {
+      _clearStoredMarksForExpandedSelection();
+      return;
+    }
 
     if (_applyTableCellLinkPaste(cell, currentText, nextText)) {
       return;
@@ -2699,6 +2848,14 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (_applyTableCellInlineMarkdownPaste(
       cell,
       currentChildren,
+      currentText,
+      nextText,
+    )) {
+      return;
+    }
+
+    if (_applyTableCellStoredMarkInsertion(
+      cell,
       currentText,
       nextText,
     )) {
@@ -2727,6 +2884,37 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       columnIndex: cell.columnIndex,
       header: cell.header,
     );
+  }
+
+  bool _applyTableCellStoredMarkInsertion(
+    _TableCellSelection cell,
+    String currentText,
+    String nextText,
+  ) {
+    if (!_storedMarkTargetMatchesCurrentSelection()) return false;
+
+    final diff = _plainTextDiff(currentText, nextText);
+    if (!diff.range.isCollapsed ||
+        diff.replacement.isEmpty ||
+        diff.replacement.contains('\n')) {
+      return false;
+    }
+
+    final applied =
+        _controller.documentEditor.replaceTableCellRangeWithInlineNodes(
+      blockId: cell.tableId,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+      range: diff.range,
+      replacement: _storedMarkedTextNodes(diff.replacement),
+    );
+    if (!applied) return false;
+
+    _syncActiveTableCell(
+      selectionOffset: diff.range.start + diff.replacement.length,
+    );
+    return true;
   }
 
   bool _applyTableCellInlineMarkdownPaste(
@@ -3596,6 +3784,12 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       editingText.length,
       plainTextEditing: plainTextEditing,
     );
+    final nextStoredTarget = plainTextEditing && segment.block != null
+        ? _StoredMarkTarget.formattedBlock(segment.block!.id)
+        : null;
+    if (nextStoredTarget == null || nextStoredTarget != _storedMarkTarget) {
+      _clearStoredMarks();
+    }
     _syncingFormattedBlock = true;
     _formattedBlockController.block = plainTextEditing ? segment.block : null;
     _formattedBlockController.value = TextEditingValue(
@@ -3686,6 +3880,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (_applyFormattedInputRule(range, block, replacement)) return;
 
     if (block != null && block.plainText == replacement) {
+      _clearStoredMarksForExpandedSelection();
       final sourceOffset = _activeFormattedBlockSourceOffset +
           _plainTextSourceOffsetFor(block, block.toMarkdown());
       final localSelection = _formattedBlockController.selection;
@@ -3708,6 +3903,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     }
 
     if (_applyFormattedLinkPaste(range, block, replacement)) {
+      return;
+    }
+
+    if (_applyFormattedStoredMarkInsertion(range, block, replacement)) {
       return;
     }
 
@@ -3743,6 +3942,38 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _formattedBlockController.block = nextBlock;
     _activeFormattedRange = _rangeForActiveContainer(range.start, nextBlock);
     _controller.textController.selection = globalSelection;
+  }
+
+  bool _applyFormattedStoredMarkInsertion(
+    TextRange range,
+    MarkdownBlock? block,
+    String replacement,
+  ) {
+    if (!_usesPlainTextEditing(block) ||
+        !_storedMarkTargetMatchesCurrentSelection()) {
+      return false;
+    }
+
+    final diff = _plainTextDiff(block!.plainText, replacement);
+    if (!diff.range.isCollapsed ||
+        diff.replacement.isEmpty ||
+        diff.replacement.contains('\n')) {
+      return false;
+    }
+
+    final applied = _controller.documentEditor.replaceTextRangeWithInlineNodes(
+      block.id,
+      diff.range,
+      _storedMarkedTextNodes(diff.replacement),
+    );
+    if (!applied) return false;
+
+    final selectionOffset = diff.range.start + diff.replacement.length;
+    _syncActiveFormattedBlock(
+      block.id,
+      selectionOffset: selectionOffset,
+    );
+    return true;
   }
 
   bool _preserveFormattedWikilinkTrigger(
@@ -5462,6 +5693,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _activeFormattedContainerBlockId = null;
     _activeFormattedBlockSourceOffset = 0;
     _activeFormattedPlainText = false;
+    _clearStoredMarks();
   }
 
   void _toggleFocusMode() {
@@ -5576,6 +5808,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final sourceHadFocus = _focusNode.hasFocus;
 
     if (!change()) return;
+    _clearStoredMarks();
 
     if (_mode == MarkdownEditorMode.formatted) {
       if (activeTableCell != null &&
@@ -5796,9 +6029,15 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   void _applyActiveInlineCommand(MarkdownEditorCommand command) {
     final selection = _formattedBlockController.selection;
     if (!selection.isValid || selection.isCollapsed) {
+      if (selection.isValid &&
+          selection.isCollapsed &&
+          _toggleStoredMarkCommand(command)) {
+        return;
+      }
       _formattedBlockFocusNode.requestFocus();
       return;
     }
+    _clearStoredMarks();
 
     final localRange = TextRange(
       start: selection.start,
@@ -5929,9 +6168,15 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
     final selection = _tableCellController.selection;
     if (!selection.isValid || selection.isCollapsed) {
+      if (selection.isValid &&
+          selection.isCollapsed &&
+          _toggleStoredMarkCommand(command)) {
+        return;
+      }
       _tableCellFocusNode.requestFocus();
       return;
     }
+    _clearStoredMarks();
 
     final applied = _controller.documentEditor.applyTableCellInlineCommand(
       blockId: cell.tableId,
@@ -8094,6 +8339,46 @@ class _TableCellSelection {
       header: header ?? this.header,
     );
   }
+}
+
+class _StoredMarkTarget {
+  const _StoredMarkTarget.formattedBlock(this.blockId)
+      : tableId = null,
+        rowIndex = null,
+        columnIndex = null,
+        header = null;
+
+  const _StoredMarkTarget.tableCell({
+    required this.tableId,
+    required this.rowIndex,
+    required this.columnIndex,
+    required this.header,
+  }) : blockId = null;
+
+  final String? blockId;
+  final String? tableId;
+  final int? rowIndex;
+  final int? columnIndex;
+  final bool? header;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _StoredMarkTarget &&
+        other.blockId == blockId &&
+        other.tableId == tableId &&
+        other.rowIndex == rowIndex &&
+        other.columnIndex == columnIndex &&
+        other.header == header;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        blockId,
+        tableId,
+        rowIndex,
+        columnIndex,
+        header,
+      );
 }
 
 class _MarkdownBlockSegment {
