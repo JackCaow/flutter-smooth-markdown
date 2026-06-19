@@ -3246,6 +3246,18 @@ E = mc^2
         imageId,
         url: 'assets/updated.png',
         alt: 'Updated',
+        title: 'Updated title',
+      );
+
+      expect(
+        editor.document.toMarkdown(),
+        'Intro\n\n![Updated](assets/updated.png "Updated title")',
+      );
+
+      editor.updateImageBlock(
+        imageId,
+        url: 'assets/updated.png',
+        alt: 'Updated',
       );
 
       expect(

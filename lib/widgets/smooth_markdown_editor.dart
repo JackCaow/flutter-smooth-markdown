@@ -6096,7 +6096,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     }
 
     final alt = result.alt.trim();
-    final title = result.title?.trim();
+    final title = _normalizeOptionalMarkdownTitle(result.title);
     if (_mode == MarkdownEditorMode.formatted && _activeTableCell != null) {
       _insertImageInActiveTableCell(url: url, alt: alt, title: title);
       return;
@@ -6147,6 +6147,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       return _showImageEditorDialog(
         initialUrl: '',
         initialAlt: initialAlt,
+        initialTitle: '',
       );
     }
 
@@ -6435,12 +6436,14 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   Future<_ImageEditorResult?> _showImageEditorDialog({
     required String initialUrl,
     required String initialAlt,
+    required String initialTitle,
   }) {
     return showDialog<_ImageEditorResult>(
       context: context,
       builder: (context) => _ImageEditorDialog(
         initialUrl: initialUrl,
         initialAlt: initialAlt,
+        initialTitle: initialTitle,
       ),
     );
   }
@@ -6449,6 +6452,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final result = await _showImageEditorDialog(
       initialUrl: block.url,
       initialAlt: block.alt,
+      initialTitle: block.title ?? '',
     );
     if (result == null || !mounted) return;
 
@@ -6459,9 +6463,14 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       block.id,
       url: url,
       alt: result.alt.trim(),
-      title: block.title,
+      title: _normalizeOptionalMarkdownTitle(result.title),
     );
     setState(_clearActiveFormattedBlock);
+  }
+
+  String? _normalizeOptionalMarkdownTitle(String? title) {
+    final trimmed = title?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   String _normalizeLinkUrl(String url) {
@@ -8408,10 +8417,12 @@ class _ImageEditorDialog extends StatefulWidget {
   const _ImageEditorDialog({
     required this.initialUrl,
     required this.initialAlt,
+    required this.initialTitle,
   });
 
   final String initialUrl;
   final String initialAlt;
+  final String initialTitle;
 
   @override
   State<_ImageEditorDialog> createState() => _ImageEditorDialogState();
@@ -8420,18 +8431,21 @@ class _ImageEditorDialog extends StatefulWidget {
 class _ImageEditorDialogState extends State<_ImageEditorDialog> {
   late final TextEditingController _urlController;
   late final TextEditingController _altController;
+  late final TextEditingController _titleController;
 
   @override
   void initState() {
     super.initState();
     _urlController = TextEditingController(text: widget.initialUrl);
     _altController = TextEditingController(text: widget.initialAlt);
+    _titleController = TextEditingController(text: widget.initialTitle);
   }
 
   @override
   void dispose() {
     _urlController.dispose();
     _altController.dispose();
+    _titleController.dispose();
     super.dispose();
   }
 
@@ -8463,6 +8477,16 @@ class _ImageEditorDialogState extends State<_ImageEditorDialog> {
                 border: OutlineInputBorder(),
                 labelText: 'Alt text',
               ),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('smooth_markdown_editor_image_title_input'),
+              controller: _titleController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Title',
+              ),
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _submit(),
             ),
@@ -8487,6 +8511,7 @@ class _ImageEditorDialogState extends State<_ImageEditorDialog> {
       _ImageEditorResult(
         url: _urlController.text,
         alt: _altController.text,
+        title: _titleController.text,
       ),
     );
   }

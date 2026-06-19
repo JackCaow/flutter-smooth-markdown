@@ -2327,15 +2327,20 @@ void main() {
         find.byKey(const ValueKey('smooth_markdown_editor_image_alt_input')),
         'Diagram',
       );
+      await tester.enterText(
+        find.byKey(const ValueKey('smooth_markdown_editor_image_title_input')),
+        'Initial title',
+      );
       await tester.tap(find.text('Apply'));
       await tester.pump();
 
       expect(
         controller.text,
-        'Intro\n\n![Diagram](assets/diagram.png)',
+        'Intro\n\n![Diagram](assets/diagram.png "Initial title")',
       );
       expect(controller.document.blocks, hasLength(3));
-      expect(controller.document.blocks[1], isA<MarkdownImageBlock>());
+      final insertedImage = controller.document.blocks[1] as MarkdownImageBlock;
+      expect(insertedImage.title, 'Initial title');
       expect(controller.document.blocks[2].plainText, '');
       expect(
         find.byKey(const ValueKey('smooth_markdown_editor_image_block_7')),
@@ -2360,6 +2365,37 @@ void main() {
       await tester.enterText(
         find.byKey(const ValueKey('smooth_markdown_editor_image_alt_input')),
         'Updated',
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(
+                const ValueKey('smooth_markdown_editor_image_title_input'),
+              ),
+            )
+            .controller!
+            .text,
+        'Initial title',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('smooth_markdown_editor_image_title_input')),
+        'Updated title',
+      );
+      await tester.tap(find.text('Apply'));
+      await tester.pump();
+
+      expect(
+        controller.text,
+        'Intro\n\n![Updated](assets/updated.png "Updated title")',
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_image_edit_7')),
+      );
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('smooth_markdown_editor_image_title_input')),
+        '',
       );
       await tester.tap(find.text('Apply'));
       await tester.pump();

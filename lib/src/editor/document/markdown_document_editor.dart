@@ -593,7 +593,8 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     final block = _document.blockById(blockId);
     if (block is! MarkdownImageBlock) return;
     replaceBlock(
-      block.copyWith(
+      MarkdownImageBlock(
+        id: block.id,
         url: url,
         alt: alt,
         title: title,
