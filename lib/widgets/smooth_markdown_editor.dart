@@ -10,6 +10,7 @@ import '../src/config/markdown_config.dart';
 import '../src/config/style_sheet.dart';
 import '../src/editor/document/markdown_document.dart';
 import '../src/editor/document/markdown_document_codec.dart';
+import '../src/editor/document/markdown_document_editor.dart';
 import '../src/editor/markdown_editor_controller.dart';
 import '../src/editor/markdown_editor_export.dart';
 import '../src/editor/wikilink.dart';
@@ -311,6 +312,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   String? _activeFormattedContainerBlockId;
   var _activeFormattedBlockSourceOffset = 0;
   bool _activeFormattedPlainText = false;
+  MarkdownDocumentSelection? _activeDocumentSelection;
   _TableCellSelection? _activeTableCell;
   bool _syncingFormattedBlock = false;
   bool _syncingTableCell = false;
@@ -331,6 +333,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   final _FormattedInlineTextController _tableCellController =
       _FormattedInlineTextController();
   final FocusNode _formattedBlockFocusNode = FocusNode();
+  final FocusNode _formattedPaneFocusNode = FocusNode();
   final FocusNode _tableCellFocusNode = FocusNode();
   final FocusNode _searchFocusNode = FocusNode();
 
@@ -394,6 +397,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       ..removeListener(_handleFormattedBlockChanged)
       ..dispose();
     _formattedBlockFocusNode.dispose();
+    _formattedPaneFocusNode.dispose();
     _tableCellController
       ..removeListener(_handleTableCellChanged)
       ..dispose();
@@ -448,6 +452,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   void _handleControllerChanged() {
     _refreshInlineSuggestions();
     _refreshSearchMatches();
+    _clearActiveDocumentSelectionIfInvalid();
     widget.onChanged?.call(_controller.text);
     if (mounted) {
       setState(() {});
@@ -1130,33 +1135,37 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final theme = Theme.of(context);
     final segments = _documentBlockSegments();
 
-    return DecoratedBox(
-      key: _formattedViewportKey,
-      decoration: widget.previewDecoration ??
-          BoxDecoration(color: theme.colorScheme.surface),
-      child: SingleChildScrollView(
-        key: _formattedScrollKey,
-        controller: _formattedScrollController,
-        padding: const EdgeInsets.all(16),
-        child: segments.isEmpty
-            ? _buildEmptyFormattedEditor(context)
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < segments.length; i++) ...[
-                    KeyedSubtree(
-                      key: _formattedSegmentGlobalKey(segments[i]),
-                      child: _buildFormattedSegment(context, segments[i]),
-                    ),
-                    if (i < segments.length - 1)
-                      SizedBox(
-                        height: widget.styleSheet?.blockSpacing ??
-                            MarkdownStyleSheet.light().blockSpacing ??
-                            16,
+    return Focus(
+      focusNode: _formattedPaneFocusNode,
+      onKeyEvent: _handleFormattedPaneKeyEvent,
+      child: DecoratedBox(
+        key: _formattedViewportKey,
+        decoration: widget.previewDecoration ??
+            BoxDecoration(color: theme.colorScheme.surface),
+        child: SingleChildScrollView(
+          key: _formattedScrollKey,
+          controller: _formattedScrollController,
+          padding: const EdgeInsets.all(16),
+          child: segments.isEmpty
+              ? _buildEmptyFormattedEditor(context)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < segments.length; i++) ...[
+                      KeyedSubtree(
+                        key: _formattedSegmentGlobalKey(segments[i]),
+                        child: _buildFormattedSegment(context, segments[i]),
                       ),
+                      if (i < segments.length - 1)
+                        SizedBox(
+                          height: widget.styleSheet?.blockSpacing ??
+                              MarkdownStyleSheet.light().blockSpacing ??
+                              16,
+                        ),
+                    ],
                   ],
-                ],
-              ),
+                ),
+        ),
       ),
     );
   }
@@ -1240,15 +1249,25 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       return _buildFormattedBlockquoteSegment(context, segment, block);
     }
 
-    return InkWell(
+    final selected = _activeDocumentSelectionIncludes(segment);
+    final child = InkWell(
       key: ValueKey(
           'smooth_markdown_editor_formatted_block_${segment.range.start}'),
       borderRadius: BorderRadius.circular(6),
-      onTap: widget.enabled ? () => _activateFormattedSegment(segment) : null,
+      onTap: widget.enabled ? () => _handleFormattedSegmentTap(segment) : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: _renderMarkdown(segment.source),
       ),
+    );
+    if (!selected) return child;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: child,
     );
   }
 
@@ -4003,6 +4022,168 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     widget.onTapLink?.call(normalizedUrl);
   }
 
+  void _handleFormattedSegmentTap(_MarkdownBlockSegment segment) {
+    if (HardwareKeyboard.instance.isShiftPressed &&
+        _selectFormattedDocumentRangeTo(segment)) {
+      return;
+    }
+
+    _activateFormattedSegment(segment);
+  }
+
+  bool _selectFormattedDocumentRangeTo(_MarkdownBlockSegment focusSegment) {
+    if (!_isSelectableTopLevelTextSegment(focusSegment)) return false;
+
+    final focusBlock = focusSegment.block!;
+    final focusIndex = _topLevelTextBlockIndex(focusBlock.id);
+    if (focusIndex == -1) return false;
+
+    final existingSelection = _activeDocumentSelection;
+    final existingAnchor = existingSelection?.anchor;
+    final existingAnchorIndex = existingAnchor == null
+        ? -1
+        : _topLevelTextBlockIndex(existingAnchor.blockId);
+    final anchorIndex = existingAnchorIndex == -1
+        ? _activeTopLevelTextBlockIndex()
+        : existingAnchorIndex;
+    if (anchorIndex == -1) return false;
+
+    final anchorBlock = _controller.document.blocks[anchorIndex];
+    if (!_isSelectableTopLevelTextBlock(anchorBlock)) return false;
+
+    final anchor = existingAnchorIndex == -1
+        ? MarkdownDocumentPosition(
+            blockId: anchorBlock.id,
+            offset:
+                focusIndex >= anchorIndex ? 0 : anchorBlock.plainText.length,
+          )
+        : existingAnchor!;
+    final focus = MarkdownDocumentPosition(
+      blockId: focusBlock.id,
+      offset: focusIndex >= anchorIndex ? focusBlock.plainText.length : 0,
+    );
+    final selection = MarkdownDocumentSelection(anchor: anchor, focus: focus);
+    if (_documentSelectionBlockIds(selection).isEmpty) return false;
+
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = null
+      ..value = const TextEditingValue();
+    _syncingFormattedBlock = false;
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeDocumentSelection = selection;
+    });
+    final sourceSelection = _sourceSelectionForDocumentSelection(selection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _isSelectableTopLevelTextSegment(_MarkdownBlockSegment segment) {
+    final block = segment.block;
+    return block != null &&
+        _isSelectableTopLevelTextBlock(block) &&
+        segment.containerBlockId == block.id;
+  }
+
+  bool _isSelectableTopLevelTextBlock(MarkdownBlock block) {
+    return block is MarkdownParagraphBlock || block is MarkdownHeadingBlock;
+  }
+
+  int _topLevelTextBlockIndex(String blockId) {
+    final blocks = _controller.document.blocks;
+    for (var index = 0; index < blocks.length; index++) {
+      final block = blocks[index];
+      if (block.id == blockId && _isSelectableTopLevelTextBlock(block)) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  int _activeTopLevelTextBlockIndex() {
+    final blockId = _activeFormattedBlockId;
+    if (!_activeFormattedPlainText || blockId == null) return -1;
+    return _topLevelTextBlockIndex(blockId);
+  }
+
+  bool _activeDocumentSelectionIncludes(_MarkdownBlockSegment segment) {
+    final selection = _activeDocumentSelection;
+    final block = segment.block;
+    if (selection == null || block == null) return false;
+    if (!_isSelectableTopLevelTextSegment(segment)) return false;
+    return _documentSelectionBlockIds(selection).contains(block.id);
+  }
+
+  List<String> _documentSelectionBlockIds(
+    MarkdownDocumentSelection selection,
+  ) {
+    final anchorIndex = _topLevelTextBlockIndex(selection.anchor.blockId);
+    final focusIndex = _topLevelTextBlockIndex(selection.focus.blockId);
+    if (anchorIndex == -1 || focusIndex == -1) return const [];
+
+    final startIndex = anchorIndex < focusIndex ? anchorIndex : focusIndex;
+    final endIndex = anchorIndex < focusIndex ? focusIndex : anchorIndex;
+    final blocks = _controller.document.blocks;
+    final selected = <String>[];
+    for (var index = startIndex; index <= endIndex; index++) {
+      final block = blocks[index];
+      if (!_isSelectableTopLevelTextBlock(block)) return const [];
+      selected.add(block.id);
+    }
+    return selected;
+  }
+
+  TextSelection? _sourceSelectionForDocumentSelection(
+    MarkdownDocumentSelection selection,
+  ) {
+    final anchorIndex = _topLevelTextBlockIndex(selection.anchor.blockId);
+    final focusIndex = _topLevelTextBlockIndex(selection.focus.blockId);
+    if (anchorIndex == -1 || focusIndex == -1) return null;
+
+    final segments = _documentBlockSegments();
+    _MarkdownBlockSegment? segmentFor(String blockId) {
+      for (final segment in segments) {
+        if (segment.block?.id == blockId) return segment;
+      }
+      return null;
+    }
+
+    final anchorSegment = segmentFor(selection.anchor.blockId);
+    final focusSegment = segmentFor(selection.focus.blockId);
+    if (anchorSegment == null || focusSegment == null) return null;
+
+    return TextSelection(
+      baseOffset: anchorIndex <= focusIndex
+          ? anchorSegment.range.start
+          : anchorSegment.range.end,
+      extentOffset: anchorIndex <= focusIndex
+          ? focusSegment.range.end
+          : focusSegment.range.start,
+    );
+  }
+
+  void _clearActiveDocumentSelectionIfInvalid() {
+    final selection = _activeDocumentSelection;
+    if (selection != null && _documentSelectionBlockIds(selection).isEmpty) {
+      _activeDocumentSelection = null;
+    }
+  }
+
   Widget _renderBlockMath(BuildContext context, String latex) {
     final styleSheet = widget.styleSheet ?? MarkdownStyleSheet.light();
     return const BlockMathBuilder().build(
@@ -4043,6 +4224,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _syncingFormattedBlock = false;
 
     setState(() {
+      _activeDocumentSelection = null;
+      _activeTableCell = null;
       _activeFormattedRange = segment.range;
       _activeFormattedBlockId = plainTextEditing ? segment.block!.id : null;
       _activeFormattedContainerBlockId = plainTextEditing
@@ -5182,6 +5365,19 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     });
   }
 
+  KeyEventResult _handleFormattedPaneKeyEvent(
+    FocusNode node,
+    KeyEvent event,
+  ) {
+    if (event is KeyDownEvent && _shouldDeleteActiveDocumentSelection(event)) {
+      return _deleteActiveDocumentSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    return _handleKeyEvent(node, event);
+  }
+
   Future<void> _showBlockMathEditor(
     _MarkdownBlockSegment segment,
     String latex,
@@ -5222,6 +5418,12 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final suggestionResult = _handleSuggestionKeyEvent(event);
     if (suggestionResult == KeyEventResult.handled) {
       return suggestionResult;
+    }
+
+    if (_shouldDeleteActiveDocumentSelection(event)) {
+      return _deleteActiveDocumentSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
     }
 
     final isModifierPressed = HardwareKeyboard.instance.isMetaPressed ||
@@ -5339,6 +5541,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   String? _activeFormattedSelectionMarkdown() {
+    final documentSelection = _activeDocumentSelection;
+    if (_mode == MarkdownEditorMode.formatted && documentSelection != null) {
+      return _controller.copyDocumentSelectionAsMarkdown(documentSelection);
+    }
+
     if (_tableCellFocusNode.hasFocus) {
       final children = _tableCellController.inlineNodes;
       if (children == null ||
@@ -5968,6 +6175,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _activeFormattedContainerBlockId = null;
     _activeFormattedBlockSourceOffset = 0;
     _activeFormattedPlainText = false;
+    _activeDocumentSelection = null;
     _clearStoredMarks();
   }
 
@@ -6068,6 +6276,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   String? _activeBlockIdForTopLevelMove() {
+    if (_activeDocumentSelection != null) return null;
+
     final activeTableCell = _activeTableCell;
     if (activeTableCell != null) return activeTableCell.tableId;
     if (_activeFormattedPlainText && _activeFormattedBlockId != null) {
@@ -6135,6 +6345,44 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return true;
   }
 
+  bool _shouldDeleteActiveDocumentSelection(KeyEvent event) {
+    if (_mode != MarkdownEditorMode.formatted ||
+        _activeDocumentSelection == null ||
+        event is! KeyDownEvent) {
+      return false;
+    }
+
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isMetaPressed ||
+        keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isShiftPressed) {
+      return false;
+    }
+
+    return event.logicalKey == LogicalKeyboardKey.backspace ||
+        event.logicalKey == LogicalKeyboardKey.delete;
+  }
+
+  bool _deleteActiveDocumentSelection() {
+    if (!widget.enabled || _mode != MarkdownEditorMode.formatted) return false;
+
+    final selection = _activeDocumentSelection;
+    if (selection == null) return false;
+
+    final result = _controller.deleteDocumentSelection(selection);
+    if (result == null) {
+      setState(_clearActiveFormattedBlock);
+      return false;
+    }
+
+    _syncActiveFormattedBlock(
+      result.activeBlockId,
+      selectionOffset: result.selectionOffset,
+    );
+    return true;
+  }
+
   void _undo() {
     _applyHistoryChange(_controller.undo);
   }
@@ -6147,6 +6395,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (!widget.enabled) return;
 
     final activeTableCell = _activeTableCell;
+    final activeDocumentSelection = _activeDocumentSelection;
     final tableSelection = _tableCellController.selection;
     final sourceHadFocus = _focusNode.hasFocus;
 
@@ -6156,6 +6405,22 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (_mode == MarkdownEditorMode.formatted) {
       if (activeTableCell != null &&
           _restoreTableCellAfterHistory(activeTableCell, tableSelection)) {
+        return;
+      }
+
+      if (activeDocumentSelection != null &&
+          _documentSelectionBlockIds(activeDocumentSelection).isNotEmpty) {
+        setState(() {
+          _clearActiveFormattedBlock();
+          _activeTableCell = null;
+          _activeDocumentSelection = activeDocumentSelection;
+        });
+        final sourceSelection =
+            _sourceSelectionForDocumentSelection(activeDocumentSelection);
+        if (sourceSelection != null) {
+          _controller.textController.selection = sourceSelection;
+        }
+        _formattedPaneFocusNode.requestFocus();
         return;
       }
 
@@ -6275,6 +6540,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _syncingFormattedBlock = false;
 
     setState(() {
+      _activeDocumentSelection = null;
+      _activeTableCell = null;
       _activeFormattedRange = activeSegment.range;
       _activeFormattedBlockId = activeBlock.id;
       _activeFormattedContainerBlockId = container?.id ?? activeBlock.id;
@@ -6297,8 +6564,68 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     });
   }
 
+  bool _applyActiveDocumentSelectionCommand(MarkdownEditorCommand command) {
+    final selection = _activeDocumentSelection;
+    if (_mode != MarkdownEditorMode.formatted || selection == null) {
+      return false;
+    }
+
+    var changed = false;
+    if (_isDocumentSelectionInlineCommand(command)) {
+      changed = _controller.applyInlineCommandToDocumentSelection(
+        selection,
+        command,
+      );
+    } else if (_isBlockCommand(command)) {
+      changed = _controller.applyBlockCommandToDocumentSelection(
+        selection,
+        command,
+      );
+    }
+    if (!changed) return false;
+
+    final nextSelection =
+        _documentSelectionBlockIds(selection).isEmpty ? null : selection;
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeDocumentSelection = nextSelection;
+    });
+    final sourceSelection = nextSelection == null
+        ? null
+        : _sourceSelectionForDocumentSelection(nextSelection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _isDocumentSelectionInlineCommand(MarkdownEditorCommand command) {
+    return switch (command) {
+      MarkdownEditorCommand.bold ||
+      MarkdownEditorCommand.italic ||
+      MarkdownEditorCommand.strikethrough ||
+      MarkdownEditorCommand.inlineCode =>
+        true,
+      _ => false,
+    };
+  }
+
   void _applyCommand(MarkdownEditorCommand command) {
     if (!widget.enabled) return;
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeDocumentSelection != null) {
+      if (_applyActiveDocumentSelectionCommand(command)) {
+        return;
+      }
+      _formattedPaneFocusNode.requestFocus();
+      return;
+    }
     if (command == MarkdownEditorCommand.image) {
       unawaited(_insertImageCommand());
       return;
@@ -6965,7 +7292,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   void _requestActiveEditorFocus() {
-    if (_mode == MarkdownEditorMode.formatted && _activeTableCell != null) {
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeDocumentSelection != null) {
+      _formattedPaneFocusNode.requestFocus();
+    } else if (_mode == MarkdownEditorMode.formatted &&
+        _activeTableCell != null) {
       _tableCellFocusNode.requestFocus();
     } else if (_mode == MarkdownEditorMode.formatted &&
         _activeFormattedPlainText) {

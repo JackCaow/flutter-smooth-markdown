@@ -99,6 +99,15 @@ Future<void> _sendControlShortcut(
   }
 }
 
+Future<void> _shiftTap(WidgetTester tester, Finder finder) async {
+  await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+  try {
+    await tester.tap(finder);
+  } finally {
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+  }
+}
+
 Future<void> _tapToolbarIcon(WidgetTester tester, IconData icon) async {
   final iconFinder = find.byIcon(icon);
   final toolbarScrollable = find.byWidgetPredicate(
@@ -2042,6 +2051,192 @@ void main() {
       );
       expect(_hasBoldSpan(linkedSpan, 'world'), isTrue);
       expect(_hasUnderlineSpan(linkedSpan, 'world'), isTrue);
+    });
+
+    testWidgets('formatted shift-click copies top-level document selection',
+        (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final controller = MarkdownEditorController(text: '**Alpha**\n\nBeta');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_11')),
+      );
+      await tester.pump();
+
+      await _sendControlShortcut(tester, LogicalKeyboardKey.keyC);
+      await tester.pump();
+
+      expect(clipboardText, '**Alpha**\n\nBeta');
+    });
+
+    testWidgets('formatted document selection toolbar bolds selected blocks',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Alpha\n\nBeta');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_7')),
+      );
+      await tester.pump();
+
+      await _tapToolbarIcon(tester, Icons.format_bold);
+      await tester.pump();
+
+      expect(controller.text, '**Alpha**\n\n**Beta**');
+    });
+
+    testWidgets('formatted document selection toolbar groups selected blocks',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Alpha\n\nBeta');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_7')),
+      );
+      await tester.pump();
+
+      await _tapToolbarIcon(tester, Icons.format_list_bulleted);
+      await tester.pump();
+
+      expect(controller.text, '- Alpha\n- Beta');
+    });
+
+    testWidgets('formatted document selection delete removes selected blocks',
+        (tester) async {
+      final controller =
+          MarkdownEditorController(text: 'Alpha\n\nBeta\n\nGamma');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_7')),
+      );
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.pump();
+
+      expect(controller.text, 'Gamma');
+
+      await tester
+          .tap(find.byKey(const ValueKey('smooth_markdown_editor_undo')));
+      await tester.pump();
+
+      expect(controller.text, 'Alpha\n\nBeta\n\nGamma');
+    });
+
+    testWidgets('formatted document selection ignores unsupported block ranges',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: 'Alpha\n\n'
+            '| A |\n'
+            '| --- |\n'
+            '| cell |\n\n'
+            'Omega',
+      );
+      addTearDown(controller.dispose);
+      final omegaStart = controller.text.indexOf('Omega');
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          ValueKey('smooth_markdown_editor_formatted_block_$omegaStart'),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_formatted_active_$omegaStart'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('toolbar reflects active inline marks like Scratch',
