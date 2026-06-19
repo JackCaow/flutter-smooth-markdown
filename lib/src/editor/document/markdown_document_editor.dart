@@ -397,6 +397,30 @@ class MarkdownDocumentEditor extends ChangeNotifier {
         !_isGeneratedScratchTrailingParagraph(target);
   }
 
+  /// Whether the top-level block containing [blockId] can move to [targetIndex].
+  bool canMoveBlockToIndex({
+    required String blockId,
+    required int targetIndex,
+  }) {
+    final fromIndex = _topLevelBlockIndexContaining(blockId);
+    if (fromIndex == -1 ||
+        targetIndex < 0 ||
+        targetIndex >= _document.blocks.length ||
+        fromIndex == targetIndex) {
+      return false;
+    }
+
+    final block = _document.blocks[fromIndex];
+    if (block is MarkdownFrontmatterBlock ||
+        _isGeneratedScratchTrailingParagraph(block)) {
+      return false;
+    }
+
+    final target = _document.blocks[targetIndex];
+    return target is! MarkdownFrontmatterBlock &&
+        !_isGeneratedScratchTrailingParagraph(target);
+  }
+
   /// Moves the top-level block containing [blockId] up or down.
   MarkdownSelectionTransactionResult? moveBlock({
     required String blockId,
@@ -409,6 +433,32 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     if (!canMoveBlock(blockId: blockId, upward: upward)) return null;
 
     final nextDocument = _document.moveTopLevelBlock(blockId, upward: upward);
+    if (!_replaceDocument(nextDocument)) return null;
+
+    return MarkdownSelectionTransactionResult(
+      document: _document,
+      activeBlockId: blockId,
+      selectionOffset: selectionOffset.clamp(0, block.plainText.length).toInt(),
+    );
+  }
+
+  /// Moves the top-level block containing [blockId] to [targetIndex].
+  MarkdownSelectionTransactionResult? moveBlockToIndex({
+    required String blockId,
+    required int targetIndex,
+    required int selectionOffset,
+  }) {
+    final block = _document.blockById(blockId);
+    if (block == null) return null;
+
+    if (!canMoveBlockToIndex(blockId: blockId, targetIndex: targetIndex)) {
+      return null;
+    }
+
+    final nextDocument = _document.moveTopLevelBlockToIndex(
+      blockId,
+      targetIndex: targetIndex,
+    );
     if (!_replaceDocument(nextDocument)) return null;
 
     return MarkdownSelectionTransactionResult(

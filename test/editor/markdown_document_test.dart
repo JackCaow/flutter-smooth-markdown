@@ -1781,6 +1781,74 @@ E = mc^2
       );
     });
 
+    test('moves the top-level block containing an active block to an index',
+        () {
+      const document = MarkdownDocument(
+        blocks: [
+          MarkdownParagraphBlock(
+            id: 'before',
+            children: [MarkdownText('Before')],
+          ),
+          MarkdownBlockquoteBlock(
+            id: 'quote',
+            blocks: [
+              MarkdownParagraphBlock(
+                id: 'inside',
+                children: [MarkdownText('Inside')],
+              ),
+            ],
+          ),
+          MarkdownParagraphBlock(
+            id: 'after',
+            children: [MarkdownText('After')],
+          ),
+          MarkdownParagraphBlock(
+            id: 'scratch-trailing',
+            children: [MarkdownText('')],
+          ),
+        ],
+      );
+      final editor = MarkdownDocumentEditor(document);
+      addTearDown(editor.dispose);
+
+      expect(
+        editor.canMoveBlockToIndex(blockId: 'inside', targetIndex: 0),
+        isTrue,
+      );
+      expect(
+        editor.canMoveBlockToIndex(blockId: 'inside', targetIndex: 1),
+        isFalse,
+      );
+      expect(
+        editor.canMoveBlockToIndex(blockId: 'inside', targetIndex: 3),
+        isFalse,
+      );
+
+      final result = editor.moveBlockToIndex(
+        blockId: 'inside',
+        targetIndex: 0,
+        selectionOffset: 3,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.activeBlockId, 'inside');
+      expect(result.selectionOffset, 3);
+      expect(
+        editor.document.toMarkdown(),
+        '> Inside\n\n'
+        'Before\n\n'
+        'After',
+      );
+
+      expect(editor.undo(), isTrue);
+      expect(
+        editor.document.toMarkdown(),
+        'Before\n\n'
+        '> Inside\n\n'
+        'After',
+      );
+    });
+
     test('splits a top-level paragraph at the caret', () {
       const document = MarkdownDocument(
         blocks: [

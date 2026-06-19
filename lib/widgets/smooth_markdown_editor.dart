@@ -318,6 +318,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   bool _syncingTableCell = false;
   _StoredMarkTarget? _storedMarkTarget;
   Set<MarkdownEditorCommand> _storedMarks = const {};
+  String? _draggingFormattedBlockId;
   final Set<int> _mermaidSourceBlocks = <int>{};
   final MenuController _copyMenuController = MenuController();
   int? _copiedCodeBlockStart;
@@ -1154,7 +1155,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                     for (var i = 0; i < segments.length; i++) ...[
                       KeyedSubtree(
                         key: _formattedSegmentGlobalKey(segments[i]),
-                        child: _buildFormattedSegment(context, segments[i]),
+                        child: _buildFormattedDraggableSegment(
+                          context,
+                          segments[i],
+                          i,
+                        ),
                       ),
                       if (i < segments.length - 1)
                         SizedBox(
@@ -1186,6 +1191,111 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         border: InputBorder.none,
         hintText: widget.placeholder ?? 'Start writing...',
       ),
+    );
+  }
+
+  Widget _buildFormattedDraggableSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    int index,
+  ) {
+    final theme = Theme.of(context);
+
+    return DragTarget<_FormattedBlockDragPayload>(
+      key: ValueKey(
+        'smooth_markdown_editor_formatted_drop_${segment.range.start}',
+      ),
+      onWillAccept: (payload) =>
+          payload != null && _canDropFormattedBlockAt(payload, index),
+      onAccept: (payload) => _moveFormattedBlockToIndex(payload, index),
+      builder: (context, candidateData, rejectedData) {
+        final highlighted = candidateData.isNotEmpty;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: highlighted
+                ? theme.colorScheme.primary.withOpacity(0.08)
+                : Colors.transparent,
+            border: Border.all(
+              color: highlighted
+                  ? theme.colorScheme.primary.withOpacity(0.65)
+                  : Colors.transparent,
+            ),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 32,
+                  child: _buildFormattedBlockDragHandle(
+                    context,
+                    segment,
+                  ),
+                ),
+                Expanded(child: _buildFormattedSegment(context, segment)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFormattedBlockDragHandle(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+  ) {
+    final block = segment.block;
+    if (block == null || !_canDragFormattedSegment(segment)) {
+      return const SizedBox(height: 32);
+    }
+
+    final theme = Theme.of(context);
+    final dragging = _draggingFormattedBlockId == block.id;
+    final color = theme.iconTheme.color?.withOpacity(dragging ? 0.35 : 0.62);
+    final child = MouseRegion(
+      cursor: SystemMouseCursors.grab,
+      child: Tooltip(
+        message: 'Move block',
+        child: SizedBox(
+          key: ValueKey(
+            'smooth_markdown_editor_drag_handle_${segment.range.start}',
+          ),
+          height: 32,
+          child: Center(
+            child: Icon(
+              Icons.drag_indicator,
+              size: 20,
+              color: color,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Draggable<_FormattedBlockDragPayload>(
+      data: _FormattedBlockDragPayload(
+        blockId: block.id,
+      ),
+      axis: Axis.vertical,
+      feedback: Material(
+        type: MaterialType.transparency,
+        child: Icon(
+          Icons.drag_indicator,
+          size: 22,
+          color: theme.colorScheme.primary,
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.35, child: child),
+      onDragStarted: () {
+        setState(() => _draggingFormattedBlockId = block.id);
+      },
+      onDragEnd: (_) {
+        if (mounted) setState(() => _draggingFormattedBlockId = null);
+      },
+      child: child,
     );
   }
 
@@ -6291,6 +6401,93 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return blockId != null && _controller.canMoveBlock(blockId, upward: upward);
   }
 
+  bool _canDragFormattedSegment(_MarkdownBlockSegment segment) {
+    if (!widget.enabled ||
+        _mode != MarkdownEditorMode.formatted ||
+        _activeDocumentSelection != null) {
+      return false;
+    }
+
+    final blockId = segment.block?.id;
+    return blockId != null &&
+        (_controller.canMoveBlock(blockId, upward: true) ||
+            _controller.canMoveBlock(blockId, upward: false));
+  }
+
+  bool _canDropFormattedBlockAt(
+    _FormattedBlockDragPayload payload,
+    int targetIndex,
+  ) {
+    return widget.enabled &&
+        _mode == MarkdownEditorMode.formatted &&
+        _controller.canMoveBlockToIndex(
+          payload.blockId,
+          targetIndex: targetIndex,
+        );
+  }
+
+  bool _moveFormattedBlockToIndex(
+    _FormattedBlockDragPayload payload,
+    int targetIndex,
+  ) {
+    if (!_canDropFormattedBlockAt(payload, targetIndex)) return false;
+
+    final activeTableCell = _activeTableCell;
+    final activeTableSelectionOffset = _selectionExtentOrTextEnd(
+      _tableCellController,
+    );
+    final activeTextBlockId =
+        _activeFormattedPlainText ? _activeFormattedBlockId : null;
+    final activeTextTopLevelId = activeTextBlockId == null
+        ? null
+        : _topLevelBlockContaining(activeTextBlockId)?.id;
+    final activeTextSelectionOffset = _selectionExtentOrTextEnd(
+      _formattedBlockController,
+    );
+    final movedActiveBlock = activeTextTopLevelId == payload.blockId;
+    final movedActiveTable = activeTableCell?.tableId == payload.blockId;
+
+    final result = _controller.moveBlockToIndex(
+      payload.blockId,
+      targetIndex: targetIndex,
+      selectionOffset: movedActiveBlock
+          ? activeTextSelectionOffset
+          : movedActiveTable
+              ? activeTableSelectionOffset
+              : 0,
+    );
+    if (result == null) return false;
+
+    _draggingFormattedBlockId = null;
+    if (activeTableCell != null &&
+        _controller.document.blockById(activeTableCell.tableId)
+            is MarkdownTableBlock) {
+      _syncActiveTableCell(selectionOffset: activeTableSelectionOffset);
+      return true;
+    }
+
+    if (activeTextBlockId != null &&
+        _controller.document.blockById(activeTextBlockId) != null) {
+      _syncActiveFormattedBlock(
+        activeTextBlockId,
+        selectionOffset: activeTextSelectionOffset,
+      );
+      return true;
+    }
+
+    setState(() {
+      _draggingFormattedBlockId = null;
+      _clearActiveFormattedBlock();
+    });
+    return true;
+  }
+
+  int _selectionExtentOrTextEnd(TextEditingController controller) {
+    final selection = controller.selection;
+    if (!selection.isValid) return controller.text.length;
+    return selection.extentOffset.clamp(0, controller.text.length).toInt();
+  }
+
   bool _moveActiveTopLevelBlock({required bool upward}) {
     if (!widget.enabled || _mode != MarkdownEditorMode.formatted) {
       return false;
@@ -9069,6 +9266,14 @@ class _MarkdownBlockSegment {
   final MarkdownBlock? block;
   final String? containerBlockId;
   final int blockSourceOffset;
+}
+
+class _FormattedBlockDragPayload {
+  const _FormattedBlockDragPayload({
+    required this.blockId,
+  });
+
+  final String blockId;
 }
 
 class _FencedCodeBlock {

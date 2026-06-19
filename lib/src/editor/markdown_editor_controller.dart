@@ -161,6 +161,17 @@ class MarkdownEditorController extends ChangeNotifier {
     return documentEditor.canMoveBlock(blockId: blockId, upward: upward);
   }
 
+  /// Whether the top-level block containing [blockId] can move to [targetIndex].
+  bool canMoveBlockToIndex(
+    String blockId, {
+    required int targetIndex,
+  }) {
+    return documentEditor.canMoveBlockToIndex(
+      blockId: blockId,
+      targetIndex: targetIndex,
+    );
+  }
+
   /// Moves the top-level block containing [blockId] up or down.
   MarkdownSelectionTransactionResult? moveBlock(
     String blockId, {
@@ -170,6 +181,21 @@ class MarkdownEditorController extends ChangeNotifier {
     final result = documentEditor.moveBlock(
       blockId: blockId,
       upward: upward,
+      selectionOffset: selectionOffset,
+    );
+    _syncSourceSelectionFromDocumentResult(result);
+    return result;
+  }
+
+  /// Moves the top-level block containing [blockId] to [targetIndex].
+  MarkdownSelectionTransactionResult? moveBlockToIndex(
+    String blockId, {
+    required int targetIndex,
+    int selectionOffset = 0,
+  }) {
+    final result = documentEditor.moveBlockToIndex(
+      blockId: blockId,
+      targetIndex: targetIndex,
       selectionOffset: selectionOffset,
     );
     _syncSourceSelectionFromDocumentResult(result);

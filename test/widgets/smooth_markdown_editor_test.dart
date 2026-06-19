@@ -3830,6 +3830,45 @@ void main() {
       expect(activeField.controller!.selection.extentOffset, 2);
     });
 
+    testWidgets('formatted drag handle reorders top-level blocks',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: 'One\n\nTwo\n\nThree',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final handle = find.byKey(
+        const ValueKey('smooth_markdown_editor_drag_handle_0'),
+      );
+      final target = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_drop_10'),
+      );
+      expect(handle, findsOneWidget);
+      expect(target, findsOneWidget);
+
+      await tester.timedDragFrom(
+        tester.getCenter(handle),
+        tester.getCenter(target) - tester.getCenter(handle),
+        const Duration(milliseconds: 300),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.text, 'Two\n\nThree\n\nOne');
+
+      expect(controller.undo(), isTrue);
+      await tester.pump();
+      expect(controller.text, 'One\n\nTwo\n\nThree');
+    });
+
     testWidgets('formatted Enter splits a paragraph block', (tester) async {
       final controller = MarkdownEditorController(text: 'HelloWorld');
       addTearDown(controller.dispose);

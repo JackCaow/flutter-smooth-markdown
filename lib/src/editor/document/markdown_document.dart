@@ -126,6 +126,25 @@ class MarkdownDocument {
     return MarkdownDocument(blocks: nextBlocks);
   }
 
+  /// Moves the top-level block containing [blockId] to [targetIndex].
+  MarkdownDocument moveTopLevelBlockToIndex(
+    String blockId, {
+    required int targetIndex,
+  }) {
+    final fromIndex = blocks.indexWhere(
+      (block) => block.findBlock(blockId) != null,
+    );
+    if (fromIndex == -1) return this;
+
+    final clampedTarget = targetIndex.clamp(0, blocks.length - 1).toInt();
+    if (fromIndex == clampedTarget) return this;
+
+    final nextBlocks = [...blocks];
+    final moved = nextBlocks.removeAt(fromIndex);
+    nextBlocks.insert(clampedTarget, moved);
+    return MarkdownDocument(blocks: nextBlocks);
+  }
+
   /// Removes the block with [blockId].
   MarkdownDocument removeBlock(String blockId) {
     return MarkdownDocument(
