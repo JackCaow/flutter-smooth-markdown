@@ -1012,6 +1012,54 @@ void main() {
       expect(controller.text, '# Edited\n\nBody');
     });
 
+    testWidgets('notifies host callbacks for text mode and focus changes',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Draft');
+      final textChanges = <String>[];
+      final modeChanges = <MarkdownEditorMode>[];
+      final focusModeChanges = <bool>[];
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            initialMode: MarkdownEditorMode.source,
+            height: 240,
+            onChanged: textChanges.add,
+            onModeChanged: modeChanges.add,
+            onFocusModeChanged: focusModeChanges.add,
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('smooth_markdown_editor_source')),
+        'Draft updated',
+      );
+      await tester.pump();
+
+      expect(textChanges, contains('Draft updated'));
+
+      await tester.tap(find.byTooltip('Preview'));
+      await tester.pump();
+      await tester.tap(find.byTooltip('Formatted'));
+      await tester.pump();
+
+      expect(
+        modeChanges,
+        <MarkdownEditorMode>[
+          MarkdownEditorMode.preview,
+          MarkdownEditorMode.formatted,
+        ],
+      );
+
+      await _tapToolbarIcon(tester, Icons.fullscreen);
+      await tester.pump();
+
+      expect(focusModeChanges, <bool>[true]);
+    });
+
     testWidgets('maps formatted inline mark cursors back to source',
         (tester) async {
       final scenarios = <({

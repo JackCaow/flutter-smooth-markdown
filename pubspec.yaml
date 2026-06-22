@@ -33,9 +33,6 @@ dependencies:
   # Image handling
   cached_network_image: ^3.3.0
 
-  # URL handling
-  url_launcher: ^6.2.0
-
   # Math formula rendering
   flutter_math_fork: ^0.7.2
 

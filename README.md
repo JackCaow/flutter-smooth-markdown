@@ -117,6 +117,12 @@ the built-in URL dialog. Provide `onExportMarkdown`, `onExportPdf`,
 `onImportMarkdown`, and `onPickImage` to connect file pickers, print/PDF
 packages, asset uploads, or platform share sheets.
 
+The core package does not ship default file picker, printing, share, upload, or
+platform image picker adapters; keep those integrations in the host app and
+route them through the callbacks above. The exported editor document model
+types are available for advanced integrations, but should be treated as
+experimental until the editor API is finalized.
+
 ### Programmatic Selection
 
 When `selectable: true`, the content is wrapped in a `SmoothSelectionRegion` (a thin `SelectableRegion` adapter). Pass a `selectionController` to drive selection programmatically:
