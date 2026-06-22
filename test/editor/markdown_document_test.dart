@@ -2576,6 +2576,183 @@ E = mc^2
       );
     });
 
+    test('normalizes and contains table cell selections', () {
+      const selection = MarkdownTableCellSelection(
+        tableId: 'table',
+        anchor: MarkdownTableCellPosition(rowIndex: 3, columnIndex: 2),
+        focus: MarkdownTableCellPosition(rowIndex: 1, columnIndex: 0),
+      );
+
+      expect(
+        selection.normalized,
+        const MarkdownTableCellSelection(
+          tableId: 'table',
+          anchor: MarkdownTableCellPosition(rowIndex: 1, columnIndex: 0),
+          focus: MarkdownTableCellPosition(rowIndex: 3, columnIndex: 2),
+        ),
+      );
+      expect(
+        selection.contains(
+          const MarkdownTableCellPosition(rowIndex: 2, columnIndex: 1),
+        ),
+        isTrue,
+      );
+      expect(
+        selection.contains(
+          const MarkdownTableCellPosition(rowIndex: 0, columnIndex: 1),
+        ),
+        isFalse,
+      );
+      expect(
+        selection.contains(
+          const MarkdownTableCellPosition(rowIndex: 2, columnIndex: 3),
+        ),
+        isFalse,
+      );
+    });
+
+    test('copies table cell selections as TSV with inline markdown', () {
+      final editor = MarkdownDocumentEditor(
+        const MarkdownDocument(
+          blocks: [
+            MarkdownTableBlock(
+              id: 'table',
+              headers: [
+                [MarkdownText('Name')],
+                [
+                  MarkdownStrong([MarkdownText('Value')]),
+                ],
+              ],
+              alignments: [null, null],
+              rows: [
+                [
+                  [MarkdownText('Alpha')],
+                  [
+                    MarkdownEmphasis([MarkdownText('one')]),
+                  ],
+                ],
+                [
+                  [MarkdownText('Beta')],
+                  [MarkdownInlineCode('two')],
+                ],
+              ],
+            ),
+          ],
+        ),
+      );
+      addTearDown(editor.dispose);
+
+      final copied = editor.copyTableSelectionAsTsv(
+        const MarkdownTableCellSelection(
+          tableId: 'table',
+          anchor: MarkdownTableCellPosition(rowIndex: 0, columnIndex: 0),
+          focus: MarkdownTableCellPosition(rowIndex: 2, columnIndex: 1),
+        ),
+      );
+
+      expect(copied, 'Name\t**Value**\nAlpha\t*one*\nBeta\t`two`');
+    });
+
+    test('clears table cell selections without deleting rows or columns', () {
+      final editor = MarkdownDocumentEditor(
+        const MarkdownDocument(
+          blocks: [
+            MarkdownTableBlock(
+              id: 'table',
+              headers: [
+                [MarkdownText('A')],
+                [MarkdownText('B')],
+                [MarkdownText('C')],
+              ],
+              alignments: [null, null, null],
+              rows: [
+                [
+                  [MarkdownText('a1')],
+                  [MarkdownText('b1')],
+                  [MarkdownText('c1')],
+                ],
+                [
+                  [MarkdownText('a2')],
+                  [MarkdownText('b2')],
+                  [MarkdownText('c2')],
+                ],
+              ],
+            ),
+          ],
+        ),
+      );
+      addTearDown(editor.dispose);
+
+      final cleared = editor.clearTableSelection(
+        const MarkdownTableCellSelection(
+          tableId: 'table',
+          anchor: MarkdownTableCellPosition(rowIndex: 1, columnIndex: 0),
+          focus: MarkdownTableCellPosition(rowIndex: 2, columnIndex: 1),
+        ),
+      );
+
+      expect(cleared, isTrue);
+      final table = editor.document.blocks.single as MarkdownTableBlock;
+      expect(table.columnCount, 3);
+      expect(table.rows, hasLength(2));
+      expect(
+        editor.document.toMarkdown(),
+        '| A | B | C |\n'
+        '| --- | --- | --- |\n'
+        '|  |  | c1 |\n'
+        '|  |  | c2 |',
+      );
+    });
+
+    test('applies inline commands to 2x2 table selections', () {
+      final editor = MarkdownDocumentEditor(
+        const MarkdownDocument(
+          blocks: [
+            MarkdownTableBlock(
+              id: 'table',
+              headers: [
+                [MarkdownText('A')],
+                [MarkdownText('B')],
+                [MarkdownText('C')],
+              ],
+              alignments: [null, null, null],
+              rows: [
+                [
+                  [MarkdownText('a1')],
+                  [MarkdownText('b1')],
+                  [MarkdownText('c1')],
+                ],
+                [
+                  [MarkdownText('a2')],
+                  [MarkdownText('b2')],
+                  [MarkdownText('c2')],
+                ],
+              ],
+            ),
+          ],
+        ),
+      );
+      addTearDown(editor.dispose);
+
+      final applied = editor.applyInlineCommandToTableSelection(
+        const MarkdownTableCellSelection(
+          tableId: 'table',
+          anchor: MarkdownTableCellPosition(rowIndex: 1, columnIndex: 0),
+          focus: MarkdownTableCellPosition(rowIndex: 2, columnIndex: 1),
+        ),
+        MarkdownEditorCommand.bold,
+      );
+
+      expect(applied, isTrue);
+      expect(
+        editor.document.toMarkdown(),
+        '| A | B | C |\n'
+        '| --- | --- | --- |\n'
+        '| **a1** | **b1** | c1 |\n'
+        '| **a2** | **b2** | c2 |',
+      );
+    });
+
     test('edits and removes existing links in text blocks', () {
       final editor = MarkdownDocumentEditor(
         const MarkdownDocument(

@@ -159,6 +159,109 @@ class MarkdownDocument {
       };
 }
 
+/// A visual position inside one editable table.
+///
+/// Row `0` addresses the table header row. Body rows start at visual row `1`
+/// and map to `MarkdownTableBlock.rows[rowIndex - 1]`.
+class MarkdownTableCellPosition {
+  /// Creates a table cell position.
+  const MarkdownTableCellPosition({
+    required this.rowIndex,
+    required this.columnIndex,
+  });
+
+  /// Visual row index. Header row is `0`; body rows start at `1`.
+  final int rowIndex;
+
+  /// Zero-based column index.
+  final int columnIndex;
+
+  /// Whether this position addresses the header row.
+  bool get isHeader => rowIndex == 0;
+
+  /// Body row index for [MarkdownTableBlock.rows].
+  int get bodyRowIndex => rowIndex - 1;
+
+  @override
+  bool operator ==(Object other) {
+    return other is MarkdownTableCellPosition &&
+        other.rowIndex == rowIndex &&
+        other.columnIndex == columnIndex;
+  }
+
+  @override
+  int get hashCode => Object.hash(rowIndex, columnIndex);
+}
+
+/// A rectangular selection inside a single editable table.
+class MarkdownTableCellSelection {
+  /// Creates a table cell selection from an anchor and focus position.
+  const MarkdownTableCellSelection({
+    required this.tableId,
+    required this.anchor,
+    required this.focus,
+  });
+
+  /// Target table block ID.
+  final String tableId;
+
+  /// Selection anchor.
+  final MarkdownTableCellPosition anchor;
+
+  /// Selection focus.
+  final MarkdownTableCellPosition focus;
+
+  /// Topmost visual row index in the normalized rectangle.
+  int get startRowIndex =>
+      anchor.rowIndex < focus.rowIndex ? anchor.rowIndex : focus.rowIndex;
+
+  /// Bottommost visual row index in the normalized rectangle.
+  int get endRowIndex =>
+      anchor.rowIndex > focus.rowIndex ? anchor.rowIndex : focus.rowIndex;
+
+  /// Leftmost column index in the normalized rectangle.
+  int get startColumnIndex => anchor.columnIndex < focus.columnIndex
+      ? anchor.columnIndex
+      : focus.columnIndex;
+
+  /// Rightmost column index in the normalized rectangle.
+  int get endColumnIndex => anchor.columnIndex > focus.columnIndex
+      ? anchor.columnIndex
+      : focus.columnIndex;
+
+  /// Returns this selection with anchor at top-left and focus at bottom-right.
+  MarkdownTableCellSelection get normalized => MarkdownTableCellSelection(
+        tableId: tableId,
+        anchor: MarkdownTableCellPosition(
+          rowIndex: startRowIndex,
+          columnIndex: startColumnIndex,
+        ),
+        focus: MarkdownTableCellPosition(
+          rowIndex: endRowIndex,
+          columnIndex: endColumnIndex,
+        ),
+      );
+
+  /// Whether [position] is inside the normalized rectangle.
+  bool contains(MarkdownTableCellPosition position) {
+    return position.rowIndex >= startRowIndex &&
+        position.rowIndex <= endRowIndex &&
+        position.columnIndex >= startColumnIndex &&
+        position.columnIndex <= endColumnIndex;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MarkdownTableCellSelection &&
+        other.tableId == tableId &&
+        other.anchor == anchor &&
+        other.focus == focus;
+  }
+
+  @override
+  int get hashCode => Object.hash(tableId, anchor, focus);
+}
+
 List<MarkdownBlock> _replaceBlockInList(
   List<MarkdownBlock> blocks,
   MarkdownBlock replacement, {

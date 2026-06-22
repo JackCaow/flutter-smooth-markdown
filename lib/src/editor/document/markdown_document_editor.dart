@@ -1075,6 +1075,115 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     return true;
   }
 
+  /// Serializes a rectangular table cell selection as tab-separated Markdown.
+  String? copyTableSelectionAsTsv(MarkdownTableCellSelection selection) {
+    final block = _document.blockById(selection.tableId);
+    if (block is! MarkdownTableBlock) return null;
+
+    final bounds = _tableSelectionBounds(block, selection);
+    if (bounds == null) return null;
+
+    final lines = <String>[];
+    for (var row = bounds.startRowIndex; row <= bounds.endRowIndex; row++) {
+      final cells = <String>[];
+      for (var column = bounds.startColumnIndex;
+          column <= bounds.endColumnIndex;
+          column++) {
+        final children = _tableCellInlineChildren(
+          block,
+          rowIndex: row == 0 ? 0 : row - 1,
+          columnIndex: column,
+          header: row == 0,
+        );
+        if (children == null) return null;
+        cells.add(_inlineMarkdown(children));
+      }
+      lines.add(cells.join('\t'));
+    }
+    return lines.join('\n');
+  }
+
+  /// Clears the contents of a rectangular table selection without deleting
+  /// rows or columns.
+  bool clearTableSelection(MarkdownTableCellSelection selection) {
+    final block = _document.blockById(selection.tableId);
+    if (block is! MarkdownTableBlock) return false;
+
+    final bounds = _tableSelectionBounds(block, selection);
+    if (bounds == null) return false;
+
+    var nextTable = block;
+    for (var row = bounds.startRowIndex; row <= bounds.endRowIndex; row++) {
+      for (var column = bounds.startColumnIndex;
+          column <= bounds.endColumnIndex;
+          column++) {
+        nextTable = nextTable.updateCell(
+          rowIndex: row == 0 ? 0 : row - 1,
+          columnIndex: column,
+          header: row == 0,
+          children: const [MarkdownText('')],
+        );
+      }
+    }
+
+    replaceBlock(nextTable);
+    return true;
+  }
+
+  /// Applies a basic inline command to every non-empty cell in a rectangular
+  /// table selection.
+  bool applyInlineCommandToTableSelection(
+    MarkdownTableCellSelection selection,
+    MarkdownEditorCommand command, {
+    String? argument,
+  }) {
+    if (!_isBasicTableSelectionInlineCommand(command)) return false;
+
+    final block = _document.blockById(selection.tableId);
+    if (block is! MarkdownTableBlock) return false;
+
+    final bounds = _tableSelectionBounds(block, selection);
+    if (bounds == null) return false;
+
+    var appliedAny = false;
+    runTransaction(() {
+      for (var row = bounds.startRowIndex; row <= bounds.endRowIndex; row++) {
+        for (var column = bounds.startColumnIndex;
+            column <= bounds.endColumnIndex;
+            column++) {
+          final current = _document.blockById(selection.tableId);
+          if (current is! MarkdownTableBlock) continue;
+
+          final header = row == 0;
+          final rowIndex = header ? 0 : row - 1;
+          final children = _tableCellInlineChildren(
+            current,
+            rowIndex: rowIndex,
+            columnIndex: column,
+            header: header,
+          );
+          if (children == null) continue;
+
+          final length = _inlinePlainText(children).length;
+          if (length == 0) continue;
+
+          final applied = applyTableCellInlineCommand(
+            blockId: selection.tableId,
+            rowIndex: rowIndex,
+            columnIndex: column,
+            header: header,
+            range: TextRange(start: 0, end: length),
+            command: command,
+            argument: argument,
+          );
+          appliedAny = appliedAny || applied;
+        }
+      }
+    });
+
+    return appliedAny;
+  }
+
   /// Returns the link intersecting [range] inside one table cell.
   MarkdownLinkEdit? tableCellLinkAtRange({
     required String blockId,
@@ -2672,6 +2781,47 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     if (rowIndex < 0 || rowIndex >= table.rows.length) return null;
     final row = table.rows[rowIndex];
     return columnIndex < row.length ? row[columnIndex] : null;
+  }
+
+  _TableSelectionBounds? _tableSelectionBounds(
+    MarkdownTableBlock table,
+    MarkdownTableCellSelection selection,
+  ) {
+    if (selection.tableId != table.id || table.columnCount == 0) {
+      return null;
+    }
+
+    final maxRowIndex = table.rows.length;
+    final maxColumnIndex = table.columnCount - 1;
+    if (selection.endRowIndex < 0 ||
+        selection.startRowIndex > maxRowIndex ||
+        selection.endColumnIndex < 0 ||
+        selection.startColumnIndex > maxColumnIndex) {
+      return null;
+    }
+
+    return _TableSelectionBounds(
+      startRowIndex: selection.startRowIndex.clamp(0, maxRowIndex).toInt(),
+      endRowIndex: selection.endRowIndex.clamp(0, maxRowIndex).toInt(),
+      startColumnIndex:
+          selection.startColumnIndex.clamp(0, maxColumnIndex).toInt(),
+      endColumnIndex: selection.endColumnIndex.clamp(0, maxColumnIndex).toInt(),
+    );
+  }
+
+  bool _isBasicTableSelectionInlineCommand(MarkdownEditorCommand command) {
+    return switch (command) {
+      MarkdownEditorCommand.bold ||
+      MarkdownEditorCommand.italic ||
+      MarkdownEditorCommand.strikethrough ||
+      MarkdownEditorCommand.inlineCode =>
+        true,
+      _ => false,
+    };
+  }
+
+  String _inlineMarkdown(List<MarkdownInlineNode> nodes) {
+    return nodes.map((node) => node.toMarkdown()).join();
   }
 
   String _inlinePlainText(List<MarkdownInlineNode> nodes) {
@@ -4390,6 +4540,20 @@ class _ResolvedTopLevelTextSelection {
   final int endOffset;
 
   bool get isCollapsed => startIndex == endIndex && startOffset == endOffset;
+}
+
+class _TableSelectionBounds {
+  const _TableSelectionBounds({
+    required this.startRowIndex,
+    required this.endRowIndex,
+    required this.startColumnIndex,
+    required this.endColumnIndex,
+  });
+
+  final int startRowIndex;
+  final int endRowIndex;
+  final int startColumnIndex;
+  final int endColumnIndex;
 }
 
 class _InlineSplit {

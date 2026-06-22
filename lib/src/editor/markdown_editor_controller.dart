@@ -260,6 +260,29 @@ class MarkdownEditorController extends ChangeNotifier {
     );
   }
 
+  /// Serializes a semantic table cell selection as TSV.
+  String? copyTableSelectionAsTsv(MarkdownTableCellSelection selection) {
+    return documentEditor.copyTableSelectionAsTsv(selection);
+  }
+
+  /// Clears a semantic table cell selection without deleting rows or columns.
+  bool clearTableSelection(MarkdownTableCellSelection selection) {
+    return documentEditor.clearTableSelection(selection);
+  }
+
+  /// Applies a basic inline command to a semantic table cell selection.
+  bool applyInlineCommandToTableSelection(
+    MarkdownTableCellSelection selection,
+    MarkdownEditorCommand command, {
+    String? argument,
+  }) {
+    return documentEditor.applyInlineCommandToTableSelection(
+      selection,
+      command,
+      argument: argument,
+    );
+  }
+
   /// Applies a block command to a semantic document selection.
   bool applyBlockCommandToDocumentSelection(
     MarkdownDocumentSelection selection,
