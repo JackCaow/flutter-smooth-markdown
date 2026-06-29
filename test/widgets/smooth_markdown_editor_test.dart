@@ -6391,6 +6391,305 @@ void main() {
       expect(clipboardText, '[site](https://example.com) and **bold**');
     });
 
+    testWidgets('formatted table shift click selects a rectangular cell range',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '| A | B | C |\n'
+            '| --- | --- | --- |\n'
+            '| 1 | 2 | 3 |\n'
+            '| 4 | 5 | 6 |',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final table =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_0'),
+        ),
+      );
+      await tester.pump();
+
+      await _shiftTap(
+        tester,
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_1_1'),
+        ),
+      );
+      await tester.pump();
+
+      for (final key in [
+        'smooth_markdown_editor_table_cell_selected_${table.id}_row_0_0',
+        'smooth_markdown_editor_table_cell_selected_${table.id}_row_0_1',
+        'smooth_markdown_editor_table_cell_selected_${table.id}_row_1_0',
+        'smooth_markdown_editor_table_cell_selected_${table.id}_row_1_1',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget);
+      }
+      expect(
+        find.byKey(
+          ValueKey(
+            'smooth_markdown_editor_table_cell_selected_${table.id}_row_0_2',
+          ),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byKey(
+          ValueKey(
+            'smooth_markdown_editor_table_cell_active_${table.id}_row_0_0',
+          ),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+        'formatted table range copy serializes TSV with inline markdown',
+        (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final controller = MarkdownEditorController(
+        text: '| A | B | C |\n'
+            '| --- | --- | --- |\n'
+            '| 1 | **2** | 3 |\n'
+            '| 4 | 5 | 6 |',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final table =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_1'),
+        ),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_1_2'),
+        ),
+      );
+      await tester.pump();
+
+      await _sendControlShortcut(tester, LogicalKeyboardKey.keyC);
+      await tester.pump();
+
+      expect(clipboardText, '**2**\t3\n5\t6');
+    });
+
+    testWidgets('formatted table range delete clears selected cells',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '| A | B | C |\n'
+            '| --- | --- | --- |\n'
+            '| 1 | 2 | 3 |\n'
+            '| 4 | 5 | 6 |',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final table =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_0'),
+        ),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_1_1'),
+        ),
+      );
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.delete);
+      await tester.pump();
+
+      final updated =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      expect(
+        updated.rows[0][0].map((node) => node.plainText).join(),
+        isEmpty,
+      );
+      expect(
+        updated.rows[0][1].map((node) => node.plainText).join(),
+        isEmpty,
+      );
+      expect(updated.rows[0][2].map((node) => node.plainText).join(), '3');
+      expect(
+        updated.rows[1][0].map((node) => node.plainText).join(),
+        isEmpty,
+      );
+      expect(
+        updated.rows[1][1].map((node) => node.plainText).join(),
+        isEmpty,
+      );
+      expect(updated.rows[1][2].map((node) => node.plainText).join(), '6');
+      expect(updated.headers.map((cell) => cell.single.plainText),
+          ['A', 'B', 'C']);
+    });
+
+    testWidgets('formatted table range toolbar command bolds selected cells',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '| A | B | C |\n'
+            '| --- | --- | --- |\n'
+            '| 1 | 2 | 3 |\n'
+            '| 4 | 5 | 6 |',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final table =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_0'),
+        ),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_1_1'),
+        ),
+      );
+      await tester.pump();
+
+      await _tapToolbarIcon(tester, Icons.format_bold);
+      await tester.pump();
+
+      final updated =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      expect(updated.rows[0][0], contains(isA<MarkdownStrong>()));
+      expect(updated.rows[0][1], contains(isA<MarkdownStrong>()));
+      expect(updated.rows[0][2], isNot(contains(isA<MarkdownStrong>())));
+      expect(updated.rows[1][0], contains(isA<MarkdownStrong>()));
+      expect(updated.rows[1][1], contains(isA<MarkdownStrong>()));
+      expect(updated.rows[1][2], isNot(contains(isA<MarkdownStrong>())));
+    });
+
+    testWidgets('formatted table normal tap clears range selection',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '| A | B | C |\n'
+            '| --- | --- | --- |\n'
+            '| 1 | 2 | 3 |\n'
+            '| 4 | 5 | 6 |',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final table =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_0'),
+        ),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_1_1'),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.byKey(
+          ValueKey(
+            'smooth_markdown_editor_table_cell_selected_${table.id}_row_0_0',
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_2'),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(
+          ValueKey(
+            'smooth_markdown_editor_table_cell_selected_${table.id}_row_0_0',
+          ),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byKey(
+          ValueKey(
+            'smooth_markdown_editor_table_cell_active_${table.id}_row_0_2',
+          ),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('formatted table cell single-line markdown paste parses inline',
         (tester) async {
       final controller = MarkdownEditorController(
