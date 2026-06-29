@@ -319,6 +319,10 @@ class MarkdownEditorController extends ChangeNotifier {
   }
 
   /// Replaces a block with parsed Markdown blocks.
+  ///
+  /// Updates [document] when [blockId] is found and [markdown] parses into at
+  /// least one block. The returned document contains the retagged replacement
+  /// blocks only, not the full updated editor document.
   MarkdownDocument? replaceBlockWithMarkdown(
     String blockId,
     String markdown,

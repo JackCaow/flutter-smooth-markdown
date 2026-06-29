@@ -1,9 +1,9 @@
-/// Experimental Markdown editor document APIs.
+/// Experimental Markdown editor model helpers.
 ///
-/// Import this library when you need low-level editable document structures or
-/// transaction helpers. These APIs are still evolving and are not covered by the
-/// same stability guarantees as the main `flutter_smooth_markdown.dart` entry
-/// point.
+/// Import this library when you need Markdown document codec access or other
+/// low-level editor model helpers that are still evolving. The main
+/// `flutter_smooth_markdown.dart` entry point exports the supported editor
+/// widgets, controller, semantic document, selection, and transaction APIs.
 library;
 
 export 'flutter_smooth_markdown.dart';

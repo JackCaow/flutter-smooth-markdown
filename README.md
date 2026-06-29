@@ -120,10 +120,10 @@ packages, asset uploads, or platform share sheets.
 The core package does not ship default file picker, printing, share, upload, or
 platform image picker adapters; keep those integrations in the host app and
 route them through the callbacks above. The main entry point exports the editor
-controller, command, and semantic document/selection APIs used by host
-integrations. For lower-level document transaction APIs, import the explicit
-experimental entry point below and treat it as unstable until the editor API is
-finalized.
+controller, command, semantic document/selection APIs, and document transaction
+helpers used by host integrations. For lower-level Markdown codec access and
+model tools that are still evolving, import the explicit experimental entry
+point below.
 
 ```dart
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor_experimental.dart';

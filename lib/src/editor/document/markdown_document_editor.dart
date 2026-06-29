@@ -820,6 +820,9 @@ class MarkdownDocumentEditor extends ChangeNotifier {
   }
 
   /// Replaces a block with parsed Markdown blocks after retagging inserted IDs.
+  ///
+  /// Returns a document containing the retagged replacement blocks only, not the
+  /// full updated editor document.
   MarkdownDocument? replaceBlockWithBlocks(
     String blockId,
     List<MarkdownBlock> blocks,
