@@ -262,6 +262,64 @@ class MarkdownTableCellSelection {
   int get hashCode => Object.hash(tableId, anchor, focus);
 }
 
+/// A contiguous item selection inside a single editable list.
+class MarkdownListItemSelection {
+  /// Creates a list item selection from an anchor and focus item ID.
+  const MarkdownListItemSelection({
+    required this.listId,
+    required this.anchorItemId,
+    required this.focusItemId,
+  });
+
+  /// Target list block ID.
+  final String listId;
+
+  /// Selection anchor item ID.
+  final String anchorItemId;
+
+  /// Selection focus item ID.
+  final String focusItemId;
+
+  /// Returns the normalized selection for [items], or null if either item is
+  /// not present in the list.
+  MarkdownListItemSelection? normalizedFor(List<MarkdownListItem> items) {
+    final anchorIndex = items.indexWhere((item) => item.id == anchorItemId);
+    final focusIndex = items.indexWhere((item) => item.id == focusItemId);
+    if (anchorIndex == -1 || focusIndex == -1) return null;
+    if (anchorIndex <= focusIndex) return this;
+    return MarkdownListItemSelection(
+      listId: listId,
+      anchorItemId: focusItemId,
+      focusItemId: anchorItemId,
+    );
+  }
+
+  /// Whether [itemId] is inside this selection for [items].
+  bool containsItem(String itemId, List<MarkdownListItem> items) {
+    final anchorIndex = items.indexWhere((item) => item.id == anchorItemId);
+    final focusIndex = items.indexWhere((item) => item.id == focusItemId);
+    final itemIndex = items.indexWhere((item) => item.id == itemId);
+    if (anchorIndex == -1 || focusIndex == -1 || itemIndex == -1) {
+      return false;
+    }
+
+    final startIndex = anchorIndex < focusIndex ? anchorIndex : focusIndex;
+    final endIndex = anchorIndex > focusIndex ? anchorIndex : focusIndex;
+    return itemIndex >= startIndex && itemIndex <= endIndex;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MarkdownListItemSelection &&
+        other.listId == listId &&
+        other.anchorItemId == anchorItemId &&
+        other.focusItemId == focusItemId;
+  }
+
+  @override
+  int get hashCode => Object.hash(listId, anchorItemId, focusItemId);
+}
+
 List<MarkdownBlock> _replaceBlockInList(
   List<MarkdownBlock> blocks,
   MarkdownBlock replacement, {

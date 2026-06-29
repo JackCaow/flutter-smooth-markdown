@@ -315,6 +315,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   MarkdownDocumentSelection? _activeDocumentSelection;
   _TableCellSelection? _activeTableCell;
   MarkdownTableCellSelection? _activeTableSelection;
+  MarkdownListItemSelection? _activeListItemSelection;
   bool _syncingFormattedBlock = false;
   bool _syncingTableCell = false;
   _StoredMarkTarget? _storedMarkTarget;
@@ -1452,6 +1453,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           );
     final active =
         editableBlock != null && _activeFormattedBlockId == editableBlock.id;
+    final selected = _activeListItemSelectionIncludes(list, item);
     final theme = Theme.of(context);
     final primaryContent = active && itemSegment != null
         ? _buildActiveFormattedTextField(context, itemSegment)
@@ -1470,7 +1472,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                 ),
                 borderRadius: BorderRadius.circular(6),
                 onTap: widget.enabled && itemSegment != null
-                    ? () => _activateFormattedSegment(itemSegment)
+                    ? () => _handleFormattedListItemTap(
+                          list,
+                          index,
+                          itemSegment,
+                        )
                     : null,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1482,6 +1488,15 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                         ),
                 ),
               );
+    final decoratedPrimaryContent = selected
+        ? DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: primaryContent,
+          )
+        : primaryContent;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1496,7 +1511,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                primaryContent,
+                decoratedPrimaryContent,
                 if (editableBlock != null)
                   for (var childIndex = 0;
                       childIndex < item.blocks.length;
@@ -4278,6 +4293,74 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _activateFormattedSegment(segment);
   }
 
+  void _handleFormattedListItemTap(
+    MarkdownListBlock list,
+    int itemIndex,
+    _MarkdownBlockSegment segment,
+  ) {
+    if (HardwareKeyboard.instance.isShiftPressed &&
+        _selectFormattedListItemRangeTo(list, itemIndex)) {
+      return;
+    }
+
+    _activateFormattedSegment(segment);
+  }
+
+  bool _selectFormattedListItemRangeTo(
+    MarkdownListBlock focusList,
+    int focusIndex,
+  ) {
+    if (focusIndex < 0 || focusIndex >= focusList.items.length) return false;
+
+    final existingSelection = _activeListItemSelection;
+    final existingAnchorLocation = existingSelection == null
+        ? null
+        : _listItemLocationForItemId(
+            existingSelection.listId,
+            existingSelection.anchorItemId,
+          );
+    final activeLocation = existingAnchorLocation ?? _activeListItemLocation();
+    if (activeLocation == null || activeLocation.list.id != focusList.id) {
+      return false;
+    }
+
+    final anchorItemId =
+        existingAnchorLocation?.item.id ?? activeLocation.item.id;
+    final selection = MarkdownListItemSelection(
+      listId: focusList.id,
+      anchorItemId: anchorItemId,
+      focusItemId: focusList.items[focusIndex].id,
+    );
+    if (selection.normalizedFor(focusList.items) == null) return false;
+
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = null
+      ..value = const TextEditingValue();
+    _syncingFormattedBlock = false;
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeListItemSelection = selection;
+    });
+    final sourceSelection = _sourceSelectionForListItemSelection(selection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
   bool _selectFormattedDocumentRangeTo(_MarkdownBlockSegment focusSegment) {
     if (!_isSelectableDocumentTextSegment(focusSegment)) return false;
 
@@ -4502,6 +4585,162 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     );
   }
 
+  bool _activeListItemSelectionIncludes(
+    MarkdownListBlock list,
+    MarkdownListItem item,
+  ) {
+    final selection = _activeListItemSelection;
+    if (selection == null || selection.listId != list.id) return false;
+    return selection.containsItem(item.id, list.items);
+  }
+
+  _ListItemLocation? _activeListItemLocation() {
+    final blockId = _activeFormattedBlockId;
+    if (!_activeFormattedPlainText || blockId == null) return null;
+    return _listItemLocationForBlockId(blockId);
+  }
+
+  _ListItemLocation? _listItemLocationForBlockId(String blockId) {
+    return _listItemLocationForBlockIdInBlocks(
+      _controller.document.blocks,
+      blockId,
+    );
+  }
+
+  _ListItemLocation? _listItemLocationForBlockIdInBlocks(
+    List<MarkdownBlock> blocks,
+    String blockId,
+  ) {
+    for (final block in blocks) {
+      if (block is MarkdownListBlock) {
+        for (var itemIndex = 0; itemIndex < block.items.length; itemIndex++) {
+          final item = block.items[itemIndex];
+          for (final child in item.blocks) {
+            final nested = _listItemLocationForBlockIdInBlocks(
+              [child],
+              blockId,
+            );
+            if (nested != null) return nested;
+          }
+
+          final primaryBlock = _firstEditableListItemBlock(item);
+          if (primaryBlock?.id == blockId) {
+            return _ListItemLocation(
+              list: block,
+              item: item,
+              itemIndex: itemIndex,
+              primaryBlock: primaryBlock,
+            );
+          }
+        }
+      } else if (block is MarkdownBlockquoteBlock) {
+        final nested = _listItemLocationForBlockIdInBlocks(
+          block.blocks,
+          blockId,
+        );
+        if (nested != null) return nested;
+      }
+    }
+    return null;
+  }
+
+  _ListItemLocation? _listItemLocationForItemId(
+    String listId,
+    String itemId,
+  ) {
+    return _listItemLocationForItemIdInBlocks(
+      _controller.document.blocks,
+      listId,
+      itemId,
+    );
+  }
+
+  _ListItemLocation? _listItemLocationForItemIdInBlocks(
+    List<MarkdownBlock> blocks,
+    String listId,
+    String itemId,
+  ) {
+    for (final block in blocks) {
+      if (block is MarkdownListBlock) {
+        if (block.id == listId) {
+          for (var index = 0; index < block.items.length; index++) {
+            final item = block.items[index];
+            if (item.id == itemId) {
+              return _ListItemLocation(
+                list: block,
+                item: item,
+                itemIndex: index,
+                primaryBlock: _firstEditableListItemBlock(item),
+              );
+            }
+          }
+        }
+
+        for (final item in block.items) {
+          final nested = _listItemLocationForItemIdInBlocks(
+            item.blocks,
+            listId,
+            itemId,
+          );
+          if (nested != null) return nested;
+        }
+      } else if (block is MarkdownBlockquoteBlock) {
+        final nested = _listItemLocationForItemIdInBlocks(
+          block.blocks,
+          listId,
+          itemId,
+        );
+        if (nested != null) return nested;
+      }
+    }
+    return null;
+  }
+
+  TextSelection? _sourceSelectionForListItemSelection(
+    MarkdownListItemSelection selection,
+  ) {
+    final list = _controller.document.blockById(selection.listId);
+    if (list is! MarkdownListBlock) return null;
+    final normalized = selection.normalizedFor(list.items);
+    if (normalized == null) return null;
+
+    final startIndex = list.items.indexWhere(
+      (item) => item.id == normalized.anchorItemId,
+    );
+    final endIndex = list.items.indexWhere(
+      (item) => item.id == normalized.focusItemId,
+    );
+    if (startIndex == -1 || endIndex == -1) return null;
+
+    _MarkdownBlockSegment? listSegment;
+    for (final segment in _documentBlockSegments()) {
+      listSegment = _nestedSegmentForBlockId(segment, list.id);
+      if (listSegment != null) break;
+    }
+    if (listSegment == null) return null;
+
+    final start = listSegment.range.start +
+        listSegment.blockSourceOffset +
+        _listItemSourceOffset(list, startIndex);
+    final end = listSegment.range.start +
+        listSegment.blockSourceOffset +
+        _listItemSourceOffset(list, endIndex) +
+        _serializedListItemLines(list, endIndex).join('\n').length;
+    final forward = selection.anchorItemId == normalized.anchorItemId;
+    return TextSelection(
+      baseOffset: forward ? start : end,
+      extentOffset: forward ? end : start,
+    );
+  }
+
+  int _listItemSourceOffset(MarkdownListBlock list, int itemIndex) {
+    var offset = 0;
+    for (var index = 0; index < itemIndex; index++) {
+      offset += _serializedListItemLines(list, index).join('\n').length + 1;
+    }
+    return offset;
+  }
+
   _MarkdownBlockSegment? _nestedSegmentForBlockId(
     _MarkdownBlockSegment segment,
     String blockId,
@@ -4550,6 +4789,16 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (selection != null && _documentSelectionBlockIds(selection).isEmpty) {
       _activeDocumentSelection = null;
     }
+
+    final listSelection = _activeListItemSelection;
+    final list = listSelection == null
+        ? null
+        : _controller.document.blockById(listSelection.listId);
+    if (listSelection != null &&
+        (list is! MarkdownListBlock ||
+            listSelection.normalizedFor(list.items) == null)) {
+      _activeListItemSelection = null;
+    }
   }
 
   Widget _renderBlockMath(BuildContext context, String latex) {
@@ -4595,6 +4844,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       _activeDocumentSelection = null;
       _activeTableCell = null;
       _activeTableSelection = null;
+      _activeListItemSelection = null;
       _activeFormattedRange = segment.range;
       _activeFormattedBlockId = plainTextEditing ? segment.block!.id : null;
       _activeFormattedContainerBlockId = plainTextEditing
@@ -5738,6 +5988,12 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     FocusNode node,
     KeyEvent event,
   ) {
+    if (event is KeyDownEvent && _shouldDeleteActiveListItemSelection(event)) {
+      return _deleteActiveListItemSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
     if (event is KeyDownEvent && _shouldDeleteActiveTableSelection(event)) {
       return _clearActiveTableSelection()
           ? KeyEventResult.handled
@@ -5797,6 +6053,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
     if (_shouldDeleteActiveDocumentSelection(event)) {
       return _deleteActiveDocumentSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (_shouldDeleteActiveListItemSelection(event)) {
+      return _deleteActiveListItemSelection()
           ? KeyEventResult.handled
           : KeyEventResult.ignored;
     }
@@ -5924,6 +6185,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final tableSelection = _activeTableSelection;
     if (_mode == MarkdownEditorMode.formatted && tableSelection != null) {
       return _controller.copyTableSelectionAsTsv(tableSelection);
+    }
+
+    final listItemSelection = _activeListItemSelection;
+    if (_mode == MarkdownEditorMode.formatted && listItemSelection != null) {
+      return _controller.copyListItemSelectionAsMarkdown(listItemSelection);
     }
 
     final documentSelection = _activeDocumentSelection;
@@ -6562,6 +6828,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _activeFormattedPlainText = false;
     _activeDocumentSelection = null;
     _activeTableSelection = null;
+    _activeListItemSelection = null;
     _clearStoredMarks();
   }
 
@@ -6681,7 +6948,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (!widget.enabled ||
         _mode != MarkdownEditorMode.formatted ||
         _activeDocumentSelection != null ||
-        _activeTableSelection != null) {
+        _activeTableSelection != null ||
+        _activeListItemSelection != null) {
       return false;
     }
 
@@ -6838,6 +7106,25 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         event.logicalKey == LogicalKeyboardKey.delete;
   }
 
+  bool _shouldDeleteActiveListItemSelection(KeyEvent event) {
+    if (_mode != MarkdownEditorMode.formatted ||
+        _activeListItemSelection == null ||
+        event is! KeyDownEvent) {
+      return false;
+    }
+
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isMetaPressed ||
+        keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isShiftPressed) {
+      return false;
+    }
+
+    return event.logicalKey == LogicalKeyboardKey.backspace ||
+        event.logicalKey == LogicalKeyboardKey.delete;
+  }
+
   bool _shouldDeleteActiveTableSelection(KeyEvent event) {
     if (_mode != MarkdownEditorMode.formatted ||
         _activeTableSelection == null ||
@@ -6874,6 +7161,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       _activeTableSelection = table is MarkdownTableBlock ? selection : null;
       _activeTableCell = null;
       _activeDocumentSelection = null;
+      _activeListItemSelection = null;
       _clearStoredMarks();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -6881,6 +7169,25 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         _formattedPaneFocusNode.requestFocus();
       }
     });
+    return true;
+  }
+
+  bool _deleteActiveListItemSelection() {
+    if (!widget.enabled || _mode != MarkdownEditorMode.formatted) return false;
+
+    final selection = _activeListItemSelection;
+    if (selection == null) return false;
+
+    final result = _controller.deleteListItemSelection(selection);
+    if (result == null) {
+      setState(_clearActiveFormattedBlock);
+      return false;
+    }
+
+    _syncActiveFormattedBlock(
+      result.activeBlockId,
+      selectionOffset: result.selectionOffset,
+    );
     return true;
   }
 
@@ -7084,6 +7391,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       _activeDocumentSelection = null;
       _activeTableCell = null;
       _activeTableSelection = null;
+      _activeListItemSelection = null;
       _activeFormattedRange = activeSegment.range;
       _activeFormattedBlockId = activeBlock.id;
       _activeFormattedContainerBlockId = container?.id ?? activeBlock.id;
@@ -7132,6 +7440,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       _clearActiveFormattedBlock();
       _activeTableCell = null;
       _activeDocumentSelection = nextSelection;
+      _activeListItemSelection = null;
     });
     final sourceSelection = nextSelection == null
         ? null
@@ -7176,6 +7485,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       _activeTableSelection = table is MarkdownTableBlock ? selection : null;
       _activeTableCell = null;
       _activeDocumentSelection = null;
+      _activeListItemSelection = null;
       _clearStoredMarks();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -7186,8 +7496,53 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return true;
   }
 
+  bool _applyActiveListItemSelectionCommand(MarkdownEditorCommand command) {
+    final selection = _activeListItemSelection;
+    if (_mode != MarkdownEditorMode.formatted || selection == null) {
+      return false;
+    }
+    if (!_isDocumentSelectionInlineCommand(command)) return false;
+
+    final changed = _controller.applyInlineCommandToListItemSelection(
+      selection,
+      command,
+    );
+    if (!changed) return false;
+
+    final list = _controller.document.blockById(selection.listId);
+    final nextSelection =
+        list is MarkdownListBlock && selection.normalizedFor(list.items) != null
+            ? selection
+            : null;
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeListItemSelection = nextSelection;
+    });
+    final sourceSelection = nextSelection == null
+        ? null
+        : _sourceSelectionForListItemSelection(nextSelection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
   void _applyCommand(MarkdownEditorCommand command) {
     if (!widget.enabled) return;
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeListItemSelection != null) {
+      if (_applyActiveListItemSelectionCommand(command)) {
+        return;
+      }
+      _formattedPaneFocusNode.requestFocus();
+      return;
+    }
     if (_mode == MarkdownEditorMode.formatted &&
         _activeDocumentSelection != null) {
       if (_applyActiveDocumentSelectionCommand(command)) {
@@ -9664,6 +10019,20 @@ class _DocumentTextBlockLocation {
   final List<MarkdownBlock> siblings;
   final int index;
   final MarkdownBlock block;
+}
+
+class _ListItemLocation {
+  const _ListItemLocation({
+    required this.list,
+    required this.item,
+    required this.itemIndex,
+    required this.primaryBlock,
+  });
+
+  final MarkdownListBlock list;
+  final MarkdownListItem item;
+  final int itemIndex;
+  final MarkdownBlock? primaryBlock;
 }
 
 class _FormattedBlockDragPayload {

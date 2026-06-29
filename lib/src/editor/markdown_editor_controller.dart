@@ -283,6 +283,33 @@ class MarkdownEditorController extends ChangeNotifier {
     );
   }
 
+  /// Serializes a semantic list item selection as Markdown.
+  String? copyListItemSelectionAsMarkdown(
+    MarkdownListItemSelection selection,
+  ) {
+    return documentEditor.copyListItemSelectionAsMarkdown(selection);
+  }
+
+  /// Deletes a semantic list item selection.
+  MarkdownSelectionTransactionResult? deleteListItemSelection(
+    MarkdownListItemSelection selection,
+  ) {
+    return documentEditor.deleteListItemSelection(selection);
+  }
+
+  /// Applies a basic inline command to a semantic list item selection.
+  bool applyInlineCommandToListItemSelection(
+    MarkdownListItemSelection selection,
+    MarkdownEditorCommand command, {
+    String? argument,
+  }) {
+    return documentEditor.applyInlineCommandToListItemSelection(
+      selection,
+      command,
+      argument: argument,
+    );
+  }
+
   /// Applies a block command to a semantic document selection.
   bool applyBlockCommandToDocumentSelection(
     MarkdownDocumentSelection selection,

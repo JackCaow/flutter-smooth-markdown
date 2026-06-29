@@ -6,6 +6,8 @@ export 'src/config/markdown_config.dart';
 export 'src/config/style_sheet.dart';
 
 // Export editor
+export 'src/editor/document/markdown_document.dart';
+export 'src/editor/document/markdown_document_editor.dart';
 export 'src/editor/markdown_editor_command.dart';
 export 'src/editor/markdown_editor_controller.dart';
 export 'src/editor/markdown_editor_export.dart';

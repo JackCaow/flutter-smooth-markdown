@@ -1165,6 +1165,121 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     return appliedAny;
   }
 
+  /// Serializes a contiguous list item selection as Markdown.
+  String? copyListItemSelectionAsMarkdown(
+    MarkdownListItemSelection selection,
+  ) {
+    final block = _document.blockById(selection.listId);
+    if (block is! MarkdownListBlock) return null;
+
+    final bounds = _listItemSelectionBounds(block, selection);
+    if (bounds == null) return null;
+
+    final selectedItems =
+        block.items.sublist(bounds.startIndex, bounds.endIndex + 1);
+    return block
+        .copyWith(
+          startIndex: block.kind == MarkdownListKind.ordered
+              ? block.startIndex + bounds.startIndex
+              : block.startIndex,
+          items: selectedItems,
+        )
+        .toMarkdown();
+  }
+
+  /// Deletes a contiguous list item selection.
+  MarkdownSelectionTransactionResult? deleteListItemSelection(
+    MarkdownListItemSelection selection,
+  ) {
+    final block = _document.blockById(selection.listId);
+    if (block is! MarkdownListBlock) return null;
+
+    final bounds = _listItemSelectionBounds(block, selection);
+    if (bounds == null) return null;
+
+    final remainingItems = [
+      ...block.items.take(bounds.startIndex),
+      ...block.items.skip(bounds.endIndex + 1),
+    ];
+    final activeItemIndex = bounds.startIndex < remainingItems.length
+        ? bounds.startIndex
+        : remainingItems.length - 1;
+
+    MarkdownBlock replacement;
+    String activeBlockId;
+    if (remainingItems.isEmpty) {
+      replacement = MarkdownParagraphBlock(
+        id: block.id,
+        children: const [MarkdownText('')],
+      );
+      activeBlockId = replacement.id;
+    } else {
+      replacement = block.copyWith(items: remainingItems);
+      final activeBlock = _firstEditableTextBlock(
+        remainingItems[activeItemIndex].blocks,
+      );
+      activeBlockId = activeBlock?.id ?? replacement.id;
+    }
+
+    if (!_replaceDocument(_document.replaceBlock(replacement))) return null;
+    return MarkdownSelectionTransactionResult(
+      document: _document,
+      activeBlockId: activeBlockId,
+      selectionOffset: 0,
+    );
+  }
+
+  /// Applies an inline command to the primary text block in each selected list
+  /// item.
+  bool applyInlineCommandToListItemSelection(
+    MarkdownListItemSelection selection,
+    MarkdownEditorCommand command, {
+    String? argument,
+  }) {
+    final wrap = _inlineWrapForCommand(command);
+    if (wrap == null) return false;
+
+    final block = _document.blockById(selection.listId);
+    if (block is! MarkdownListBlock) return false;
+
+    final bounds = _listItemSelectionBounds(block, selection);
+    if (bounds == null) return false;
+
+    final nextItems = [...block.items];
+    var changed = false;
+    for (var index = bounds.startIndex; index <= bounds.endIndex; index++) {
+      final item = nextItems[index];
+      final blockIndex = item.blocks.indexWhere(_isTextBlock);
+      if (blockIndex == -1) continue;
+
+      final textBlock = item.blocks[blockIndex];
+      final length = textBlock.plainText.length;
+      if (length == 0) continue;
+
+      final marked = _wrapRange(
+        textBlock,
+        TextRange(start: 0, end: length),
+        wrap,
+        argument: _inlineArgumentForCommand(command, argument),
+      );
+      if (marked == null) return false;
+
+      nextItems[index] = item.copyWith(
+        blocks: [
+          ...item.blocks.take(blockIndex),
+          marked,
+          ...item.blocks.skip(blockIndex + 1),
+        ],
+      );
+      changed = true;
+    }
+
+    if (!changed) return false;
+    return _replaceDocument(_document.replaceBlock(block.copyWith(
+      items: nextItems,
+    )));
+  }
+
   /// Returns the link intersecting [range] inside one table cell.
   MarkdownLinkEdit? tableCellLinkAtRange({
     required String blockId,
@@ -2788,6 +2903,33 @@ class MarkdownDocumentEditor extends ChangeNotifier {
           selection.startColumnIndex.clamp(0, maxColumnIndex).toInt(),
       endColumnIndex: selection.endColumnIndex.clamp(0, maxColumnIndex).toInt(),
     );
+  }
+
+  _ListItemSelectionBounds? _listItemSelectionBounds(
+    MarkdownListBlock list,
+    MarkdownListItemSelection selection,
+  ) {
+    if (selection.listId != list.id || list.items.isEmpty) return null;
+
+    final anchorIndex = list.items.indexWhere(
+      (item) => item.id == selection.anchorItemId,
+    );
+    final focusIndex = list.items.indexWhere(
+      (item) => item.id == selection.focusItemId,
+    );
+    if (anchorIndex == -1 || focusIndex == -1) return null;
+
+    return _ListItemSelectionBounds(
+      startIndex: anchorIndex < focusIndex ? anchorIndex : focusIndex,
+      endIndex: anchorIndex > focusIndex ? anchorIndex : focusIndex,
+    );
+  }
+
+  MarkdownBlock? _firstEditableTextBlock(List<MarkdownBlock> blocks) {
+    for (final block in blocks) {
+      if (_isTextBlock(block)) return block;
+    }
+    return null;
   }
 
   bool _isBasicTableSelectionInlineCommand(MarkdownEditorCommand command) {
@@ -4766,6 +4908,16 @@ class _TableSelectionBounds {
   final int endRowIndex;
   final int startColumnIndex;
   final int endColumnIndex;
+}
+
+class _ListItemSelectionBounds {
+  const _ListItemSelectionBounds({
+    required this.startIndex,
+    required this.endIndex,
+  });
+
+  final int startIndex;
+  final int endIndex;
 }
 
 class _InlineSplit {

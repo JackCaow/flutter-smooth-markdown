@@ -2695,6 +2695,255 @@ E = mc^2
       );
     });
 
+    test('normalizes and contains list item selections', () {
+      const items = [
+        MarkdownListItem(
+          id: 'a',
+          blocks: [
+            MarkdownParagraphBlock(
+              id: 'p1',
+              children: [MarkdownText('A')],
+            ),
+          ],
+        ),
+        MarkdownListItem(
+          id: 'b',
+          blocks: [
+            MarkdownParagraphBlock(
+              id: 'p2',
+              children: [MarkdownText('B')],
+            ),
+          ],
+        ),
+        MarkdownListItem(
+          id: 'c',
+          blocks: [
+            MarkdownParagraphBlock(
+              id: 'p3',
+              children: [MarkdownText('C')],
+            ),
+          ],
+        ),
+      ];
+      const selection = MarkdownListItemSelection(
+        listId: 'list',
+        anchorItemId: 'c',
+        focusItemId: 'a',
+      );
+
+      expect(
+        selection.normalizedFor(items),
+        const MarkdownListItemSelection(
+          listId: 'list',
+          anchorItemId: 'a',
+          focusItemId: 'c',
+        ),
+      );
+      expect(selection.containsItem('b', items), isTrue);
+      expect(selection.containsItem('missing', items), isFalse);
+    });
+
+    test('copies nested list item selections as list markdown', () {
+      final editor = MarkdownDocumentEditor(
+        const MarkdownDocument(
+          blocks: [
+            MarkdownListBlock(
+              id: 'outer',
+              kind: MarkdownListKind.bullet,
+              items: [
+                MarkdownListItem(
+                  id: 'outer-item',
+                  blocks: [
+                    MarkdownParagraphBlock(
+                      id: 'outer-text',
+                      children: [MarkdownText('Outer')],
+                    ),
+                    MarkdownListBlock(
+                      id: 'nested',
+                      kind: MarkdownListKind.ordered,
+                      startIndex: 3,
+                      items: [
+                        MarkdownListItem(
+                          id: 'one',
+                          blocks: [
+                            MarkdownParagraphBlock(
+                              id: 'p1',
+                              children: [MarkdownText('One')],
+                            ),
+                          ],
+                        ),
+                        MarkdownListItem(
+                          id: 'two',
+                          blocks: [
+                            MarkdownParagraphBlock(
+                              id: 'p2',
+                              children: [MarkdownText('Two')],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      addTearDown(editor.dispose);
+
+      final copied = editor.copyListItemSelectionAsMarkdown(
+        const MarkdownListItemSelection(
+          listId: 'nested',
+          anchorItemId: 'one',
+          focusItemId: 'two',
+        ),
+      );
+
+      expect(
+        copied,
+        '3. One\n'
+        '4. Two',
+      );
+    });
+
+    test('deletes nested list item selections without deleting the parent list',
+        () {
+      final editor = MarkdownDocumentEditor(
+        const MarkdownDocument(
+          blocks: [
+            MarkdownListBlock(
+              id: 'list',
+              kind: MarkdownListKind.bullet,
+              items: [
+                MarkdownListItem(
+                  id: 'keep-before',
+                  blocks: [
+                    MarkdownParagraphBlock(
+                      id: 'before',
+                      children: [MarkdownText('Before')],
+                    ),
+                  ],
+                ),
+                MarkdownListItem(
+                  id: 'drop-one',
+                  blocks: [
+                    MarkdownParagraphBlock(
+                      id: 'one',
+                      children: [MarkdownText('One')],
+                    ),
+                  ],
+                ),
+                MarkdownListItem(
+                  id: 'drop-two',
+                  blocks: [
+                    MarkdownParagraphBlock(
+                      id: 'two',
+                      children: [MarkdownText('Two')],
+                    ),
+                  ],
+                ),
+                MarkdownListItem(
+                  id: 'keep-after',
+                  blocks: [
+                    MarkdownParagraphBlock(
+                      id: 'after',
+                      children: [MarkdownText('After')],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      addTearDown(editor.dispose);
+
+      final result = editor.deleteListItemSelection(
+        const MarkdownListItemSelection(
+          listId: 'list',
+          anchorItemId: 'drop-one',
+          focusItemId: 'drop-two',
+        ),
+      );
+
+      expect(result, isNotNull);
+      expect(result!.activeBlockId, 'after');
+      expect(
+        editor.document.toMarkdown(),
+        '- Before\n'
+        '- After',
+      );
+    });
+
+    test('applies inline commands to selected list item primary text blocks',
+        () {
+      final editor = MarkdownDocumentEditor(
+        const MarkdownDocument(
+          blocks: [
+            MarkdownListBlock(
+              id: 'list',
+              kind: MarkdownListKind.task,
+              items: [
+                MarkdownListItem(
+                  id: 'one',
+                  blocks: [
+                    MarkdownParagraphBlock(
+                      id: 'p1',
+                      children: [MarkdownText('One')],
+                    ),
+                  ],
+                ),
+                MarkdownListItem(
+                  id: 'two',
+                  checked: true,
+                  blocks: [
+                    MarkdownParagraphBlock(
+                      id: 'p2',
+                      children: [MarkdownText('Two')],
+                    ),
+                    MarkdownListBlock(
+                      id: 'child',
+                      kind: MarkdownListKind.bullet,
+                      items: [
+                        MarkdownListItem(
+                          id: 'child-item',
+                          blocks: [
+                            MarkdownParagraphBlock(
+                              id: 'child-p',
+                              children: [MarkdownText('Child')],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+      addTearDown(editor.dispose);
+
+      final changed = editor.applyInlineCommandToListItemSelection(
+        const MarkdownListItemSelection(
+          listId: 'list',
+          anchorItemId: 'one',
+          focusItemId: 'two',
+        ),
+        MarkdownEditorCommand.bold,
+      );
+
+      expect(changed, isTrue);
+      expect(
+        editor.document.toMarkdown(),
+        '- [ ] **One**\n'
+        '- [x] **Two**\n'
+        '  - Child',
+      );
+    });
+
     test('normalizes and contains table cell selections', () {
       const selection = MarkdownTableCellSelection(
         tableId: 'table',

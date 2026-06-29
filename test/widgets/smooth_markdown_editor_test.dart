@@ -3834,6 +3834,153 @@ void main() {
       expect(updated.items.last.checked, isTrue);
     });
 
+    testWidgets('formatted nested list range copy preserves list markdown',
+        (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final controller = MarkdownEditorController(
+        text: '- Outer\n  - Alpha\n  - Beta\n  - Gamma',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 360,
+          ),
+        ),
+      );
+
+      final outer = _singleScratchContentBlock(controller) as MarkdownListBlock;
+      final nested = outer.items.single.blocks.last as MarkdownListBlock;
+      final nestedKeyPrefix = '0_${nested.id}';
+
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_list_item_${nestedKeyPrefix}_0'),
+        ),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          ValueKey('smooth_markdown_editor_list_item_${nestedKeyPrefix}_1'),
+        ),
+      );
+      await tester.pump();
+
+      await _sendControlShortcut(tester, LogicalKeyboardKey.keyC);
+      await tester.pump();
+
+      expect(
+        clipboardText,
+        '- Alpha\n'
+        '- Beta',
+      );
+    });
+
+    testWidgets('formatted nested list range toolbar bolds selected items',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '- Outer\n  - Alpha\n  - Beta\n  - Gamma',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 360,
+          ),
+        ),
+      );
+
+      final outer = _singleScratchContentBlock(controller) as MarkdownListBlock;
+      final nested = outer.items.single.blocks.last as MarkdownListBlock;
+      final nestedKeyPrefix = '0_${nested.id}';
+
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_list_item_${nestedKeyPrefix}_0'),
+        ),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          ValueKey('smooth_markdown_editor_list_item_${nestedKeyPrefix}_1'),
+        ),
+      );
+      await tester.pump();
+
+      await _tapToolbarIcon(tester, Icons.format_bold);
+      await tester.pump();
+
+      expect(
+        controller.text,
+        '- Outer\n'
+        '  - **Alpha**\n'
+        '  - **Beta**\n'
+        '  - Gamma',
+      );
+    });
+
+    testWidgets('formatted nested list range delete removes selected items',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '- Outer\n  - Alpha\n  - Beta\n  - Gamma',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 360,
+          ),
+        ),
+      );
+
+      final outer = _singleScratchContentBlock(controller) as MarkdownListBlock;
+      final nested = outer.items.single.blocks.last as MarkdownListBlock;
+      final nestedKeyPrefix = '0_${nested.id}';
+
+      await tester.tap(
+        find.byKey(
+          ValueKey('smooth_markdown_editor_list_item_${nestedKeyPrefix}_0'),
+        ),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          ValueKey('smooth_markdown_editor_list_item_${nestedKeyPrefix}_1'),
+        ),
+      );
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.pump();
+
+      expect(controller.text, '- Outer\n  - Gamma');
+    });
+
     testWidgets('formatted Tab indents a list item and keeps it editable',
         (tester) async {
       final controller = MarkdownEditorController(
