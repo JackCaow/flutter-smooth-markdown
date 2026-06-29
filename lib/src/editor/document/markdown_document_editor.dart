@@ -719,16 +719,21 @@ class MarkdownDocumentEditor extends ChangeNotifier {
 
   /// Serializes a document-wide text selection as Markdown.
   ///
-  /// This first implementation intentionally supports only top-level paragraph
-  /// and heading blocks. Nested containers and table-cell selections are handled
-  /// by their existing single-block APIs until the richer selection model is
-  /// extended.
+  /// Supports contiguous paragraph/heading ranges that share the same parent
+  /// block list, including nested blockquote children. Table-cell selections are
+  /// handled by their dedicated APIs.
   String? copySelectionAsMarkdown(MarkdownDocumentSelection selection) {
-    final resolved = _resolveTopLevelTextSelection(selection);
+    final resolved = _resolveSiblingTextSelection(selection);
     if (resolved == null || resolved.isCollapsed) return null;
 
-    final selected = _selectedTopLevelTextBlocks(resolved);
+    final selected = _selectedSiblingTextBlocks(resolved);
     if (selected.isEmpty) return '';
+    if (resolved.parentBlock is MarkdownBlockquoteBlock) {
+      return MarkdownBlockquoteBlock(
+        id: resolved.parentId!,
+        blocks: selected,
+      ).toMarkdown();
+    }
     return MarkdownDocument(blocks: selected).toMarkdown();
   }
 
@@ -744,7 +749,7 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     MarkdownDocumentSelection selection,
     List<MarkdownBlock> blocks,
   ) {
-    final resolved = _resolveTopLevelTextSelection(selection);
+    final resolved = _resolveSiblingTextSelection(selection);
     if (resolved == null || resolved.isCollapsed) return null;
 
     final startBlock = resolved.startBlock;
@@ -776,46 +781,19 @@ class MarkdownDocumentEditor extends ChangeNotifier {
       activeBlockId = merged.id;
       selectionOffset = hasBefore ? _inlinePlainText(beforeChildren).length : 0;
     } else {
-      final reservedBlockIds = <String>{};
-      final reservedListItemIds = <String>{};
-      _collectInsertionIds(
-        _document.blocks.take(resolved.startIndex),
-        reservedBlockIds,
-        reservedListItemIds,
-      );
-      _collectInsertionIds(
-        _document.blocks.skip(resolved.endIndex + 1),
-        reservedBlockIds,
-        reservedListItemIds,
-      );
-
       MarkdownBlock? beforeBlock;
       MarkdownBlock? afterBlock;
       if (hasBefore) {
         beforeBlock = _copyTextBlockWithChildren(startBlock, beforeChildren);
-        _collectInsertionIds(
-          [beforeBlock],
-          reservedBlockIds,
-          reservedListItemIds,
-        );
         replacements.add(beforeBlock);
       }
       if (hasAfter) {
         afterBlock = resolved.startIndex == resolved.endIndex
             ? _afterTextBlockForRangePaste(endBlock, afterChildren)
             : _copyTextBlockWithChildren(endBlock, afterChildren);
-        _collectInsertionIds(
-          [afterBlock],
-          reservedBlockIds,
-          reservedListItemIds,
-        );
       }
 
-      final insertedBlocks = _retagBlocksForInsertion(
-        blocks,
-        reservedBlockIds,
-        reservedListItemIds,
-      );
+      final insertedBlocks = _retagBlocksForDocumentInsertion(blocks);
       replacements.addAll(insertedBlocks);
       if (afterBlock != null) {
         replacements.add(afterBlock);
@@ -828,12 +806,11 @@ class MarkdownDocumentEditor extends ChangeNotifier {
       selectionOffset = afterBlock == null ? active.plainText.length : 0;
     }
 
-    final nextBlocks = <MarkdownBlock>[
-      ..._document.blocks.take(resolved.startIndex),
-      ...replacements,
-      ..._document.blocks.skip(resolved.endIndex + 1),
-    ];
-    if (!_replaceDocument(MarkdownDocument(blocks: nextBlocks))) return null;
+    final nextDocument = _replaceSiblingTextSelectionBlocks(
+      resolved,
+      replacements,
+    );
+    if (nextDocument == null || !_replaceDocument(nextDocument)) return null;
 
     return MarkdownSelectionTransactionResult(
       document: _document,
@@ -864,11 +841,11 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     MarkdownEditorCommand command, {
     String? argument,
   }) {
-    final resolved = _resolveTopLevelTextSelection(selection);
+    final resolved = _resolveSiblingTextSelection(selection);
     final wrap = _inlineWrapForCommand(command);
     if (resolved == null || resolved.isCollapsed || wrap == null) return false;
 
-    final nextBlocks = [..._document.blocks];
+    final nextBlocks = [...resolved.siblingBlocks];
     var changed = false;
     for (var index = resolved.startIndex; index <= resolved.endIndex; index++) {
       final block = nextBlocks[index];
@@ -892,7 +869,11 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     }
 
     if (!changed) return false;
-    return _replaceDocument(MarkdownDocument(blocks: nextBlocks));
+    final nextDocument = _replaceSiblingTextSelectionBlocks(
+      resolved,
+      nextBlocks.sublist(resolved.startIndex, resolved.endIndex + 1),
+    );
+    return nextDocument != null && _replaceDocument(nextDocument);
   }
 
   /// Applies a block command to every top-level block touched by [selection].
@@ -3812,14 +3793,219 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     );
   }
 
-  List<MarkdownBlock> _selectedTopLevelTextBlocks(
-    _ResolvedTopLevelTextSelection selection,
+  _ResolvedSiblingTextSelection? _resolveSiblingTextSelection(
+    MarkdownDocumentSelection selection,
+  ) {
+    final topLevel = _resolveSiblingTextSelectionInBlocks(
+      parentId: null,
+      blocks: _document.blocks,
+      selection: selection,
+    );
+    if (topLevel != null) return topLevel;
+
+    for (final block in _document.blocks) {
+      final nested = _resolveNestedSiblingTextSelection(block, selection);
+      if (nested != null) return nested;
+    }
+    return null;
+  }
+
+  _ResolvedSiblingTextSelection? _resolveNestedSiblingTextSelection(
+    MarkdownBlock block,
+    MarkdownDocumentSelection selection,
+  ) {
+    if (block is MarkdownBlockquoteBlock) {
+      final direct = _resolveSiblingTextSelectionInBlocks(
+        parentId: block.id,
+        blocks: block.blocks,
+        selection: selection,
+      );
+      if (direct != null) return direct;
+
+      for (final child in block.blocks) {
+        final nested = _resolveNestedSiblingTextSelection(child, selection);
+        if (nested != null) return nested;
+      }
+    } else if (block is MarkdownListBlock) {
+      for (final item in block.items) {
+        for (final child in item.blocks) {
+          final nested = _resolveNestedSiblingTextSelection(child, selection);
+          if (nested != null) return nested;
+        }
+      }
+    }
+    return null;
+  }
+
+  _ResolvedSiblingTextSelection? _resolveSiblingTextSelectionInBlocks({
+    required String? parentId,
+    required List<MarkdownBlock> blocks,
+    required MarkdownDocumentSelection selection,
+  }) {
+    final anchorIndex = blocks.indexWhere(
+      (block) => block.id == selection.anchor.blockId,
+    );
+    final focusIndex = blocks.indexWhere(
+      (block) => block.id == selection.focus.blockId,
+    );
+    if (anchorIndex == -1 || focusIndex == -1) return null;
+
+    final anchorBlock = blocks[anchorIndex];
+    final focusBlock = blocks[focusIndex];
+    if (!_isTextBlock(anchorBlock) || !_isTextBlock(focusBlock)) return null;
+
+    var startIndex = anchorIndex;
+    var endIndex = focusIndex;
+    var startOffset = selection.anchor.offset;
+    var endOffset = selection.focus.offset;
+    if (anchorIndex > focusIndex ||
+        (anchorIndex == focusIndex && startOffset > endOffset)) {
+      startIndex = focusIndex;
+      endIndex = anchorIndex;
+      startOffset = selection.focus.offset;
+      endOffset = selection.anchor.offset;
+    }
+
+    final startBlock = blocks[startIndex];
+    final endBlock = blocks[endIndex];
+    for (var index = startIndex; index <= endIndex; index++) {
+      if (!_isTextBlock(blocks[index])) return null;
+    }
+
+    final clampedStart =
+        startOffset.clamp(0, startBlock.plainText.length).toInt();
+    final clampedEnd = endOffset.clamp(0, endBlock.plainText.length).toInt();
+
+    return _ResolvedSiblingTextSelection(
+      parentId: parentId,
+      parentBlock: parentId == null ? null : _document.blockById(parentId),
+      siblingBlocks: blocks,
+      startIndex: startIndex,
+      endIndex: endIndex,
+      startBlock: startBlock,
+      endBlock: endBlock,
+      startOffset: clampedStart,
+      endOffset: clampedEnd,
+    );
+  }
+
+  MarkdownDocument? _replaceSiblingTextSelectionBlocks(
+    _ResolvedSiblingTextSelection selection,
+    List<MarkdownBlock> replacements,
+  ) {
+    if (selection.parentId == null) {
+      return MarkdownDocument(
+        blocks: [
+          ..._document.blocks.take(selection.startIndex),
+          ...replacements,
+          ..._document.blocks.skip(selection.endIndex + 1),
+        ],
+      );
+    }
+
+    final nextBlocks = _replaceNestedSiblingBlocks(
+      blocks: _document.blocks,
+      parentId: selection.parentId!,
+      startIndex: selection.startIndex,
+      endIndex: selection.endIndex,
+      replacements: replacements,
+    );
+    if (nextBlocks == null) return null;
+    return MarkdownDocument(blocks: nextBlocks);
+  }
+
+  List<MarkdownBlock>? _replaceNestedSiblingBlocks({
+    required List<MarkdownBlock> blocks,
+    required String parentId,
+    required int startIndex,
+    required int endIndex,
+    required List<MarkdownBlock> replacements,
+  }) {
+    var changed = false;
+    final nextBlocks = <MarkdownBlock>[];
+
+    for (final block in blocks) {
+      if (block is MarkdownBlockquoteBlock) {
+        if (block.id == parentId) {
+          nextBlocks.add(
+            block.copyWith(
+              blocks: [
+                ...block.blocks.take(startIndex),
+                ...replacements,
+                ...block.blocks.skip(endIndex + 1),
+              ],
+            ),
+          );
+          changed = true;
+          continue;
+        }
+
+        final nested = _replaceNestedSiblingBlocks(
+          blocks: block.blocks,
+          parentId: parentId,
+          startIndex: startIndex,
+          endIndex: endIndex,
+          replacements: replacements,
+        );
+        if (nested != null) {
+          nextBlocks.add(block.copyWith(blocks: nested));
+          changed = true;
+          continue;
+        }
+      } else if (block is MarkdownListBlock) {
+        final nextItems = <MarkdownListItem>[];
+        var listChanged = false;
+        for (final item in block.items) {
+          if (item.id == parentId) {
+            nextItems.add(
+              item.copyWith(
+                blocks: [
+                  ...item.blocks.take(startIndex),
+                  ...replacements,
+                  ...item.blocks.skip(endIndex + 1),
+                ],
+              ),
+            );
+            listChanged = true;
+            continue;
+          }
+
+          final nested = _replaceNestedSiblingBlocks(
+            blocks: item.blocks,
+            parentId: parentId,
+            startIndex: startIndex,
+            endIndex: endIndex,
+            replacements: replacements,
+          );
+          if (nested == null) {
+            nextItems.add(item);
+          } else {
+            nextItems.add(item.copyWith(blocks: nested));
+            listChanged = true;
+          }
+        }
+
+        if (listChanged) {
+          nextBlocks.add(block.copyWith(items: nextItems));
+          changed = true;
+          continue;
+        }
+      }
+
+      nextBlocks.add(block);
+    }
+
+    return changed ? nextBlocks : null;
+  }
+
+  List<MarkdownBlock> _selectedSiblingTextBlocks(
+    _ResolvedSiblingTextSelection selection,
   ) {
     final blocks = <MarkdownBlock>[];
     for (var index = selection.startIndex;
         index <= selection.endIndex;
         index++) {
-      final block = _document.blocks[index];
+      final block = selection.siblingBlocks[index];
       final start = index == selection.startIndex ? selection.startOffset : 0;
       final end = index == selection.endIndex
           ? selection.endOffset
@@ -4532,6 +4718,32 @@ class _ResolvedTopLevelTextSelection {
     required this.endOffset,
   });
 
+  final int startIndex;
+  final int endIndex;
+  final MarkdownBlock startBlock;
+  final MarkdownBlock endBlock;
+  final int startOffset;
+  final int endOffset;
+
+  bool get isCollapsed => startIndex == endIndex && startOffset == endOffset;
+}
+
+class _ResolvedSiblingTextSelection {
+  const _ResolvedSiblingTextSelection({
+    required this.parentId,
+    required this.parentBlock,
+    required this.siblingBlocks,
+    required this.startIndex,
+    required this.endIndex,
+    required this.startBlock,
+    required this.endBlock,
+    required this.startOffset,
+    required this.endOffset,
+  });
+
+  final String? parentId;
+  final MarkdownBlock? parentBlock;
+  final List<MarkdownBlock> siblingBlocks;
   final int startIndex;
   final int endIndex;
   final MarkdownBlock startBlock;

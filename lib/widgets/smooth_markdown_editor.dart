@@ -1719,7 +1719,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       source: child.toMarkdown(),
       block: child,
       containerBlockId: blockquote.id,
-      blockSourceOffset: _blockquoteChildSourceOffset(blockquote, index),
+      blockSourceOffset: segment.blockSourceOffset +
+          _blockquoteChildSourceOffset(blockquote, index),
     );
     final active = _activeFormattedBlockId == child.id;
 
@@ -1731,17 +1732,28 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       return _buildActiveFormattedTextField(context, childSegment);
     }
 
-    return InkWell(
+    final selected = _activeDocumentSelectionIncludes(childSegment);
+    final childWidget = InkWell(
       key: ValueKey(
         'smooth_markdown_editor_blockquote_child_${segment.range.start}_$index',
       ),
       borderRadius: BorderRadius.circular(6),
-      onTap:
-          widget.enabled ? () => _activateFormattedSegment(childSegment) : null,
+      onTap: widget.enabled
+          ? () => _handleFormattedSegmentTap(childSegment)
+          : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: _renderMarkdown(childSegment.source),
       ),
+    );
+    if (!selected) return childWidget;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: childWidget,
     );
   }
 
@@ -4267,32 +4279,34 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   bool _selectFormattedDocumentRangeTo(_MarkdownBlockSegment focusSegment) {
-    if (!_isSelectableTopLevelTextSegment(focusSegment)) return false;
+    if (!_isSelectableDocumentTextSegment(focusSegment)) return false;
 
     final focusBlock = focusSegment.block!;
-    final focusIndex = _topLevelTextBlockIndex(focusBlock.id);
-    if (focusIndex == -1) return false;
+    final focusLocation = _documentTextSegmentLocation(focusSegment);
+    if (focusLocation == null) return false;
 
     final existingSelection = _activeDocumentSelection;
     final existingAnchor = existingSelection?.anchor;
-    final existingAnchorIndex = existingAnchor == null
-        ? -1
-        : _topLevelTextBlockIndex(existingAnchor.blockId);
-    final anchorIndex = existingAnchorIndex == -1
-        ? _activeTopLevelTextBlockIndex()
-        : existingAnchorIndex;
-    if (anchorIndex == -1) return false;
+    final existingAnchorLocation = existingAnchor == null
+        ? null
+        : _documentTextBlockLocation(existingAnchor.blockId);
+    final activeLocation = existingAnchorLocation ??
+        (existingAnchor == null ? _activeDocumentTextBlockLocation() : null);
+    if (activeLocation == null) return false;
+    if (activeLocation.parentId != focusLocation.parentId) return false;
 
-    final anchorBlock = _controller.document.blocks[anchorIndex];
-    if (!_isSelectableTopLevelTextBlock(anchorBlock)) return false;
-
-    final anchor = existingAnchorIndex == -1
-        ? MarkdownDocumentPosition(
+    final anchorBlock = activeLocation.block;
+    final anchorIndex = activeLocation.index;
+    final focusIndex = focusLocation.index;
+    final existingAnchorMatchesParent =
+        existingAnchor != null && existingAnchorLocation != null;
+    final anchor = existingAnchorMatchesParent
+        ? existingAnchor
+        : MarkdownDocumentPosition(
             blockId: anchorBlock.id,
             offset:
                 focusIndex >= anchorIndex ? 0 : anchorBlock.plainText.length,
-          )
-        : existingAnchor!;
+          );
     final focus = MarkdownDocumentPosition(
       blockId: focusBlock.id,
       offset: focusIndex >= anchorIndex ? focusBlock.plainText.length : 0,
@@ -4328,88 +4342,207 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return true;
   }
 
-  bool _isSelectableTopLevelTextSegment(_MarkdownBlockSegment segment) {
+  bool _isSelectableDocumentTextSegment(_MarkdownBlockSegment segment) {
     final block = segment.block;
-    return block != null &&
-        _isSelectableTopLevelTextBlock(block) &&
-        segment.containerBlockId == block.id;
+    return block != null && _isSelectableDocumentTextBlock(block);
   }
 
-  bool _isSelectableTopLevelTextBlock(MarkdownBlock block) {
+  bool _isSelectableDocumentTextBlock(MarkdownBlock block) {
     return block is MarkdownParagraphBlock || block is MarkdownHeadingBlock;
   }
 
-  int _topLevelTextBlockIndex(String blockId) {
-    final blocks = _controller.document.blocks;
-    for (var index = 0; index < blocks.length; index++) {
-      final block = blocks[index];
-      if (block.id == blockId && _isSelectableTopLevelTextBlock(block)) {
-        return index;
-      }
-    }
-    return -1;
+  _DocumentTextBlockLocation? _documentTextSegmentLocation(
+    _MarkdownBlockSegment segment,
+  ) {
+    final block = segment.block;
+    if (block == null || !_isSelectableDocumentTextBlock(block)) return null;
+    return _documentTextBlockLocation(block.id);
   }
 
-  int _activeTopLevelTextBlockIndex() {
+  _DocumentTextBlockLocation? _documentTextBlockLocation(String blockId) {
+    return _documentTextBlockLocationInBlocks(
+      parentId: null,
+      blocks: _controller.document.blocks,
+      blockId: blockId,
+    );
+  }
+
+  _DocumentTextBlockLocation? _documentTextBlockLocationInBlocks({
+    required String? parentId,
+    required List<MarkdownBlock> blocks,
+    required String blockId,
+  }) {
+    for (var index = 0; index < blocks.length; index++) {
+      final block = blocks[index];
+      if (block.id == blockId && _isSelectableDocumentTextBlock(block)) {
+        return _DocumentTextBlockLocation(
+          parentId: parentId,
+          siblings: blocks,
+          index: index,
+          block: block,
+        );
+      }
+
+      final nested = switch (block) {
+        MarkdownBlockquoteBlock() => _documentTextBlockLocationInBlocks(
+            parentId: block.id,
+            blocks: block.blocks,
+            blockId: blockId,
+          ),
+        MarkdownListBlock() => _documentTextBlockLocationInList(
+            list: block,
+            blockId: blockId,
+          ),
+        _ => null,
+      };
+      if (nested != null) return nested;
+    }
+    return null;
+  }
+
+  _DocumentTextBlockLocation? _documentTextBlockLocationInList({
+    required MarkdownListBlock list,
+    required String blockId,
+  }) {
+    for (final item in list.items) {
+      final nested = _documentTextBlockLocationInBlocks(
+        parentId: item.id,
+        blocks: item.blocks,
+        blockId: blockId,
+      );
+      if (nested != null) return nested;
+    }
+    return null;
+  }
+
+  _DocumentTextBlockLocation? _activeDocumentTextBlockLocation() {
     final blockId = _activeFormattedBlockId;
-    if (!_activeFormattedPlainText || blockId == null) return -1;
-    return _topLevelTextBlockIndex(blockId);
+    if (!_activeFormattedPlainText || blockId == null) return null;
+    return _documentTextBlockLocation(blockId);
+  }
+
+  List<_MarkdownBlockSegment> _documentSelectionSegments(
+    MarkdownDocumentSelection selection,
+  ) {
+    final anchorLocation = _documentTextBlockLocation(selection.anchor.blockId);
+    final focusLocation = _documentTextBlockLocation(selection.focus.blockId);
+    if (anchorLocation == null ||
+        focusLocation == null ||
+        anchorLocation.parentId != focusLocation.parentId) {
+      return const [];
+    }
+
+    final startIndex = anchorLocation.index < focusLocation.index
+        ? anchorLocation.index
+        : focusLocation.index;
+    final endIndex = anchorLocation.index < focusLocation.index
+        ? focusLocation.index
+        : anchorLocation.index;
+    for (var index = startIndex; index <= endIndex; index++) {
+      if (!_isSelectableDocumentTextBlock(anchorLocation.siblings[index])) {
+        return const [];
+      }
+    }
+
+    final segments = _documentBlockSegments();
+    _MarkdownBlockSegment? segmentFor(String blockId) {
+      for (final segment in segments) {
+        final nested = _nestedSegmentForBlockId(segment, blockId);
+        if (nested != null) return nested;
+      }
+      return null;
+    }
+
+    final selected = <_MarkdownBlockSegment>[];
+    for (var index = startIndex; index <= endIndex; index++) {
+      final segment = segmentFor(anchorLocation.siblings[index].id);
+      if (segment == null) return const [];
+      selected.add(segment);
+    }
+    return selected;
   }
 
   bool _activeDocumentSelectionIncludes(_MarkdownBlockSegment segment) {
     final selection = _activeDocumentSelection;
     final block = segment.block;
     if (selection == null || block == null) return false;
-    if (!_isSelectableTopLevelTextSegment(segment)) return false;
+    if (!_isSelectableDocumentTextSegment(segment)) return false;
     return _documentSelectionBlockIds(selection).contains(block.id);
   }
 
   List<String> _documentSelectionBlockIds(
     MarkdownDocumentSelection selection,
   ) {
-    final anchorIndex = _topLevelTextBlockIndex(selection.anchor.blockId);
-    final focusIndex = _topLevelTextBlockIndex(selection.focus.blockId);
-    if (anchorIndex == -1 || focusIndex == -1) return const [];
-
-    final startIndex = anchorIndex < focusIndex ? anchorIndex : focusIndex;
-    final endIndex = anchorIndex < focusIndex ? focusIndex : anchorIndex;
-    final blocks = _controller.document.blocks;
-    final selected = <String>[];
-    for (var index = startIndex; index <= endIndex; index++) {
-      final block = blocks[index];
-      if (!_isSelectableTopLevelTextBlock(block)) return const [];
-      selected.add(block.id);
-    }
-    return selected;
+    return [
+      for (final segment in _documentSelectionSegments(selection))
+        if (segment.block != null) segment.block!.id,
+    ];
   }
 
   TextSelection? _sourceSelectionForDocumentSelection(
     MarkdownDocumentSelection selection,
   ) {
-    final anchorIndex = _topLevelTextBlockIndex(selection.anchor.blockId);
-    final focusIndex = _topLevelTextBlockIndex(selection.focus.blockId);
-    if (anchorIndex == -1 || focusIndex == -1) return null;
+    final selected = _documentSelectionSegments(selection);
+    if (selected.isEmpty) return null;
 
-    final segments = _documentBlockSegments();
-    _MarkdownBlockSegment? segmentFor(String blockId) {
-      for (final segment in segments) {
-        if (segment.block?.id == blockId) return segment;
-      }
-      return null;
-    }
+    final anchorLocation = _documentTextBlockLocation(selection.anchor.blockId);
+    final focusLocation = _documentTextBlockLocation(selection.focus.blockId);
+    if (anchorLocation == null || focusLocation == null) return null;
 
-    final anchorSegment = segmentFor(selection.anchor.blockId);
-    final focusSegment = segmentFor(selection.focus.blockId);
-    if (anchorSegment == null || focusSegment == null) return null;
-
+    final forward = anchorLocation.index <= focusLocation.index;
+    final first = selected.first;
+    final last = selected.last;
     return TextSelection(
-      baseOffset: anchorIndex <= focusIndex
-          ? anchorSegment.range.start
-          : anchorSegment.range.end,
-      extentOffset: anchorIndex <= focusIndex
-          ? focusSegment.range.end
-          : focusSegment.range.start,
+      baseOffset: forward
+          ? first.range.start + first.blockSourceOffset
+          : last.range.start + last.blockSourceOffset + last.source.length,
+      extentOffset: forward
+          ? last.range.start + last.blockSourceOffset + last.source.length
+          : first.range.start + first.blockSourceOffset,
     );
+  }
+
+  _MarkdownBlockSegment? _nestedSegmentForBlockId(
+    _MarkdownBlockSegment segment,
+    String blockId,
+  ) {
+    if (segment.block?.id == blockId) return segment;
+    final block = segment.block;
+    if (block is MarkdownListBlock) {
+      for (var itemIndex = 0; itemIndex < block.items.length; itemIndex++) {
+        final item = block.items[itemIndex];
+        for (var childIndex = 0;
+            childIndex < item.blocks.length;
+            childIndex++) {
+          final child = item.blocks[childIndex];
+          final childSegment = _MarkdownBlockSegment(
+            range: segment.range,
+            source: child.toMarkdown(),
+            block: child,
+            containerBlockId: segment.containerBlockId ?? block.id,
+            blockSourceOffset: segment.blockSourceOffset +
+                _listItemChildBlockSourceOffset(block, itemIndex, childIndex),
+          );
+          final nested = _nestedSegmentForBlockId(childSegment, blockId);
+          if (nested != null) return nested;
+        }
+      }
+    } else if (block is MarkdownBlockquoteBlock) {
+      for (var index = 0; index < block.blocks.length; index++) {
+        final child = block.blocks[index];
+        final childSegment = _MarkdownBlockSegment(
+          range: segment.range,
+          source: child.toMarkdown(),
+          block: child,
+          containerBlockId: segment.containerBlockId ?? block.id,
+          blockSourceOffset: segment.blockSourceOffset +
+              _blockquoteChildSourceOffset(block, index),
+        );
+        final nested = _nestedSegmentForBlockId(childSegment, blockId);
+        if (nested != null) return nested;
+      }
+    }
+    return null;
   }
 
   void _clearActiveDocumentSelectionIfInvalid() {
@@ -9517,6 +9650,20 @@ class _MarkdownBlockSegment {
   final MarkdownBlock? block;
   final String? containerBlockId;
   final int blockSourceOffset;
+}
+
+class _DocumentTextBlockLocation {
+  const _DocumentTextBlockLocation({
+    required this.parentId,
+    required this.siblings,
+    required this.index,
+    required this.block,
+  });
+
+  final String? parentId;
+  final List<MarkdownBlock> siblings;
+  final int index;
+  final MarkdownBlock block;
 }
 
 class _FormattedBlockDragPayload {

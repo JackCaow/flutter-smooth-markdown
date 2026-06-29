@@ -2148,6 +2148,63 @@ void main() {
       expect(clipboardText, '**Alpha**\n\nBeta');
     });
 
+    testWidgets('formatted shift-click copies blockquote child selection',
+        (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final controller =
+          MarkdownEditorController(text: '> **Alpha**\n>\n> Beta');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('smooth_markdown_editor_blockquote_child_0_0'),
+        ),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          const ValueKey('smooth_markdown_editor_blockquote_child_0_1'),
+        ),
+      );
+      await tester.pump();
+
+      await _sendControlShortcut(tester, LogicalKeyboardKey.keyC);
+      await tester.pump();
+
+      expect(
+        clipboardText,
+        '> **Alpha**\n'
+        '>\n'
+        '> Beta',
+      );
+    });
+
     testWidgets('formatted document selection toolbar bolds selected blocks',
         (tester) async {
       final controller = MarkdownEditorController(text: 'Alpha\n\nBeta');
@@ -2176,6 +2233,45 @@ void main() {
       await tester.pump();
 
       expect(controller.text, '**Alpha**\n\n**Beta**');
+    });
+
+    testWidgets('formatted blockquote child selection toolbar bolds children',
+        (tester) async {
+      final controller = MarkdownEditorController(text: '> Alpha\n>\n> Beta');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('smooth_markdown_editor_blockquote_child_0_0'),
+        ),
+      );
+      await tester.pump();
+      await _shiftTap(
+        tester,
+        find.byKey(
+          const ValueKey('smooth_markdown_editor_blockquote_child_0_1'),
+        ),
+      );
+      await tester.pump();
+
+      await _tapToolbarIcon(tester, Icons.format_bold);
+      await tester.pump();
+
+      expect(
+        controller.text,
+        '> **Alpha**\n'
+        '>\n'
+        '> **Beta**',
+      );
     });
 
     testWidgets('formatted document selection toolbar groups selected blocks',

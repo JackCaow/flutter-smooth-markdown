@@ -1485,6 +1485,44 @@ E = mc^2
       expect(copied, 'lpha\n\nBet');
     });
 
+    test('copies a nested blockquote child selection as quoted markdown', () {
+      const document = MarkdownDocument(
+        blocks: [
+          MarkdownBlockquoteBlock(
+            id: 'quote',
+            blocks: [
+              MarkdownParagraphBlock(
+                id: 'p1',
+                children: [
+                  MarkdownStrong([MarkdownText('Alpha')]),
+                ],
+              ),
+              MarkdownParagraphBlock(
+                id: 'p2',
+                children: [MarkdownText('Beta')],
+              ),
+            ],
+          ),
+        ],
+      );
+      final editor = MarkdownDocumentEditor(document);
+      addTearDown(editor.dispose);
+
+      final copied = editor.copySelectionAsMarkdown(
+        const MarkdownDocumentSelection(
+          anchor: MarkdownDocumentPosition(blockId: 'p1', offset: 0),
+          focus: MarkdownDocumentPosition(blockId: 'p2', offset: 4),
+        ),
+      );
+
+      expect(
+        copied,
+        '> **Alpha**\n'
+        '>\n'
+        '> Beta',
+      );
+    });
+
     test('deletes a cross-block selection and joins endpoint text', () {
       const document = MarkdownDocument(
         blocks: [
@@ -1523,6 +1561,49 @@ E = mc^2
 
       expect(editor.undo(), isTrue);
       expect(editor.document.toMarkdown(), document.toMarkdown());
+    });
+
+    test('deletes a nested blockquote child selection in place', () {
+      const document = MarkdownDocument(
+        blocks: [
+          MarkdownBlockquoteBlock(
+            id: 'quote',
+            blocks: [
+              MarkdownParagraphBlock(
+                id: 'p1',
+                children: [MarkdownText('Alpha')],
+              ),
+              MarkdownParagraphBlock(
+                id: 'p2',
+                children: [MarkdownText('Beta')],
+              ),
+              MarkdownParagraphBlock(
+                id: 'p3',
+                children: [MarkdownText('Gamma')],
+              ),
+            ],
+          ),
+        ],
+      );
+      final editor = MarkdownDocumentEditor(document);
+      addTearDown(editor.dispose);
+
+      final result = editor.deleteSelection(
+        const MarkdownDocumentSelection(
+          anchor: MarkdownDocumentPosition(blockId: 'p1', offset: 0),
+          focus: MarkdownDocumentPosition(blockId: 'p2', offset: 4),
+        ),
+      );
+
+      expect(result, isNotNull);
+      expect(result!.activeBlockId, 'p1');
+      expect(result.selectionOffset, 0);
+      expect(
+        editor.document.toMarkdown(),
+        '>\n'
+        '>\n'
+        '> Gamma',
+      );
     });
 
     test('does not delete across unsupported top-level block types', () {
@@ -1659,6 +1740,44 @@ E = mc^2
 
       expect(changed, isTrue);
       expect(editor.document.toMarkdown(), '**Alpha**\n\n**Beta**');
+    });
+
+    test('applies inline commands across nested blockquote child blocks', () {
+      const document = MarkdownDocument(
+        blocks: [
+          MarkdownBlockquoteBlock(
+            id: 'quote',
+            blocks: [
+              MarkdownParagraphBlock(
+                id: 'p1',
+                children: [MarkdownText('Alpha')],
+              ),
+              MarkdownParagraphBlock(
+                id: 'p2',
+                children: [MarkdownText('Beta')],
+              ),
+            ],
+          ),
+        ],
+      );
+      final editor = MarkdownDocumentEditor(document);
+      addTearDown(editor.dispose);
+
+      final changed = editor.applyInlineCommandToSelection(
+        const MarkdownDocumentSelection(
+          anchor: MarkdownDocumentPosition(blockId: 'p1', offset: 0),
+          focus: MarkdownDocumentPosition(blockId: 'p2', offset: 4),
+        ),
+        MarkdownEditorCommand.bold,
+      );
+
+      expect(changed, isTrue);
+      expect(
+        editor.document.toMarkdown(),
+        '> **Alpha**\n'
+        '>\n'
+        '> **Beta**',
+      );
     });
 
     test('wraps selected top-level blocks into one bullet list', () {
