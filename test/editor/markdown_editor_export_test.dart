@@ -134,6 +134,37 @@ void main() {
       expect(html, isNot(contains('href="https://example.com"')));
     });
 
+    test('keeps protected html token-looking text literal', () {
+      final html =
+          markdownToHtml('{{SMHTML0}} and [link](https://example.com)');
+
+      expect(
+        html,
+        '<p>{{SMHTML0}} and <a target="_blank" rel="noopener noreferrer nofollow" class="underline cursor-pointer" href="https://example.com">link</a></p>',
+      );
+    });
+
+    test('only closes fenced code blocks on valid closing fences', () {
+      final html = markdownToHtml(
+        '````dart\n'
+        '```not a closing fence\n'
+        'print(1);\n'
+        '```\n'
+        'still code\n'
+        '````\n'
+        'after',
+      );
+
+      expect(
+        html,
+        '<pre><code class="language-dart">```not a closing fence\n'
+        'print(1);\n'
+        '```\n'
+        'still code</code></pre>\n'
+        '<p>after</p>',
+      );
+    });
+
     test('exports details blocks without allowing raw html injection', () {
       final html = markdownToHtml(
         '<details open>\n'

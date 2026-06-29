@@ -1372,14 +1372,45 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         child: _renderMarkdown(segment.source),
       ),
     );
-    if (!selected) return child;
+    final selectableChild = _buildFormattedDocumentSelectionDragTarget(
+      segment,
+      child,
+    );
+    if (!selected) return selectableChild;
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: child,
+      child: selectableChild,
+    );
+  }
+
+  Widget _buildFormattedDocumentSelectionDragTarget(
+    _MarkdownBlockSegment segment,
+    Widget child,
+  ) {
+    if (!widget.enabled || !_isSelectableDocumentTextSegment(segment)) {
+      return child;
+    }
+
+    return DragTarget<_FormattedRangeSelectionDragPayload>(
+      onWillAccept: (payload) =>
+          payload?.kind == _FormattedRangeSelectionDragKind.document,
+      onAccept: (_) => _selectFormattedDocumentRangeTo(segment),
+      builder: (context, candidateData, rejectedData) {
+        return Draggable<_FormattedRangeSelectionDragPayload>(
+          data: const _FormattedRangeSelectionDragPayload(
+            kind: _FormattedRangeSelectionDragKind.document,
+          ),
+          maxSimultaneousDrags: 1,
+          feedback: const SizedBox(width: 1, height: 1),
+          childWhenDragging: child,
+          onDragStarted: () => _beginFormattedDocumentRangeSelection(segment),
+          child: child,
+        );
+      },
     );
   }
 
@@ -1488,15 +1519,20 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                         ),
                 ),
               );
+    final selectablePrimaryContent = _buildFormattedListItemSelectionDragTarget(
+      list,
+      index,
+      primaryContent,
+    );
     final decoratedPrimaryContent = selected
         ? DecoratedBox(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: primaryContent,
+            child: selectablePrimaryContent,
           )
-        : primaryContent;
+        : selectablePrimaryContent;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1530,6 +1566,37 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFormattedListItemSelectionDragTarget(
+    MarkdownListBlock list,
+    int itemIndex,
+    Widget child,
+  ) {
+    if (!widget.enabled || itemIndex < 0 || itemIndex >= list.items.length) {
+      return child;
+    }
+
+    return DragTarget<_FormattedRangeSelectionDragPayload>(
+      onWillAccept: (payload) =>
+          payload?.kind == _FormattedRangeSelectionDragKind.listItem &&
+          payload?.listId == list.id,
+      onAccept: (_) => _selectFormattedListItemRangeTo(list, itemIndex),
+      builder: (context, candidateData, rejectedData) {
+        return Draggable<_FormattedRangeSelectionDragPayload>(
+          data: _FormattedRangeSelectionDragPayload(
+            kind: _FormattedRangeSelectionDragKind.listItem,
+            listId: list.id,
+          ),
+          maxSimultaneousDrags: 1,
+          feedback: const SizedBox(width: 1, height: 1),
+          childWhenDragging: child,
+          onDragStarted: () =>
+              _beginFormattedListItemRangeSelection(list, itemIndex),
+          child: child,
+        );
+      },
     );
   }
 
@@ -2052,6 +2119,38 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       );
     }
 
+    final cell = InkWell(
+      key: ValueKey(
+        'smooth_markdown_editor_table_cell_${table.id}_${keyPrefix}_$columnIndex',
+      ),
+      onTap: widget.enabled
+          ? () => _handleTableCellTap(
+                table,
+                rowIndex: rowIndex,
+                columnIndex: columnIndex,
+                header: header,
+                children: children,
+              )
+          : null,
+      child: Container(
+        key: selected
+            ? ValueKey(
+                'smooth_markdown_editor_table_cell_selected_${table.id}_${keyPrefix}_$columnIndex',
+              )
+            : null,
+        constraints: const BoxConstraints(minWidth: 96),
+        alignment: contentAlignment,
+        color: cellColor,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: _renderFormattedInlineCell(
+          context,
+          children,
+          textStyle,
+          textAlign,
+        ),
+      ),
+    );
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onSecondaryTapDown: widget.enabled
@@ -2064,37 +2163,53 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                 header: header,
               )
           : null,
-      child: InkWell(
-        key: ValueKey(
-          'smooth_markdown_editor_table_cell_${table.id}_${keyPrefix}_$columnIndex',
-        ),
-        onTap: widget.enabled
-            ? () => _handleTableCellTap(
-                  table,
-                  rowIndex: rowIndex,
-                  columnIndex: columnIndex,
-                  header: header,
-                  children: children,
-                )
-            : null,
-        child: Container(
-          key: selected
-              ? ValueKey(
-                  'smooth_markdown_editor_table_cell_selected_${table.id}_${keyPrefix}_$columnIndex',
-                )
-              : null,
-          constraints: const BoxConstraints(minWidth: 96),
-          alignment: contentAlignment,
-          color: cellColor,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: _renderFormattedInlineCell(
-            context,
-            children,
-            textStyle,
-            textAlign,
-          ),
-        ),
+      child: _buildFormattedTableCellSelectionDragTarget(
+        table,
+        rowIndex: rowIndex,
+        columnIndex: columnIndex,
+        header: header,
+        child: cell,
       ),
+    );
+  }
+
+  Widget _buildFormattedTableCellSelectionDragTarget(
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+    required Widget child,
+  }) {
+    if (!widget.enabled) return child;
+
+    return DragTarget<_FormattedRangeSelectionDragPayload>(
+      onWillAccept: (payload) =>
+          payload?.kind == _FormattedRangeSelectionDragKind.tableCell &&
+          payload?.tableId == table.id,
+      onAccept: (_) => _selectTableCellRangeTo(
+        table,
+        rowIndex: rowIndex,
+        columnIndex: columnIndex,
+        header: header,
+      ),
+      builder: (context, candidateData, rejectedData) {
+        return Draggable<_FormattedRangeSelectionDragPayload>(
+          data: _FormattedRangeSelectionDragPayload(
+            kind: _FormattedRangeSelectionDragKind.tableCell,
+            tableId: table.id,
+          ),
+          maxSimultaneousDrags: 1,
+          feedback: const SizedBox(width: 1, height: 1),
+          childWhenDragging: child,
+          onDragStarted: () => _beginTableCellRangeSelection(
+            table,
+            rowIndex: rowIndex,
+            columnIndex: columnIndex,
+            header: header,
+          ),
+          child: child,
+        );
+      },
     );
   }
 
@@ -3281,6 +3396,42 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return true;
   }
 
+  bool _beginTableCellRangeSelection(
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+  }) {
+    final anchor = _tableCellPosition(
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: header,
+    );
+    final selection = MarkdownTableCellSelection(
+      tableId: table.id,
+      anchor: anchor,
+      focus: anchor,
+    );
+
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeTableSelection = selection;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
   void _activateTableCell(
     String tableId, {
     required int rowIndex,
@@ -4361,6 +4512,47 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return true;
   }
 
+  bool _beginFormattedListItemRangeSelection(
+    MarkdownListBlock list,
+    int itemIndex,
+  ) {
+    if (itemIndex < 0 || itemIndex >= list.items.length) return false;
+
+    final item = list.items[itemIndex];
+    final selection = MarkdownListItemSelection(
+      listId: list.id,
+      anchorItemId: item.id,
+      focusItemId: item.id,
+    );
+
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = null
+      ..value = const TextEditingValue();
+    _syncingFormattedBlock = false;
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeListItemSelection = selection;
+    });
+    final sourceSelection = _sourceSelectionForListItemSelection(selection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
   bool _selectFormattedDocumentRangeTo(_MarkdownBlockSegment focusSegment) {
     if (!_isSelectableDocumentTextSegment(focusSegment)) return false;
 
@@ -4396,6 +4588,48 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     );
     final selection = MarkdownDocumentSelection(anchor: anchor, focus: focus);
     if (_documentSelectionBlockIds(selection).isEmpty) return false;
+
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = null
+      ..value = const TextEditingValue();
+    _syncingFormattedBlock = false;
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeDocumentSelection = selection;
+    });
+    final sourceSelection = _sourceSelectionForDocumentSelection(selection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _beginFormattedDocumentRangeSelection(
+    _MarkdownBlockSegment anchorSegment,
+  ) {
+    if (!_isSelectableDocumentTextSegment(anchorSegment)) return false;
+
+    final block = anchorSegment.block!;
+    final selection = MarkdownDocumentSelection(
+      anchor: MarkdownDocumentPosition(blockId: block.id, offset: 0),
+      focus: MarkdownDocumentPosition(
+        blockId: block.id,
+        offset: block.plainText.length,
+      ),
+    );
 
     _syncingFormattedBlock = true;
     _formattedBlockController
@@ -10041,6 +10275,24 @@ class _FormattedBlockDragPayload {
   });
 
   final String blockId;
+}
+
+enum _FormattedRangeSelectionDragKind {
+  document,
+  listItem,
+  tableCell,
+}
+
+class _FormattedRangeSelectionDragPayload {
+  const _FormattedRangeSelectionDragPayload({
+    required this.kind,
+    this.listId,
+    this.tableId,
+  });
+
+  final _FormattedRangeSelectionDragKind kind;
+  final String? listId;
+  final String? tableId;
 }
 
 class _FencedCodeBlock {

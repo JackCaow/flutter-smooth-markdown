@@ -2148,6 +2148,54 @@ void main() {
       expect(clipboardText, '**Alpha**\n\nBeta');
     });
 
+    testWidgets('formatted drag selects top-level document blocks',
+        (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final controller = MarkdownEditorController(text: '**Alpha**\n\nBeta');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final source = find
+          .byKey(const ValueKey('smooth_markdown_editor_formatted_block_0'));
+      final target = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_block_11'),
+      );
+      await tester.dragFrom(
+        tester.getCenter(source),
+        tester.getCenter(target) - tester.getCenter(source),
+      );
+      await tester.pump();
+
+      await _sendControlShortcut(tester, LogicalKeyboardKey.keyC);
+      await tester.pump();
+
+      expect(clipboardText, '**Alpha**\n\nBeta');
+    });
+
     testWidgets('formatted shift-click copies blockquote child selection',
         (tester) async {
       String? clipboardText;
@@ -3882,6 +3930,65 @@ void main() {
         find.byKey(
           ValueKey('smooth_markdown_editor_list_item_${nestedKeyPrefix}_1'),
         ),
+      );
+      await tester.pump();
+
+      await _sendControlShortcut(tester, LogicalKeyboardKey.keyC);
+      await tester.pump();
+
+      expect(
+        clipboardText,
+        '- Alpha\n'
+        '- Beta',
+      );
+    });
+
+    testWidgets('formatted nested list drag selects item range',
+        (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final controller = MarkdownEditorController(
+        text: '- Outer\n  - Alpha\n  - Beta\n  - Gamma',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 360,
+          ),
+        ),
+      );
+
+      final outer = _singleScratchContentBlock(controller) as MarkdownListBlock;
+      final nested = outer.items.single.blocks.last as MarkdownListBlock;
+      final nestedKeyPrefix = '0_${nested.id}';
+      final source = find.byKey(
+        ValueKey('smooth_markdown_editor_list_item_${nestedKeyPrefix}_0'),
+      );
+      final target = find.byKey(
+        ValueKey('smooth_markdown_editor_list_item_${nestedKeyPrefix}_1'),
+      );
+
+      await tester.dragFrom(
+        tester.getCenter(source),
+        tester.getCenter(target) - tester.getCenter(source),
       );
       await tester.pump();
 
@@ -6690,6 +6797,58 @@ void main() {
         find.byKey(
           ValueKey(
             'smooth_markdown_editor_table_cell_active_${table.id}_row_0_0',
+          ),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('formatted table drag selects a rectangular cell range',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '| A | B | C |\n'
+            '| --- | --- | --- |\n'
+            '| 1 | 2 | 3 |\n'
+            '| 4 | 5 | 6 |',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final table =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      final source = find.byKey(
+        ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_0'),
+      );
+      final target = find.byKey(
+        ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_1_1'),
+      );
+
+      await tester.dragFrom(
+        tester.getCenter(source),
+        tester.getCenter(target) - tester.getCenter(source),
+      );
+      await tester.pump();
+
+      for (final key in [
+        'smooth_markdown_editor_table_cell_selected_${table.id}_row_0_0',
+        'smooth_markdown_editor_table_cell_selected_${table.id}_row_0_1',
+        'smooth_markdown_editor_table_cell_selected_${table.id}_row_1_0',
+        'smooth_markdown_editor_table_cell_selected_${table.id}_row_1_1',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget);
+      }
+      expect(
+        find.byKey(
+          ValueKey(
+            'smooth_markdown_editor_table_cell_selected_${table.id}_row_0_2',
           ),
         ),
         findsNothing,

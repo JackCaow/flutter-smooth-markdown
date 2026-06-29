@@ -109,14 +109,15 @@ String _markdownLinesToHtml(List<String> lines) {
       continue;
     }
 
-    final fenceMatch = RegExp(r'^(```|~~~)\s*(.*)$').firstMatch(trimmed);
+    final fenceMatch = RegExp(r'^(`{3,}|~{3,})\s*(.*)$').firstMatch(trimmed);
     if (fenceMatch != null) {
       final fence = fenceMatch.group(1)!;
       final info = fenceMatch.group(2)!.trim();
       final language = info.isEmpty ? '' : info.split(RegExp(r'\s+')).first;
       final codeLines = <String>[];
       index++;
-      while (index < lines.length && !lines[index].trim().startsWith(fence)) {
+      while (
+          index < lines.length && !_isClosingCodeFence(lines[index], fence)) {
         codeLines.add(lines[index]);
         index++;
       }
@@ -222,6 +223,19 @@ String _markdownLinesToHtml(List<String> lines) {
   }
 
   return buffer.toString().trimRight();
+}
+
+bool _isClosingCodeFence(String line, String openingFence) {
+  final trimmed = line.trim();
+  if (trimmed.isEmpty) return false;
+
+  final marker = openingFence[0];
+  var runLength = 0;
+  while (runLength < trimmed.length && trimmed[runLength] == marker) {
+    runLength++;
+  }
+  return runLength >= openingFence.length &&
+      trimmed.substring(runLength).trim().isEmpty;
 }
 
 bool _isSpecialBlockStart(List<String> lines, int index) {
@@ -634,7 +648,7 @@ String _inlineMarkdownToHtml(String text) {
   final protectedHtml = <String>[];
 
   String protect(String value) {
-    final token = '{{SMHTML${protectedHtml.length}}}';
+    final token = '\u0000SMHTML${protectedHtml.length}\u0000';
     protectedHtml.add(value);
     return token;
   }
@@ -704,7 +718,7 @@ String _inlineMarkdownToHtml(String text) {
   );
 
   for (var i = protectedHtml.length - 1; i >= 0; i -= 1) {
-    html = html.replaceAll('{{SMHTML$i}}', protectedHtml[i]);
+    html = html.replaceAll('\u0000SMHTML$i\u0000', protectedHtml[i]);
   }
 
   return html;
