@@ -119,9 +119,14 @@ packages, asset uploads, or platform share sheets.
 
 The core package does not ship default file picker, printing, share, upload, or
 platform image picker adapters; keep those integrations in the host app and
-route them through the callbacks above. The exported editor document model
-types are available for advanced integrations, but should be treated as
-experimental until the editor API is finalized.
+route them through the callbacks above. Low-level editor document APIs are not
+exported from the main entry point. For advanced integrations, import the
+explicit experimental entry point below and treat it as unstable until the editor
+API is finalized.
+
+```dart
+import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor_experimental.dart';
+```
 
 ### Programmatic Selection
 

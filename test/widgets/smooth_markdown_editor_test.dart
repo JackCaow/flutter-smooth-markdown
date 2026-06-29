@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
+import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor_experimental.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Finder _richTextContaining(String text) {

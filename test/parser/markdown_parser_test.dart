@@ -1,4 +1,4 @@
-import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
+import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor_experimental.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

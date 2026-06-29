@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - ✨ **Markdown editor** - Added `SmoothMarkdownEditor` with formatted/source/preview/split modes, formatting commands, slash commands, wikilinks, search, Markdown import/export callbacks, and Scratch-style example entry points.
+- 🧪 **Experimental editor model entry point** - Added `flutter_smooth_markdown_editor_experimental.dart` for low-level editor document model and transaction APIs while keeping the main package root focused on stable renderer/editor widgets and controllers.
 - 🧪 **Editor coverage** - Added document, controller, and widget tests for Markdown editing workflows.
 
 ## [0.7.4] - 2026-06-17
