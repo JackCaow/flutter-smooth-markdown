@@ -89,13 +89,44 @@ Selection handles work across text and non-text blocks (images, tables, etc.). C
 ### Markdown Editor
 
 ```dart
-final editorController = MarkdownEditorController(text: '# Scratch note');
+import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor.dart';
+
+final editorController = MarkdownEditorController(
+  text: '# Scratch note',
+  historyLimit: 200,
+);
 
 SmoothMarkdownEditor(
   controller: editorController,
-  initialMode: MarkdownEditorMode.formatted,
+  mode: MarkdownEditorMode.formatted,
   wikilinkSuggestions: const ['Daily Notes', 'Project Plan'],
+  capabilities: const MarkdownEditorCapabilities(
+    disabledCommands: {
+      MarkdownEditorCommand.mermaidDiagram,
+      MarkdownEditorCommand.blockMath,
+    },
+  ),
+  toolbarCommands: const [
+    MarkdownEditorCommand.bold,
+    MarkdownEditorCommand.italic,
+    MarkdownEditorCommand.link,
+    MarkdownEditorCommand.image,
+    MarkdownEditorCommand.codeBlock,
+    MarkdownEditorCommand.table,
+  ],
+  toolbarTrailing: [
+    IconButton(
+      tooltip: 'Save',
+      icon: const Icon(Icons.save_outlined),
+      onPressed: () {
+        saveDraft(editorController.text);
+        editorController.markSaved();
+      },
+    ),
+  ],
   onChanged: (markdown) => saveDraft(markdown),
+  onCommand: (command) => analytics.track('markdown_command', command.name),
+  onSelectionChanged: (selection) => updateSelectionState(selection),
   onTapWikilink: (target) => openNote(target),
   onExportMarkdown: (markdown) => saveMarkdownFile(markdown),
 )
@@ -109,6 +140,19 @@ autocomplete, formatted block editing, code-block language selection, Mermaid
 preview/source toggling, block math editing, copy-as-Markdown/plain-text/HTML,
 Markdown import/export callbacks, focus mode, and source, preview, or split layouts.
 
+Host apps can treat `MarkdownEditorController` as the stable integration point:
+use `text` for the Markdown source, `isDirty`/`markSaved()` for save state,
+`selection`/`getSelectionMarkdown()` for source selections, `insertMarkdown()`
+or `replaceSelection()` for integrations, `undo()`/`redo()` for custom UI, and
+the table helpers (`replaceTableCellText`, `insertTableRowAfter`,
+`insertTableColumnBefore`, `setTableColumnAlignment`, etc.) for host table
+controls. Use controlled `mode` + `onModeChanged` when the app owns editor
+layout, `MarkdownEditorCapabilities` to disable built-in commands,
+`toolbarCommands` to hide or reorder the built-in toolbar buttons,
+`toolbarLeading`/`toolbarTrailing` to add host actions, `toolbarBuilder` to wrap
+or replace the toolbar, `enableKeyboardShortcuts` to turn off built-in
+shortcuts, and `onShortcut` to intercept keys before the editor handles them.
+
 File-oriented editor actions are intentionally callback-based so apps can choose
 their own desktop, mobile, or web integrations. When callbacks are omitted,
 `Export Markdown` copies Markdown to the clipboard, `Print as PDF` copies the
@@ -119,11 +163,11 @@ packages, asset uploads, or platform share sheets.
 
 The core package does not ship default file picker, printing, share, upload, or
 platform image picker adapters; keep those integrations in the host app and
-route them through the callbacks above. The main entry point exports the editor
-controller, command, semantic document/selection APIs, and document transaction
-helpers used by host integrations. For lower-level Markdown codec access and
-model tools that are still evolving, import the explicit experimental entry
-point below.
+route them through the callbacks above. `flutter_smooth_markdown_editor.dart`
+is the stable editor-only entry point for app integrations. Lower-level document
+model, codec, and transaction helpers are still evolving; import the explicit
+experimental entry point when an integration needs those APIs and pin compatible
+package versions.
 
 ```dart
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor_experimental.dart';

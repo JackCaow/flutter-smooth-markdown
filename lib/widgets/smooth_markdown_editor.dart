@@ -110,6 +110,37 @@ typedef MarkdownEditorMarkdownImportCallback = FutureOr<String?> Function();
 typedef MarkdownEditorImagePickerCallback
     = FutureOr<MarkdownEditorImageSelection?> Function();
 
+/// Host callback for editor keyboard shortcuts.
+typedef MarkdownEditorShortcutCallback = KeyEventResult Function(
+  KeyEvent event,
+  MarkdownEditorController controller,
+);
+
+/// Wraps or replaces the default editor toolbar.
+typedef MarkdownEditorToolbarBuilder = Widget Function(
+  BuildContext context,
+  Widget defaultToolbar,
+);
+
+/// Configures which built-in editor commands are available.
+class MarkdownEditorCapabilities {
+  /// Creates a command availability configuration.
+  const MarkdownEditorCapabilities({
+    this.disabledCommands = const <MarkdownEditorCommand>{},
+  });
+
+  /// Default configuration with every built-in command enabled.
+  static const all = MarkdownEditorCapabilities();
+
+  /// Built-in commands hidden from UI and ignored by shortcuts/slash commands.
+  final Set<MarkdownEditorCommand> disabledCommands;
+
+  /// Whether [command] is available to the editor.
+  bool supports(MarkdownEditorCommand command) {
+    return !disabledCommands.contains(command);
+  }
+}
+
 /// A Markdown source editor with formatted editing, live preview, and
 /// Scratch-inspired commands.
 ///
@@ -122,6 +153,7 @@ class SmoothMarkdownEditor extends StatefulWidget {
     this.controller,
     this.data = '',
     this.onChanged,
+    this.mode,
     this.initialMode = MarkdownEditorMode.formatted,
     this.onModeChanged,
     this.styleSheet,
@@ -140,6 +172,16 @@ class SmoothMarkdownEditor extends StatefulWidget {
     this.onFocusModeChanged,
     this.enableSlashCommands = true,
     this.customSlashCommands = const [],
+    this.capabilities = MarkdownEditorCapabilities.all,
+    this.toolbarCommands,
+    this.toolbarLeading = const <Widget>[],
+    this.toolbarTrailing = const <Widget>[],
+    this.toolbarBuilder,
+    this.enableKeyboardShortcuts = true,
+    this.onShortcut,
+    this.onCommand,
+    this.onSelectionChanged,
+    this.onFocusChanged,
     this.enableWikilinks = true,
     this.wikilinkSuggestions = const [],
     this.onTapWikilink,
@@ -166,6 +208,11 @@ class SmoothMarkdownEditor extends StatefulWidget {
 
   /// Called whenever the Markdown source changes.
   final ValueChanged<String>? onChanged;
+
+  /// Controlled editor display mode.
+  ///
+  /// When null, the editor owns its mode and starts from [initialMode].
+  final MarkdownEditorMode? mode;
 
   /// Initial editor display mode.
   final MarkdownEditorMode initialMode;
@@ -224,6 +271,41 @@ class SmoothMarkdownEditor extends StatefulWidget {
 
   /// Extra host-provided slash commands appended after built-in commands.
   final List<MarkdownEditorSlashCommand> customSlashCommands;
+
+  /// Built-in command availability for toolbar, shortcuts, and slash commands.
+  final MarkdownEditorCapabilities capabilities;
+
+  /// Built-in command buttons to show, in order.
+  ///
+  /// When null, Scratch-style defaults are used. Disabled commands are removed
+  /// from this list automatically.
+  final List<MarkdownEditorCommand>? toolbarCommands;
+
+  /// Host-provided widgets inserted before the built-in toolbar controls.
+  final List<Widget> toolbarLeading;
+
+  /// Host-provided widgets inserted after the built-in toolbar controls.
+  final List<Widget> toolbarTrailing;
+
+  /// Wraps or replaces the default toolbar widget.
+  final MarkdownEditorToolbarBuilder? toolbarBuilder;
+
+  /// Whether built-in keyboard shortcuts are handled.
+  final bool enableKeyboardShortcuts;
+
+  /// Host-provided shortcut hook.
+  ///
+  /// Return [KeyEventResult.handled] to suppress built-in handling for that key.
+  final MarkdownEditorShortcutCallback? onShortcut;
+
+  /// Called after a built-in editor command is accepted.
+  final ValueChanged<MarkdownEditorCommand>? onCommand;
+
+  /// Called when the source selection changes.
+  final ValueChanged<TextSelection>? onSelectionChanged;
+
+  /// Called when the source editor focus changes.
+  final ValueChanged<bool>? onFocusChanged;
 
   /// Whether preview parses and renders `[[wikilinks]]`.
   final bool enableWikilinks;
@@ -317,6 +399,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   _TableCellSelection? _activeTableCell;
   MarkdownTableCellSelection? _activeTableSelection;
   MarkdownListItemSelection? _activeListItemSelection;
+  TextSelection? _lastReportedSelection;
   bool _syncingFormattedBlock = false;
   bool _syncingTableCell = false;
   _StoredMarkTarget? _storedMarkTarget;
@@ -347,7 +430,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   @override
   void initState() {
     super.initState();
-    _mode = widget.initialMode;
+    _mode = widget.mode ?? widget.initialMode;
     _focusMode = widget.initialFocusMode;
     if (_mode != MarkdownEditorMode.source) {
       _lastNonSourceMode = _mode;
@@ -386,6 +469,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (oldWidget.focusNode != widget.focusNode) {
       _detachFocusNode();
       _attachFocusNode(widget.focusNode);
+    }
+
+    if (widget.mode != null && widget.mode != _mode) {
+      _setMode(widget.mode!, notify: false);
     }
 
     if (oldWidget.wikilinkSuggestions != widget.wikilinkSuggestions) {
@@ -441,9 +528,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   void _attachFocusNode(FocusNode? focusNode) {
     _focusNode = focusNode ?? FocusNode();
     _ownsFocusNode = focusNode == null;
+    _focusNode.addListener(_handleFocusChanged);
   }
 
   void _detachFocusNode() {
+    _focusNode.removeListener(_handleFocusChanged);
     if (_ownsFocusNode) {
       _focusNode.dispose();
     }
@@ -461,10 +550,22 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _refreshInlineSuggestions();
     _refreshSearchMatches();
     _clearActiveDocumentSelectionIfInvalid();
+    _reportSelectionChanged();
     widget.onChanged?.call(_controller.text);
     if (mounted) {
       setState(() {});
     }
+  }
+
+  void _handleFocusChanged() {
+    widget.onFocusChanged?.call(_focusNode.hasFocus);
+  }
+
+  void _reportSelectionChanged() {
+    final selection = _controller.selection;
+    if (_lastReportedSelection == selection) return;
+    _lastReportedSelection = selection;
+    widget.onSelectionChanged?.call(selection);
   }
 
   @override
@@ -544,7 +645,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   Widget _buildToolbar(BuildContext context) {
     final color = Theme.of(context).dividerColor.withOpacity(0.6);
-    return Material(
+    final toolbar = Material(
       color: Theme.of(context).colorScheme.surface,
       child: SizedBox(
         height: _toolbarHeight,
@@ -552,6 +653,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           children: [
+            ...widget.toolbarLeading,
             _modeButton(
               MarkdownEditorMode.formatted,
               Icons.article_outlined,
@@ -603,77 +705,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
               onPressed: () => _moveActiveTopLevelBlock(upward: false),
             ),
             _separator(color),
-            _commandButton(
-                Icons.format_bold, 'Bold', MarkdownEditorCommand.bold),
-            _commandButton(
-              Icons.format_italic,
-              'Italic',
-              MarkdownEditorCommand.italic,
-            ),
-            _commandButton(
-              Icons.strikethrough_s,
-              'Strikethrough ($_shortcutModifierLabel+Shift+S)',
-              MarkdownEditorCommand.strikethrough,
-            ),
-            _commandButton(
-              Icons.code,
-              'Inline code',
-              MarkdownEditorCommand.inlineCode,
-            ),
-            _separator(color),
-            _buildHeadingMenuButton(),
-            _commandButton(
-              Icons.format_list_bulleted,
-              'Bulleted list',
-              MarkdownEditorCommand.unorderedList,
-            ),
-            _commandButton(
-              Icons.format_list_numbered,
-              'Numbered list',
-              MarkdownEditorCommand.orderedList,
-            ),
-            _commandButton(
-              Icons.check_box_outlined,
-              'Task list',
-              MarkdownEditorCommand.taskList,
-            ),
-            _commandButton(
-              Icons.format_quote,
-              'Quote',
-              MarkdownEditorCommand.blockquote,
-            ),
-            _separator(color),
-            _commandButton(
-              Icons.link,
-              'Link',
-              MarkdownEditorCommand.link,
-            ),
-            _commandButton(
-              Icons.image_outlined,
-              'Image',
-              MarkdownEditorCommand.image,
-            ),
-            _commandButton(
-              Icons.data_object,
-              'Code Block',
-              MarkdownEditorCommand.codeBlock,
-            ),
-            _commandButton(
-              Icons.functions,
-              'Block Math',
-              MarkdownEditorCommand.blockMath,
-            ),
-            _commandButton(
-              Icons.account_tree_outlined,
-              'Mermaid Diagram',
-              MarkdownEditorCommand.mermaidDiagram,
-            ),
-            _buildTablePickerButton(context),
-            _commandButton(
-              Icons.horizontal_rule,
-              'Horizontal rule',
-              MarkdownEditorCommand.horizontalRule,
-            ),
+            ..._buildToolbarCommandWidgets(context, color),
             _separator(color),
             _buildCopyMenu(),
             Tooltip(
@@ -690,10 +722,167 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                 onPressed: _openSearch,
               ),
             ),
+            ...widget.toolbarTrailing,
           ],
         ),
       ),
     );
+    return widget.toolbarBuilder?.call(context, toolbar) ?? toolbar;
+  }
+
+  List<Widget> _buildToolbarCommandWidgets(
+    BuildContext context,
+    Color separatorColor,
+  ) {
+    final configured = widget.toolbarCommands;
+    if (configured != null) {
+      return [
+        for (final command in configured)
+          if (_isCommandEnabled(command))
+            _toolbarCommandWidget(context, command),
+      ];
+    }
+
+    return [
+      if (_isCommandEnabled(MarkdownEditorCommand.bold))
+        _commandButton(Icons.format_bold, 'Bold', MarkdownEditorCommand.bold),
+      if (_isCommandEnabled(MarkdownEditorCommand.italic))
+        _commandButton(
+          Icons.format_italic,
+          'Italic',
+          MarkdownEditorCommand.italic,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.strikethrough))
+        _commandButton(
+          Icons.strikethrough_s,
+          'Strikethrough ($_shortcutModifierLabel+Shift+S)',
+          MarkdownEditorCommand.strikethrough,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.inlineCode))
+        _commandButton(
+            Icons.code, 'Inline code', MarkdownEditorCommand.inlineCode),
+      _separator(separatorColor),
+      if (_hasAnyEnabledHeadingCommand()) _buildHeadingMenuButton(),
+      if (_isCommandEnabled(MarkdownEditorCommand.unorderedList))
+        _commandButton(
+          Icons.format_list_bulleted,
+          'Bulleted list',
+          MarkdownEditorCommand.unorderedList,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.orderedList))
+        _commandButton(
+          Icons.format_list_numbered,
+          'Numbered list',
+          MarkdownEditorCommand.orderedList,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.taskList))
+        _commandButton(
+          Icons.check_box_outlined,
+          'Task list',
+          MarkdownEditorCommand.taskList,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.blockquote))
+        _commandButton(
+            Icons.format_quote, 'Quote', MarkdownEditorCommand.blockquote),
+      _separator(separatorColor),
+      if (_isCommandEnabled(MarkdownEditorCommand.link))
+        _commandButton(Icons.link, 'Link', MarkdownEditorCommand.link),
+      if (_isCommandEnabled(MarkdownEditorCommand.image))
+        _commandButton(
+            Icons.image_outlined, 'Image', MarkdownEditorCommand.image),
+      if (_isCommandEnabled(MarkdownEditorCommand.codeBlock))
+        _commandButton(
+            Icons.data_object, 'Code Block', MarkdownEditorCommand.codeBlock),
+      if (_isCommandEnabled(MarkdownEditorCommand.blockMath))
+        _commandButton(
+            Icons.functions, 'Block Math', MarkdownEditorCommand.blockMath),
+      if (_isCommandEnabled(MarkdownEditorCommand.mermaidDiagram))
+        _commandButton(
+          Icons.account_tree_outlined,
+          'Mermaid Diagram',
+          MarkdownEditorCommand.mermaidDiagram,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.table))
+        _buildTablePickerButton(context),
+      if (_isCommandEnabled(MarkdownEditorCommand.horizontalRule))
+        _commandButton(
+          Icons.horizontal_rule,
+          'Horizontal rule',
+          MarkdownEditorCommand.horizontalRule,
+        ),
+    ];
+  }
+
+  Widget _toolbarCommandWidget(
+    BuildContext context,
+    MarkdownEditorCommand command,
+  ) {
+    if (command == MarkdownEditorCommand.table) {
+      return _buildTablePickerButton(context);
+    }
+    return _commandButton(
+      _toolbarIconForCommand(command),
+      _toolbarTooltipForCommand(command),
+      command,
+    );
+  }
+
+  IconData _toolbarIconForCommand(MarkdownEditorCommand command) {
+    return switch (command) {
+      MarkdownEditorCommand.bold => Icons.format_bold,
+      MarkdownEditorCommand.italic => Icons.format_italic,
+      MarkdownEditorCommand.strikethrough => Icons.strikethrough_s,
+      MarkdownEditorCommand.inlineCode => Icons.code,
+      MarkdownEditorCommand.heading1 ||
+      MarkdownEditorCommand.heading2 ||
+      MarkdownEditorCommand.heading3 ||
+      MarkdownEditorCommand.heading4 ||
+      MarkdownEditorCommand.heading5 ||
+      MarkdownEditorCommand.heading6 =>
+        Icons.title,
+      MarkdownEditorCommand.unorderedList => Icons.format_list_bulleted,
+      MarkdownEditorCommand.orderedList => Icons.format_list_numbered,
+      MarkdownEditorCommand.taskList => Icons.check_box_outlined,
+      MarkdownEditorCommand.blockquote => Icons.format_quote,
+      MarkdownEditorCommand.link => Icons.link,
+      MarkdownEditorCommand.image => Icons.image_outlined,
+      MarkdownEditorCommand.codeBlock => Icons.data_object,
+      MarkdownEditorCommand.blockMath => Icons.functions,
+      MarkdownEditorCommand.mermaidDiagram => Icons.account_tree_outlined,
+      MarkdownEditorCommand.table => Icons.table_chart_outlined,
+      MarkdownEditorCommand.horizontalRule => Icons.horizontal_rule,
+      MarkdownEditorCommand.wikilink => Icons.notes_outlined,
+      MarkdownEditorCommand.paragraph => Icons.notes_outlined,
+    };
+  }
+
+  String _toolbarTooltipForCommand(MarkdownEditorCommand command) {
+    return switch (command) {
+      MarkdownEditorCommand.bold => 'Bold',
+      MarkdownEditorCommand.italic => 'Italic',
+      MarkdownEditorCommand.strikethrough =>
+        'Strikethrough ($_shortcutModifierLabel+Shift+S)',
+      MarkdownEditorCommand.inlineCode => 'Inline code',
+      MarkdownEditorCommand.heading1 => 'Heading 1',
+      MarkdownEditorCommand.heading2 => 'Heading 2',
+      MarkdownEditorCommand.heading3 => 'Heading 3',
+      MarkdownEditorCommand.heading4 => 'Heading 4',
+      MarkdownEditorCommand.heading5 => 'Heading 5',
+      MarkdownEditorCommand.heading6 => 'Heading 6',
+      MarkdownEditorCommand.unorderedList => 'Bulleted list',
+      MarkdownEditorCommand.orderedList => 'Numbered list',
+      MarkdownEditorCommand.taskList => 'Task list',
+      MarkdownEditorCommand.blockquote => 'Quote',
+      MarkdownEditorCommand.link => 'Link',
+      MarkdownEditorCommand.image => 'Image',
+      MarkdownEditorCommand.codeBlock => 'Code Block',
+      MarkdownEditorCommand.blockMath => 'Block Math',
+      MarkdownEditorCommand.mermaidDiagram => 'Mermaid Diagram',
+      MarkdownEditorCommand.table => 'Table',
+      MarkdownEditorCommand.horizontalRule => 'Horizontal rule',
+      MarkdownEditorCommand.wikilink => 'Wikilink',
+      MarkdownEditorCommand.paragraph => 'Paragraph',
+    };
   }
 
   Widget _buildCopyMenu() {
@@ -918,37 +1107,56 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return _storedMarks.contains(command);
   }
 
+  bool _isCommandEnabled(MarkdownEditorCommand command) {
+    return widget.capabilities.supports(command);
+  }
+
+  bool _hasAnyEnabledHeadingCommand() {
+    return _isCommandEnabled(MarkdownEditorCommand.heading1) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading2) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading3) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading4) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading5) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading6);
+  }
+
   Widget _buildHeadingMenuButton() {
     return PopupMenuButton<MarkdownEditorCommand>(
       tooltip: 'Headings',
       enabled: widget.enabled,
       icon: const Icon(Icons.title),
       onSelected: _applyCommand,
-      itemBuilder: (context) => const [
-        PopupMenuItem(
-          value: MarkdownEditorCommand.heading1,
-          child: _HeadingMenuItem(label: 'H1', title: 'Heading 1'),
-        ),
-        PopupMenuItem(
-          value: MarkdownEditorCommand.heading2,
-          child: _HeadingMenuItem(label: 'H2', title: 'Heading 2'),
-        ),
-        PopupMenuItem(
-          value: MarkdownEditorCommand.heading3,
-          child: _HeadingMenuItem(label: 'H3', title: 'Heading 3'),
-        ),
-        PopupMenuItem(
-          value: MarkdownEditorCommand.heading4,
-          child: _HeadingMenuItem(label: 'H4', title: 'Heading 4'),
-        ),
-        PopupMenuItem(
-          value: MarkdownEditorCommand.heading5,
-          child: _HeadingMenuItem(label: 'H5', title: 'Heading 5'),
-        ),
-        PopupMenuItem(
-          value: MarkdownEditorCommand.heading6,
-          child: _HeadingMenuItem(label: 'H6', title: 'Heading 6'),
-        ),
+      itemBuilder: (context) => [
+        if (_isCommandEnabled(MarkdownEditorCommand.heading1))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading1,
+            child: _HeadingMenuItem(label: 'H1', title: 'Heading 1'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading2))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading2,
+            child: _HeadingMenuItem(label: 'H2', title: 'Heading 2'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading3))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading3,
+            child: _HeadingMenuItem(label: 'H3', title: 'Heading 3'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading4))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading4,
+            child: _HeadingMenuItem(label: 'H4', title: 'Heading 4'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading5))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading5,
+            child: _HeadingMenuItem(label: 'H5', title: 'Heading 5'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading6))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading6,
+            child: _HeadingMenuItem(label: 'H6', title: 'Heading 6'),
+          ),
       ],
     );
   }
@@ -6441,6 +6649,15 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           : KeyEventResult.ignored;
     }
 
+    final shortcutResult = widget.onShortcut?.call(event, _controller);
+    if (shortcutResult == KeyEventResult.handled) {
+      return KeyEventResult.handled;
+    }
+
+    if (!widget.enableKeyboardShortcuts) {
+      return KeyEventResult.ignored;
+    }
+
     final isModifierPressed = HardwareKeyboard.instance.isMetaPressed ||
         HardwareKeyboard.instance.isControlPressed;
     if (!isModifierPressed) {
@@ -6474,31 +6691,25 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (alt && !shift) {
       final headingCommand = _headingCommandForShortcutKey(key);
       if (headingCommand != null) {
-        _applyCommand(headingCommand);
-        return KeyEventResult.handled;
+        return _applyCommandFromShortcut(headingCommand);
       }
       if (key == LogicalKeyboardKey.keyC) {
-        _applyCommand(MarkdownEditorCommand.codeBlock);
-        return KeyEventResult.handled;
+        return _applyCommandFromShortcut(MarkdownEditorCommand.codeBlock);
       }
     }
 
     if (shift && !alt) {
       if (key == LogicalKeyboardKey.keyB) {
-        _applyCommand(MarkdownEditorCommand.blockquote);
-        return KeyEventResult.handled;
+        return _applyCommandFromShortcut(MarkdownEditorCommand.blockquote);
       }
       if (key == LogicalKeyboardKey.keyS || key == LogicalKeyboardKey.keyX) {
-        _applyCommand(MarkdownEditorCommand.strikethrough);
-        return KeyEventResult.handled;
+        return _applyCommandFromShortcut(MarkdownEditorCommand.strikethrough);
       }
       if (_isShortcutDigitKey(key, 7)) {
-        _applyCommand(MarkdownEditorCommand.orderedList);
-        return KeyEventResult.handled;
+        return _applyCommandFromShortcut(MarkdownEditorCommand.orderedList);
       }
       if (_isShortcutDigitKey(key, 8)) {
-        _applyCommand(MarkdownEditorCommand.unorderedList);
-        return KeyEventResult.handled;
+        return _applyCommandFromShortcut(MarkdownEditorCommand.unorderedList);
       }
       if (key == LogicalKeyboardKey.keyP) {
         unawaited(_exportPdf());
@@ -6507,20 +6718,16 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     }
 
     if (!shift && !alt && key == LogicalKeyboardKey.keyB) {
-      _applyCommand(MarkdownEditorCommand.bold);
-      return KeyEventResult.handled;
+      return _applyCommandFromShortcut(MarkdownEditorCommand.bold);
     }
     if (!shift && !alt && key == LogicalKeyboardKey.keyI) {
-      _applyCommand(MarkdownEditorCommand.italic);
-      return KeyEventResult.handled;
+      return _applyCommandFromShortcut(MarkdownEditorCommand.italic);
     }
     if (!shift && !alt && key == LogicalKeyboardKey.keyE) {
-      _applyCommand(MarkdownEditorCommand.inlineCode);
-      return KeyEventResult.handled;
+      return _applyCommandFromShortcut(MarkdownEditorCommand.inlineCode);
     }
     if (!shift && !alt && key == LogicalKeyboardKey.keyK) {
-      _applyCommand(MarkdownEditorCommand.link);
-      return KeyEventResult.handled;
+      return _applyCommandFromShortcut(MarkdownEditorCommand.link);
     }
     if (!shift && !alt && key == LogicalKeyboardKey.keyC) {
       if (_copyActiveFormattedSelectionAsMarkdown()) {
@@ -6545,6 +6752,12 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     }
 
     return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _applyCommandFromShortcut(MarkdownEditorCommand command) {
+    if (!_isCommandEnabled(command)) return KeyEventResult.ignored;
+    _applyCommand(command);
+    return KeyEventResult.handled;
   }
 
   bool _copyActiveFormattedSelectionAsMarkdown() {
@@ -6804,6 +7017,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     }
 
     if (event.logicalKey == LogicalKeyboardKey.tab) {
+      if (_changeActiveCodeIndent(outdent: shift)) {
+        return KeyEventResult.handled;
+      }
       return _changeActiveListItemIndent(outdent: shift)
           ? KeyEventResult.handled
           : KeyEventResult.ignored;
@@ -6826,7 +7042,103 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         : KeyEventResult.ignored;
   }
 
-  void _setMode(MarkdownEditorMode mode) {
+  bool _changeActiveCodeIndent({required bool outdent}) {
+    final blockId = _activeFormattedBlockId;
+    if (blockId == null) return false;
+    final block = _controller.document.blockById(blockId);
+    if (block is! MarkdownCodeBlock && block is! MarkdownMermaidBlock) {
+      return false;
+    }
+
+    final value = _formattedBlockController.value;
+    final selection = value.selection;
+    final text = value.text;
+    if (!selection.isValid) return false;
+
+    final start = selection.start.clamp(0, text.length);
+    final end = selection.end.clamp(start, text.length);
+    final lineStart = start == 0 ? 0 : text.lastIndexOf('\n', start - 1) + 1;
+    final effectiveEnd =
+        end > start && end <= text.length && text[end - 1] == '\n'
+            ? end - 1
+            : end;
+    final lineEndIndex = text.indexOf('\n', effectiveEnd);
+    final lineEnd = lineEndIndex == -1 ? text.length : lineEndIndex;
+
+    if (selection.isCollapsed) {
+      if (outdent) {
+        final removed = _leadingIndentToRemove(text, lineStart);
+        if (removed == 0 || start < lineStart + removed) return true;
+        _formattedBlockController.value = value.copyWith(
+          text: text.replaceRange(lineStart, lineStart + removed, ''),
+          selection: TextSelection.collapsed(offset: start - removed),
+          composing: TextRange.empty,
+        );
+        return true;
+      }
+
+      _formattedBlockController.value = value.copyWith(
+        text: text.replaceRange(start, start, '  '),
+        selection: TextSelection.collapsed(offset: start + 2),
+        composing: TextRange.empty,
+      );
+      return true;
+    }
+
+    final selectedBlock = text.substring(lineStart, lineEnd);
+    final lines = selectedBlock.split('\n');
+    if (!outdent) {
+      final replacement = lines.map((line) => '  $line').join('\n');
+      _formattedBlockController.value = value.copyWith(
+        text: text.replaceRange(lineStart, lineEnd, replacement),
+        selection: TextSelection(
+          baseOffset: selection.baseOffset + 2,
+          extentOffset: selection.extentOffset + (lines.length * 2),
+        ),
+        composing: TextRange.empty,
+      );
+      return true;
+    }
+
+    var removedBeforeBase = 0;
+    var removedBeforeExtent = 0;
+    var cursor = lineStart;
+    final replacementLines = <String>[];
+    for (final line in lines) {
+      final removed = _leadingIndentToRemove(line, 0);
+      replacementLines.add(line.substring(removed));
+      final lineEndOffset = cursor + line.length;
+      if (cursor < selection.baseOffset) removedBeforeBase += removed;
+      if (lineEndOffset < selection.extentOffset) {
+        removedBeforeExtent += removed;
+      }
+      cursor = lineEndOffset + 1;
+    }
+
+    final replacement = replacementLines.join('\n');
+    _formattedBlockController.value = value.copyWith(
+      text: text.replaceRange(lineStart, lineEnd, replacement),
+      selection: TextSelection(
+        baseOffset: (selection.baseOffset - removedBeforeBase)
+            .clamp(lineStart, text.length),
+        extentOffset: (selection.extentOffset - removedBeforeExtent)
+            .clamp(lineStart, text.length),
+      ),
+      composing: TextRange.empty,
+    );
+    return true;
+  }
+
+  int _leadingIndentToRemove(String text, int lineStart) {
+    if (lineStart >= text.length) return 0;
+    if (text.codeUnitAt(lineStart) == 0x09) return 1;
+    if (text.codeUnitAt(lineStart) != 0x20) return 0;
+    final next = lineStart + 1;
+    if (next < text.length && text.codeUnitAt(next) == 0x20) return 2;
+    return 1;
+  }
+
+  void _setMode(MarkdownEditorMode mode, {bool notify = true}) {
     if (_mode == mode) return;
     final previousMode = _mode;
     final transition = _modeTransitionAnchor(previousMode, mode);
@@ -6839,7 +7151,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         _lastNonSourceMode = mode;
       }
     });
-    widget.onModeChanged?.call(mode);
+    if (notify) {
+      widget.onModeChanged?.call(mode);
+    }
     _restoreModeTransition(mode, transition);
   }
 
@@ -8043,6 +8357,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   void _applyCommand(MarkdownEditorCommand command) {
     if (!widget.enabled) return;
+    if (!_isCommandEnabled(command)) return;
+    widget.onCommand?.call(command);
+
     if (_mode == MarkdownEditorMode.formatted &&
         _activeListItemSelection != null) {
       if (_applyActiveListItemSelectionCommand(command)) {
@@ -9466,7 +9783,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   List<_EditorCommandItem> _allSlashCommands() {
     return [
-      ..._builtInSlashCommands,
+      for (final item in _builtInSlashCommands)
+        if (item.command == null || _isCommandEnabled(item.command!)) item,
       for (final command in widget.customSlashCommands)
         _EditorCommandItem.custom(command),
     ];
@@ -9493,6 +9811,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     }
     final command = item.command;
     if (command == null) return;
+    if (!_isCommandEnabled(command)) return;
 
     if (_runFormattedSlashCommand(item, match)) {
       return;

@@ -21,10 +21,13 @@ class MarkdownEditorController extends ChangeNotifier {
     String text = '',
     TextEditingController? textController,
     ParserPluginRegistry? plugins,
+    int historyLimit = _defaultHistoryLimit,
   })  : textController = textController ?? TextEditingController(text: text),
-        _ownsTextController = textController == null {
+        _ownsTextController = textController == null,
+        _historyLimit = historyLimit < 0 ? 0 : historyLimit {
     _codec = MarkdownDocumentCodec(plugins: plugins);
     _lastParsedText = this.textController.text;
+    _savedText = _lastParsedText;
     documentEditor = MarkdownDocumentEditor(
       _parseEditableDocument(_lastParsedText),
     );
@@ -46,11 +49,12 @@ class MarkdownEditorController extends ChangeNotifier {
   final bool _ownsTextController;
 
   late String _lastParsedText;
+  late String _savedText;
   late TextEditingValue _lastHistoryValue;
 
   final List<TextEditingValue> _undoStack = <TextEditingValue>[];
   final List<TextEditingValue> _redoStack = <TextEditingValue>[];
-  final int _historyLimit = _defaultHistoryLimit;
+  final int _historyLimit;
 
   bool _syncingSourceFromDocument = false;
   bool _syncingDocumentFromSource = false;
@@ -77,6 +81,12 @@ class MarkdownEditorController extends ChangeNotifier {
   /// Current semantic Markdown document.
   MarkdownDocument get document => documentEditor.document;
 
+  /// Source text snapshot last marked as persisted by host code.
+  String get savedText => _savedText;
+
+  /// Whether the current source differs from [savedText].
+  bool get isDirty => text != _savedText;
+
   /// Whether an undo step is available.
   bool get canUndo => _undoStack.isNotEmpty;
 
@@ -86,6 +96,14 @@ class MarkdownEditorController extends ChangeNotifier {
   /// Replaces the semantic document and updates [text].
   set document(MarkdownDocument value) {
     documentEditor.document = value;
+  }
+
+  /// Marks the current source, or [savedText] when provided, as persisted.
+  void markSaved([String? savedText]) {
+    final nextSavedText = savedText ?? text;
+    if (_savedText == nextSavedText) return;
+    _savedText = nextSavedText;
+    notifyListeners();
   }
 
   /// Clears source undo and redo history.
@@ -335,6 +353,19 @@ class MarkdownEditorController extends ChangeNotifier {
   /// Current text selection.
   TextSelection get selection => textController.selection;
 
+  /// Currently selected Markdown source text.
+  String get selectedText {
+    final value = textController.value;
+    final range = _normalizedSelection(value);
+    return value.text.substring(range.start, range.end);
+  }
+
+  /// Returns the selected Markdown source, or null when the selection is empty.
+  String? getSelectionMarkdown() {
+    final selected = selectedText;
+    return selected.isEmpty ? null : selected;
+  }
+
   /// Replaces the current selection with [replacement].
   void replaceSelection(
     String replacement, {
@@ -401,6 +432,101 @@ class MarkdownEditorController extends ChangeNotifier {
         columns: columns,
       ).toMarkdown(),
     );
+  }
+
+  /// Replaces a table cell's plain text.
+  bool replaceTableCellText({
+    required String tableId,
+    required int rowIndex,
+    required int columnIndex,
+    required String text,
+  }) {
+    return documentEditor.replaceTableCellText(
+      blockId: tableId,
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      text: text,
+    );
+  }
+
+  /// Inserts a table row before [rowIndex].
+  bool insertTableRowBefore(String tableId, int rowIndex) {
+    if (document.blockById(tableId) is! MarkdownTableBlock) return false;
+    documentEditor.insertTableRowBefore(tableId, rowIndex);
+    return true;
+  }
+
+  /// Inserts a table row after [rowIndex].
+  bool insertTableRowAfter(String tableId, int rowIndex) {
+    if (document.blockById(tableId) is! MarkdownTableBlock) return false;
+    documentEditor.insertTableRowAfter(tableId, rowIndex);
+    return true;
+  }
+
+  /// Deletes a table row.
+  bool deleteTableRow(String tableId, int rowIndex) {
+    final table = document.blockById(tableId);
+    if (table is! MarkdownTableBlock || table.rows.isEmpty) return false;
+    documentEditor.deleteTableRow(tableId, rowIndex);
+    return true;
+  }
+
+  /// Inserts a table column before [columnIndex].
+  bool insertTableColumnBefore(String tableId, int columnIndex) {
+    if (document.blockById(tableId) is! MarkdownTableBlock) return false;
+    documentEditor.insertTableColumnBefore(tableId, columnIndex);
+    return true;
+  }
+
+  /// Inserts a table column after [columnIndex].
+  bool insertTableColumnAfter(String tableId, int columnIndex) {
+    if (document.blockById(tableId) is! MarkdownTableBlock) return false;
+    documentEditor.insertTableColumnAfter(tableId, columnIndex);
+    return true;
+  }
+
+  /// Deletes a table column.
+  bool deleteTableColumn(String tableId, int columnIndex) {
+    final table = document.blockById(tableId);
+    if (table is! MarkdownTableBlock || table.columnCount <= 1) return false;
+    documentEditor.deleteTableColumn(tableId, columnIndex);
+    return true;
+  }
+
+  /// Sets a table column alignment.
+  bool setTableColumnAlignment({
+    required String tableId,
+    required int columnIndex,
+    required MarkdownTableAlignment? alignment,
+  }) {
+    if (document.blockById(tableId) is! MarkdownTableBlock) return false;
+    documentEditor.setTableColumnAlignment(
+      blockId: tableId,
+      columnIndex: columnIndex,
+      alignment: alignment,
+    );
+    return true;
+  }
+
+  /// Toggles whether the first table row is a header.
+  bool toggleTableHeaderRow(String tableId) {
+    if (document.blockById(tableId) is! MarkdownTableBlock) return false;
+    documentEditor.toggleTableHeaderRow(tableId);
+    return true;
+  }
+
+  /// Toggles whether the first table column is a header.
+  bool toggleTableHeaderColumn(String tableId) {
+    if (document.blockById(tableId) is! MarkdownTableBlock) return false;
+    documentEditor.toggleTableHeaderColumn(tableId);
+    return true;
+  }
+
+  /// Deletes a table block.
+  bool deleteTable(String tableId) {
+    if (document.blockById(tableId) is! MarkdownTableBlock) return false;
+    documentEditor.deleteTable(tableId);
+    return true;
   }
 
   /// Applies a Markdown editing [command].
@@ -1049,6 +1175,7 @@ class MarkdownEditorController extends ChangeNotifier {
   }
 
   void _pushUndo(TextEditingValue value) {
+    if (_historyLimit == 0) return;
     _undoStack.add(value);
     if (_undoStack.length > _historyLimit) {
       _undoStack.removeAt(0);

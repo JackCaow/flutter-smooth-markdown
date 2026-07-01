@@ -250,6 +250,97 @@ void main() {
       expect(controller.selection.textInside(controller.text), 'Hello');
     });
 
+    test('tracks saved source and selected markdown for host integrations', () {
+      final controller = MarkdownEditorController(text: 'Hello world');
+      addTearDown(controller.dispose);
+
+      expect(controller.savedText, 'Hello world');
+      expect(controller.isDirty, isFalse);
+
+      controller.textController.selection = const TextSelection(
+        baseOffset: 6,
+        extentOffset: 11,
+      );
+      expect(controller.selectedText, 'world');
+      expect(controller.getSelectionMarkdown(), 'world');
+
+      controller.insertMarkdown('Scratch');
+      expect(controller.text, 'Hello Scratch');
+      expect(controller.isDirty, isTrue);
+
+      controller.markSaved();
+      expect(controller.savedText, 'Hello Scratch');
+      expect(controller.isDirty, isFalse);
+    });
+
+    test('allows hosts to disable source undo history', () {
+      final controller = MarkdownEditorController(historyLimit: 0);
+      addTearDown(controller.dispose);
+
+      controller
+        ..text = 'first'
+        ..text = 'second';
+
+      expect(controller.canUndo, isFalse);
+      expect(controller.undo(), isFalse);
+      expect(controller.text, 'second');
+    });
+
+    test('exposes table row and column editing through controller', () {
+      final controller = MarkdownEditorController();
+      addTearDown(controller.dispose);
+      controller.document = const MarkdownDocument(
+        blocks: [
+          MarkdownTableBlock(
+            id: 'table',
+            headers: [
+              [MarkdownText('A')],
+              [MarkdownText('B')],
+            ],
+            rows: [
+              [
+                [MarkdownText('1')],
+                [MarkdownText('2')],
+              ],
+            ],
+            alignments: [null, null],
+          ),
+        ],
+      );
+
+      expect(
+        controller.replaceTableCellText(
+          tableId: 'table',
+          rowIndex: 0,
+          columnIndex: 1,
+          text: 'updated',
+        ),
+        isTrue,
+      );
+      expect(controller.insertTableColumnAfter('table', 1), isTrue);
+      expect(controller.insertTableRowAfter('table', 0), isTrue);
+      expect(
+        controller.setTableColumnAlignment(
+          tableId: 'table',
+          columnIndex: 1,
+          alignment: MarkdownTableAlignment.center,
+        ),
+        isTrue,
+      );
+
+      var table = controller.document.blockById('table') as MarkdownTableBlock;
+      expect(table.columnCount, 3);
+      expect(table.rows, hasLength(2));
+      expect(table.rows.first[1].single.plainText, 'updated');
+      expect(table.alignments[1], MarkdownTableAlignment.center);
+
+      expect(controller.deleteTableColumn('table', 2), isTrue);
+      expect(controller.deleteTableRow('table', 1), isTrue);
+      table = controller.document.blockById('table') as MarkdownTableBlock;
+      expect(table.columnCount, 2);
+      expect(table.rows, hasLength(1));
+    });
+
     test('prefixes selected lines as an ordered list', () {
       final controller = MarkdownEditorController(text: 'one\ntwo');
       addTearDown(controller.dispose);
@@ -1534,6 +1625,160 @@ void main() {
       expect(activeField.controller!.text, 'Shortcut edited');
     });
 
+    testWidgets('capabilities hide disabled toolbar and slash commands',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Body');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 240,
+            toolbarCommands: const [
+              MarkdownEditorCommand.bold,
+              MarkdownEditorCommand.image,
+              MarkdownEditorCommand.table,
+            ],
+            capabilities: const MarkdownEditorCapabilities(
+              disabledCommands: {
+                MarkdownEditorCommand.image,
+                MarkdownEditorCommand.table,
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('smooth_markdown_editor_command_bold')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('smooth_markdown_editor_command_image')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(
+            const ValueKey('smooth_markdown_editor_table_picker_button')),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_active_0')),
+        '/table',
+      );
+      await tester.pump();
+
+      expect(find.text('Table'), findsNothing);
+    });
+
+    testWidgets('supports controlled mode and host toolbar slots',
+        (tester) async {
+      var mode = MarkdownEditorMode.source;
+      var modeChanges = 0;
+
+      await tester.pumpWidget(
+        _wrapWithWidth(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return SmoothMarkdownEditor(
+                data: 'Body',
+                mode: mode,
+                height: 240,
+                toolbarLeading: const [
+                  SizedBox(
+                    key: ValueKey('host_toolbar_leading'),
+                    width: 12,
+                  ),
+                ],
+                toolbarTrailing: const [
+                  SizedBox(
+                    key: ValueKey('host_toolbar_trailing'),
+                    width: 12,
+                  ),
+                ],
+                onModeChanged: (nextMode) {
+                  modeChanges++;
+                  setState(() => mode = nextMode);
+                },
+              );
+            },
+          ),
+          width: 1600,
+        ),
+      );
+
+      expect(
+          find.byKey(const ValueKey('host_toolbar_leading')), findsOneWidget);
+      expect(find.byKey(const ValueKey('smooth_markdown_editor_source')),
+          findsOneWidget);
+
+      await tester.tap(find.byTooltip('Preview'));
+      await tester.pump();
+
+      expect(mode, MarkdownEditorMode.preview);
+      expect(modeChanges, 1);
+      expect(find.byKey(const ValueKey('smooth_markdown_editor_source')),
+          findsNothing);
+
+      final toolbarScrollable = find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable &&
+            axisDirectionToAxis(widget.axisDirection) == Axis.horizontal,
+        description: 'horizontal editor toolbar',
+      );
+      for (var i = 0;
+          i < 20 &&
+              find
+                  .byKey(const ValueKey('host_toolbar_trailing'))
+                  .evaluate()
+                  .isEmpty;
+          i++) {
+        await tester.drag(toolbarScrollable.first, const Offset(-220, 0));
+        await tester.pump();
+      }
+      expect(
+        find.byKey(const ValueKey('host_toolbar_trailing')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('disabled command shortcuts are ignored', (tester) async {
+      final controller = MarkdownEditorController(text: 'Bold me');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 240,
+            capabilities: const MarkdownEditorCapabilities(
+              disabledCommands: {MarkdownEditorCommand.bold},
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+
+      controller.textController.selection = const TextSelection(
+        baseOffset: 0,
+        extentOffset: 4,
+      );
+      await _sendControlShortcut(tester, LogicalKeyboardKey.keyB);
+      await tester.pump();
+
+      expect(controller.text, 'Bold me');
+    });
+
     testWidgets('formatted code block language selector uses document model',
         (tester) async {
       final controller = MarkdownEditorController(
@@ -1659,6 +1904,57 @@ void main() {
       expect(
         controller.textController.selection,
         const TextSelection.collapsed(offset: 19),
+      );
+    });
+
+    testWidgets('formatted code block indents code with Tab', (tester) async {
+      final controller = MarkdownEditorController(
+        text: '```dart\nprint("hi");\n```',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byTooltip('Edit code'));
+      await tester.pump();
+
+      final activeFinder = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
+      );
+      await tester.showKeyboard(activeFinder);
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'print("hi");',
+          selection: TextSelection.collapsed(offset: 0),
+        ),
+      );
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+
+      expect(controller.text, '```dart\n  print("hi");\n```');
+      expect(
+        tester.widget<TextField>(activeFinder).controller!.selection,
+        const TextSelection.collapsed(offset: 2),
+      );
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+
+      expect(controller.text, '```dart\nprint("hi");\n```');
+      expect(
+        tester.widget<TextField>(activeFinder).controller!.selection,
+        const TextSelection.collapsed(offset: 0),
       );
     });
 

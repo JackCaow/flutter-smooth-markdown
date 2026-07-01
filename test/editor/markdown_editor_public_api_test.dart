@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
+import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor.dart'
+    as editor_api;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -84,6 +86,19 @@ void main() {
       );
       expect(result.activeBlockId, 'paragraph');
       expect(TextRange.empty.isCollapsed, isTrue);
+    });
+
+    test('offers a stable editor-only import surface', () {
+      final controller = editor_api.MarkdownEditorController(text: 'Body');
+      addTearDown(controller.dispose);
+
+      expect(controller.text, 'Body');
+      expect(
+        const editor_api.MarkdownEditorCapabilities()
+            .supports(editor_api.MarkdownEditorCommand.bold),
+        isTrue,
+      );
+      expect(editor_api.MarkdownEditorMode.formatted.name, 'formatted');
     });
   });
 }
