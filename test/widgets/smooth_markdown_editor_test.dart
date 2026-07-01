@@ -2196,6 +2196,82 @@ void main() {
       expect(clipboardText, '**Alpha**\n\nBeta');
     });
 
+    testWidgets('formatted drag range auto-scrolls near viewport edges',
+        (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final markdown = List.generate(
+        18,
+        (index) => 'Block $index',
+      ).join('\n\n');
+      final controller = MarkdownEditorController(text: markdown);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 180,
+          ),
+        ),
+      );
+
+      final source = find
+          .byKey(const ValueKey('smooth_markdown_editor_formatted_block_0'));
+      final start = tester.getCenter(source);
+      final editorBottom = tester
+          .getBottomLeft(
+            find.byType(SmoothMarkdownEditor),
+          )
+          .dy;
+      final scrollable = find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable &&
+            axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+        description: 'formatted vertical scrollable',
+      );
+      final scrollState = tester.state<ScrollableState>(scrollable.first);
+      expect(scrollState.position.maxScrollExtent, greaterThan(0));
+
+      final gesture = await tester.startGesture(start);
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, 80));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveTo(Offset(start.dx, editorBottom - 8));
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      final target = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_block_160'),
+      );
+      expect(tester.getTopLeft(target).dy, lessThan(editorBottom));
+      await gesture.moveTo(tester.getCenter(target));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+
+      expect(scrollState.position.pixels, greaterThan(10));
+      await _sendControlShortcut(tester, LogicalKeyboardKey.keyC);
+      await tester.pump();
+
+      expect(clipboardText, markdown);
+    });
+
     testWidgets('formatted shift-click copies blockquote child selection',
         (tester) async {
       String? clipboardText;
@@ -2239,6 +2315,61 @@ void main() {
         find.byKey(
           const ValueKey('smooth_markdown_editor_blockquote_child_0_1'),
         ),
+      );
+      await tester.pump();
+
+      await _sendControlShortcut(tester, LogicalKeyboardKey.keyC);
+      await tester.pump();
+
+      expect(
+        clipboardText,
+        '> **Alpha**\n'
+        '>\n'
+        '> Beta',
+      );
+    });
+
+    testWidgets('formatted drag selects blockquote child blocks',
+        (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final controller =
+          MarkdownEditorController(text: '> **Alpha**\n>\n> Beta');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final source = find.byKey(
+        const ValueKey('smooth_markdown_editor_blockquote_child_0_0'),
+      );
+      final target = find.byKey(
+        const ValueKey('smooth_markdown_editor_blockquote_child_0_1'),
+      );
+      await tester.dragFrom(
+        tester.getCenter(source),
+        tester.getCenter(target) - tester.getCenter(source),
       );
       await tester.pump();
 

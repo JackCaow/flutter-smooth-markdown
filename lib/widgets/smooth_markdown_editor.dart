@@ -325,6 +325,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   final MenuController _copyMenuController = MenuController();
   int? _copiedCodeBlockStart;
   Timer? _copiedCodeBlockResetTimer;
+  Timer? _formattedRangeAutoScrollTimer;
+  Offset? _formattedRangeDragGlobalPosition;
+  bool _formattedRangeDragActive = false;
   final ScrollController _formattedScrollController = ScrollController();
   final ScrollController _sourceScrollController = ScrollController();
   final GlobalKey _formattedViewportKey = GlobalKey();
@@ -392,6 +395,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   @override
   void dispose() {
     _copiedCodeBlockResetTimer?.cancel();
+    _stopFormattedRangeAutoScroll();
     _detachController();
     _detachFocusNode();
     _formattedScrollController.dispose();
@@ -1141,37 +1145,43 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return Focus(
       focusNode: _formattedPaneFocusNode,
       onKeyEvent: _handleFormattedPaneKeyEvent,
-      child: DecoratedBox(
-        key: _formattedViewportKey,
-        decoration: widget.previewDecoration ??
-            BoxDecoration(color: theme.colorScheme.surface),
-        child: SingleChildScrollView(
-          key: _formattedScrollKey,
-          controller: _formattedScrollController,
-          padding: const EdgeInsets.all(16),
-          child: segments.isEmpty
-              ? _buildEmptyFormattedEditor(context)
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var i = 0; i < segments.length; i++) ...[
-                      KeyedSubtree(
-                        key: _formattedSegmentGlobalKey(segments[i]),
-                        child: _buildFormattedDraggableSegment(
-                          context,
-                          segments[i],
-                          i,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerMove: _handleFormattedRangeSelectionPointerMove,
+        onPointerUp: (_) => _stopFormattedRangeAutoScroll(),
+        onPointerCancel: (_) => _stopFormattedRangeAutoScroll(),
+        child: DecoratedBox(
+          key: _formattedViewportKey,
+          decoration: widget.previewDecoration ??
+              BoxDecoration(color: theme.colorScheme.surface),
+          child: SingleChildScrollView(
+            key: _formattedScrollKey,
+            controller: _formattedScrollController,
+            padding: const EdgeInsets.all(16),
+            child: segments.isEmpty
+                ? _buildEmptyFormattedEditor(context)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < segments.length; i++) ...[
+                        KeyedSubtree(
+                          key: _formattedSegmentGlobalKey(segments[i]),
+                          child: _buildFormattedDraggableSegment(
+                            context,
+                            segments[i],
+                            i,
+                          ),
                         ),
-                      ),
-                      if (i < segments.length - 1)
-                        SizedBox(
-                          height: widget.styleSheet?.blockSpacing ??
-                              MarkdownStyleSheet.light().blockSpacing ??
-                              16,
-                        ),
+                        if (i < segments.length - 1)
+                          SizedBox(
+                            height: widget.styleSheet?.blockSpacing ??
+                                MarkdownStyleSheet.light().blockSpacing ??
+                                16,
+                          ),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
+          ),
         ),
       ),
     );
@@ -1398,6 +1408,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return DragTarget<_FormattedRangeSelectionDragPayload>(
       onWillAccept: (payload) =>
           payload?.kind == _FormattedRangeSelectionDragKind.document,
+      onMove: _handleFormattedRangeSelectionDragTargetMove,
       onAccept: (_) => _selectFormattedDocumentRangeTo(segment),
       builder: (context, candidateData, rejectedData) {
         return Draggable<_FormattedRangeSelectionDragPayload>(
@@ -1407,7 +1418,14 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           maxSimultaneousDrags: 1,
           feedback: const SizedBox(width: 1, height: 1),
           childWhenDragging: child,
-          onDragStarted: () => _beginFormattedDocumentRangeSelection(segment),
+          onDragStarted: () {
+            _beginFormattedDocumentRangeSelection(segment);
+            _beginFormattedRangeDragAutoScroll();
+          },
+          onDragUpdate: _handleFormattedRangeSelectionDragUpdate,
+          onDragEnd: (_) => _stopFormattedRangeAutoScroll(),
+          onDragCompleted: _stopFormattedRangeAutoScroll,
+          onDraggableCanceled: (_, __) => _stopFormattedRangeAutoScroll(),
           child: child,
         );
       },
@@ -1582,6 +1600,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       onWillAccept: (payload) =>
           payload?.kind == _FormattedRangeSelectionDragKind.listItem &&
           payload?.listId == list.id,
+      onMove: _handleFormattedRangeSelectionDragTargetMove,
       onAccept: (_) => _selectFormattedListItemRangeTo(list, itemIndex),
       builder: (context, candidateData, rejectedData) {
         return Draggable<_FormattedRangeSelectionDragPayload>(
@@ -1592,8 +1611,14 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           maxSimultaneousDrags: 1,
           feedback: const SizedBox(width: 1, height: 1),
           childWhenDragging: child,
-          onDragStarted: () =>
-              _beginFormattedListItemRangeSelection(list, itemIndex),
+          onDragStarted: () {
+            _beginFormattedListItemRangeSelection(list, itemIndex);
+            _beginFormattedRangeDragAutoScroll();
+          },
+          onDragUpdate: _handleFormattedRangeSelectionDragUpdate,
+          onDragEnd: (_) => _stopFormattedRangeAutoScroll(),
+          onDragCompleted: _stopFormattedRangeAutoScroll,
+          onDraggableCanceled: (_, __) => _stopFormattedRangeAutoScroll(),
           child: child,
         );
       },
@@ -1828,14 +1853,18 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         child: _renderMarkdown(childSegment.source),
       ),
     );
-    if (!selected) return childWidget;
+    final selectableChild = _buildFormattedDocumentSelectionDragTarget(
+      childSegment,
+      childWidget,
+    );
+    if (!selected) return selectableChild;
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: childWidget,
+      child: selectableChild,
     );
   }
 
@@ -2186,6 +2215,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       onWillAccept: (payload) =>
           payload?.kind == _FormattedRangeSelectionDragKind.tableCell &&
           payload?.tableId == table.id,
+      onMove: _handleFormattedRangeSelectionDragTargetMove,
       onAccept: (_) => _selectTableCellRangeTo(
         table,
         rowIndex: rowIndex,
@@ -2201,12 +2231,19 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           maxSimultaneousDrags: 1,
           feedback: const SizedBox(width: 1, height: 1),
           childWhenDragging: child,
-          onDragStarted: () => _beginTableCellRangeSelection(
-            table,
-            rowIndex: rowIndex,
-            columnIndex: columnIndex,
-            header: header,
-          ),
+          onDragStarted: () {
+            _beginTableCellRangeSelection(
+              table,
+              rowIndex: rowIndex,
+              columnIndex: columnIndex,
+              header: header,
+            );
+            _beginFormattedRangeDragAutoScroll();
+          },
+          onDragUpdate: _handleFormattedRangeSelectionDragUpdate,
+          onDragEnd: (_) => _stopFormattedRangeAutoScroll(),
+          onDragCompleted: _stopFormattedRangeAutoScroll,
+          onDraggableCanceled: (_, __) => _stopFormattedRangeAutoScroll(),
           child: child,
         );
       },
@@ -6930,6 +6967,88 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       alignment: 0,
       duration: Duration.zero,
     );
+  }
+
+  void _handleFormattedRangeSelectionDragUpdate(DragUpdateDetails details) {
+    _updateFormattedRangeAutoScrollPosition(details.globalPosition);
+  }
+
+  void _handleFormattedRangeSelectionPointerMove(PointerMoveEvent event) {
+    if (!_formattedRangeDragActive) return;
+    _updateFormattedRangeAutoScrollPosition(event.position);
+  }
+
+  void _handleFormattedRangeSelectionDragTargetMove(
+    DragTargetDetails<_FormattedRangeSelectionDragPayload> details,
+  ) {
+    _updateFormattedRangeAutoScrollPosition(details.offset);
+  }
+
+  void _beginFormattedRangeDragAutoScroll() {
+    _formattedRangeDragActive = true;
+  }
+
+  void _updateFormattedRangeAutoScrollPosition(Offset globalPosition) {
+    _formattedRangeDragGlobalPosition = globalPosition;
+    _startFormattedRangeAutoScroll();
+  }
+
+  void _startFormattedRangeAutoScroll() {
+    _formattedRangeAutoScrollTimer ??=
+        Timer.periodic(const Duration(milliseconds: 16), (_) {
+      _tickFormattedRangeAutoScroll();
+    });
+    _tickFormattedRangeAutoScroll();
+  }
+
+  void _stopFormattedRangeAutoScroll() {
+    _formattedRangeAutoScrollTimer?.cancel();
+    _formattedRangeAutoScrollTimer = null;
+    _formattedRangeDragGlobalPosition = null;
+    _formattedRangeDragActive = false;
+  }
+
+  void _tickFormattedRangeAutoScroll() {
+    if (!_formattedScrollController.hasClients) return;
+    final pointer = _formattedRangeDragGlobalPosition;
+    if (pointer == null) return;
+
+    final viewportContext = _formattedViewportKey.currentContext;
+    if (viewportContext == null) return;
+
+    final viewportBox = viewportContext.findRenderObject();
+    if (viewportBox is! RenderBox || !viewportBox.hasSize) return;
+
+    final topLeft = viewportBox.localToGlobal(Offset.zero);
+    final viewportTop = topLeft.dy;
+    final viewportBottom = viewportTop + viewportBox.size.height;
+    const edgeInset = 56.0;
+    const maxScrollStep = 18.0;
+
+    double? target;
+    if (pointer.dy < viewportTop + edgeInset) {
+      final distance = (viewportTop + edgeInset - pointer.dy).clamp(
+        0.0,
+        edgeInset,
+      );
+      target = _formattedScrollController.offset -
+          (maxScrollStep * distance / edgeInset);
+    } else if (pointer.dy > viewportBottom - edgeInset) {
+      final distance = (pointer.dy - (viewportBottom - edgeInset)).clamp(
+        0.0,
+        edgeInset,
+      );
+      target = _formattedScrollController.offset +
+          (maxScrollStep * distance / edgeInset);
+    }
+    if (target == null) return;
+
+    final clampedTarget = target.clamp(
+      _formattedScrollController.position.minScrollExtent,
+      _formattedScrollController.position.maxScrollExtent,
+    );
+    if (clampedTarget == _formattedScrollController.offset) return;
+    _formattedScrollController.jumpTo(clampedTarget.toDouble());
   }
 
   GlobalKey _formattedSegmentGlobalKey(_MarkdownBlockSegment segment) {
