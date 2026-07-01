@@ -2138,25 +2138,28 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             : null,
         child: ColoredBox(
           color: cellColor ?? Colors.transparent,
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: TextField(
-              key: ValueKey(
-                'smooth_markdown_editor_table_cell_active_${table.id}_${keyPrefix}_$columnIndex',
-              ),
-              controller: _tableCellController,
-              focusNode: _tableCellFocusNode,
-              enabled: widget.enabled,
-              autofocus: true,
-              minLines: 1,
-              maxLines: null,
-              textAlign: textAlign,
-              style: textStyle,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                isDense: true,
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 96),
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: TextField(
+                key: ValueKey(
+                  'smooth_markdown_editor_table_cell_active_${table.id}_${keyPrefix}_$columnIndex',
+                ),
+                controller: _tableCellController,
+                focusNode: _tableCellFocusNode,
+                enabled: widget.enabled,
+                autofocus: true,
+                minLines: 1,
+                maxLines: null,
+                textAlign: textAlign,
+                style: textStyle,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                ),
               ),
             ),
           ),
@@ -2239,11 +2242,12 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         header: header,
       ),
       builder: (context, candidateData, rejectedData) {
-        return Draggable<_FormattedRangeSelectionDragPayload>(
+        return LongPressDraggable<_FormattedRangeSelectionDragPayload>(
           data: _FormattedRangeSelectionDragPayload(
             kind: _FormattedRangeSelectionDragKind.tableCell,
             tableId: table.id,
           ),
+          hapticFeedbackOnStart: false,
           maxSimultaneousDrags: 1,
           feedback: const SizedBox(width: 1, height: 1),
           childWhenDragging: child,

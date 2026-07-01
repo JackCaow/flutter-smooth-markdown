@@ -7054,7 +7054,8 @@ void main() {
       );
     });
 
-    testWidgets('formatted table drag selects a rectangular cell range',
+    testWidgets(
+        'formatted table long-press drag selects a rectangular cell range',
         (tester) async {
       final controller = MarkdownEditorController(
         text: '| A | B | C |\n'
@@ -7082,10 +7083,11 @@ void main() {
         ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_1_1'),
       );
 
-      await tester.dragFrom(
-        tester.getCenter(source),
-        tester.getCenter(target) - tester.getCenter(source),
-      );
+      final gesture = await tester.startGesture(tester.getCenter(source));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+      await gesture.moveTo(tester.getCenter(target));
+      await tester.pump();
+      await gesture.up();
       await tester.pump();
 
       for (final key in [
@@ -8125,9 +8127,33 @@ void main() {
       expect(toolbarScroll, findsOneWidget);
       expect(bodyScroll, findsOneWidget);
 
-      await tester.drag(toolbarScroll, const Offset(-240, 0));
+      final bodyScrollable = find.descendant(
+        of: bodyScroll,
+        matching: find.byType(Scrollable),
+      );
+      final bodyPosition =
+          tester.state<ScrollableState>(bodyScrollable).position;
+      expect(bodyPosition.pixels, 0);
+
+      final table =
+          _singleScratchContentBlock(controller) as MarkdownTableBlock;
+      final firstCell = find.byKey(
+        ValueKey('smooth_markdown_editor_table_cell_${table.id}_row_0_0'),
+      );
+      await tester.drag(firstCell, const Offset(-160, 0));
       await tester.pump();
-      await tester.drag(bodyScroll, const Offset(-240, 0));
+
+      expect(bodyPosition.pixels, greaterThan(0));
+      expect(
+        find.byKey(
+          ValueKey(
+            'smooth_markdown_editor_table_cell_selected_${table.id}_row_0_0',
+          ),
+        ),
+        findsNothing,
+      );
+
+      await tester.drag(toolbarScroll, const Offset(-240, 0));
       await tester.pump();
 
       expect(tester.takeException(), isNull);
