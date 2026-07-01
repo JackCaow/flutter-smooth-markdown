@@ -5825,7 +5825,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final autoLinkMatch = _autoLinkInputRuleMatch(prefix);
     if (autoLinkMatch != null) return autoLinkMatch;
 
-    final wikilinkMatch = RegExp(r'\[\[([^\]\n]+?)\]\]$').firstMatch(prefix);
+    final wikilinkMatch = widget.enableWikilinks
+        ? RegExp(r'\[\[([^\]\n]+?)\]\]$').firstMatch(prefix)
+        : null;
     if (wikilinkMatch != null) {
       final target = wikilinkMatch.group(1)!;
       if (target.isNotEmpty) {

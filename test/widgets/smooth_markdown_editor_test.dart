@@ -3592,6 +3592,47 @@ void main() {
       );
     });
 
+    testWidgets('formatted wikilink input rule respects disabled wikilinks',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Open ');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            enableWikilinks: false,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_block_0')),
+      );
+      await tester.pump();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_active_0')),
+        'Open [[Alpha Note]]',
+      );
+      await tester.pump();
+
+      expect(controller.text, r'Open \[\[Alpha Note\]\]');
+      final block =
+          _singleScratchContentBlock(controller) as MarkdownParagraphBlock;
+      expect(block.children, isNot(contains(isA<MarkdownWikilink>())));
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is EditableText &&
+              widget.controller.text == 'Open [[Alpha Note]]',
+          description: 'active field with disabled wikilink input rule',
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('formatted typed markdown link normalizes bare URLs',
         (tester) async {
       final controller = MarkdownEditorController(text: 'Open ');
@@ -8124,6 +8165,31 @@ void main() {
           findsOneWidget);
       expect(_richTextContaining('Title'), findsWidgets);
       expect(_richTextContaining('Body'), findsWidgets);
+    });
+
+    testWidgets('split mode updates preview from source edits', (tester) async {
+      final controller = MarkdownEditorController(text: '# Title\n\nBody');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            initialMode: MarkdownEditorMode.split,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('smooth_markdown_editor_source')),
+        '# Updated\n\nNext body',
+      );
+      await tester.pump();
+
+      expect(controller.text, '# Updated\n\nNext body');
+      expect(_richTextContaining('Updated'), findsWidgets);
+      expect(_richTextContaining('Next body'), findsWidgets);
     });
 
     testWidgets('formatted to source anchors stale cursor to visible block',

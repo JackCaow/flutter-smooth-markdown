@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - ✨ **Markdown editor** - Added `SmoothMarkdownEditor` with formatted/source/preview/split modes, formatting commands, slash commands, wikilinks, search, Markdown import/export callbacks, and Scratch-style example entry points.
-- ✨ **Formatted range selection** - Added Shift-click and pointer-drag selection, copy, delete, and inline formatting support for top-level blocks, blockquote children, nested list items, and table cell ranges.
+- ✨ **Formatted range selection** - Added Shift-click and pointer-drag selection, copy, delete, and inline formatting support for top-level text blocks, blockquote children, nested list items, and table cell ranges.
 - 🛡️ **Editor HTML export hardening** - Avoided protected-token collisions in copy/export HTML and tightened fenced code closing detection for longer fences.
 - 🧪 **Experimental editor model entry point** - Added `flutter_smooth_markdown_editor_experimental.dart` for low-level Markdown codec and editor model helpers while the main package root exports the supported editor widgets, controller, semantic document, selection, and transaction APIs.
 - 🧪 **Editor coverage** - Added document, controller, and widget tests for Markdown editing workflows.
