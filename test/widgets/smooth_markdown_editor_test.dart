@@ -1139,6 +1139,42 @@ void main() {
       expect(focusModeChanges, <bool>[true]);
     });
 
+    testWidgets('formatted pane lazily renders long documents', (tester) async {
+      final markdown = List.generate(
+        200,
+        (index) => 'Paragraph ${index.toString().padLeft(3, '0')}',
+      ).join('\n\n');
+      final controller = MarkdownEditorController(text: markdown);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 240,
+          ),
+        ),
+      );
+
+      expect(_richTextContaining('Paragraph 000'), findsOneWidget);
+      expect(_richTextContaining('Paragraph 199'), findsNothing);
+
+      final formattedScrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey('smooth_markdown_editor_formatted_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final position =
+          tester.state<ScrollableState>(formattedScrollable).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+
+      expect(_richTextContaining('Paragraph 199'), findsOneWidget);
+    });
+
     testWidgets('maps formatted inline mark cursors back to source',
         (tester) async {
       final scenarios = <({
@@ -7808,7 +7844,17 @@ void main() {
       );
       await tester.pump();
 
-      await tester.drag(find.byType(ListView), const Offset(-720, 0));
+      await tester.drag(
+        find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is ListView &&
+                  widget.scrollDirection == Axis.horizontal,
+              description: 'horizontal toolbar list',
+            )
+            .first,
+        const Offset(-720, 0),
+      );
       await tester.pump();
 
       final pickerButton = find
@@ -8402,6 +8448,59 @@ void main() {
       expect(editable.controller.selection.extentOffset, 3);
     });
 
+    testWidgets('source mode returns to a lazily built formatted block',
+        (tester) async {
+      final markdown = List.generate(
+        120,
+        (index) => 'Paragraph ${index.toString().padLeft(3, '0')}',
+      ).join('\n\n');
+      final controller = MarkdownEditorController(text: markdown);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            initialMode: MarkdownEditorMode.source,
+            height: 240,
+          ),
+        ),
+      );
+
+      controller.textController.selection =
+          TextSelection.collapsed(offset: controller.text.length);
+      final sourceScrollable = find.descendant(
+        of: find.byKey(const ValueKey('smooth_markdown_editor_source')),
+        matching: find.byType(Scrollable),
+      );
+      final sourcePosition =
+          tester.state<ScrollableState>(sourceScrollable).position;
+      sourcePosition.jumpTo(sourcePosition.maxScrollExtent);
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Formatted'));
+      await tester.pumpAndSettle();
+
+      final formattedScrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey('smooth_markdown_editor_formatted_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final formattedPosition =
+          tester.state<ScrollableState>(formattedScrollable).position;
+      final tailEditableFinder = find.byWidgetPredicate(
+        (widget) =>
+            widget is EditableText && widget.controller.text == 'Paragraph 119',
+        description: 'active lazily built tail paragraph',
+      );
+
+      expect(formattedPosition.pixels, greaterThan(0));
+      expect(tailEditableFinder, findsOneWidget);
+    });
+
     testWidgets('source mode returns to formatted nested list item',
         (tester) async {
       final controller = MarkdownEditorController(
@@ -8453,7 +8552,7 @@ void main() {
       await _tapToolbarIcon(tester, Icons.search);
       await tester.pump();
       await tester.enterText(find.byType(TextField).first, 'target');
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
       await tester.pump();
 
@@ -8535,10 +8634,15 @@ void main() {
       await _tapToolbarIcon(tester, Icons.search);
       await tester.pump();
       await tester.enterText(find.byType(TextField).first, 'target');
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const ValueKey('smooth_markdown_editor_formatted_scroll')),
+        const Offset(0, -700),
+      );
+      await tester.pumpAndSettle();
 
       expect(find.text('1/1'), findsOneWidget);
-      expect(_highlightedRichTextContaining('target'), findsOneWidget);
+      expect(_richTextContaining('Visible target'), findsOneWidget);
     });
 
     testWidgets('formatted find maps after plugin blocks with blank lines',

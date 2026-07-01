@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1145,6 +1146,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   Widget _buildFormattedPane(BuildContext context) {
     final theme = Theme.of(context);
     final segments = _documentBlockSegments();
+    final blockSpacing = _effectiveStyleSheet(context).blockSpacing ?? 16;
 
     return Focus(
       focusNode: _formattedPaneFocusNode,
@@ -1158,34 +1160,33 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           key: _formattedViewportKey,
           decoration: widget.previewDecoration ??
               BoxDecoration(color: theme.colorScheme.surface),
-          child: SingleChildScrollView(
-            key: _formattedScrollKey,
-            controller: _formattedScrollController,
-            padding: const EdgeInsets.all(16),
-            child: segments.isEmpty
-                ? _buildEmptyFormattedEditor(context)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < segments.length; i++) ...[
-                        KeyedSubtree(
-                          key: _formattedSegmentGlobalKey(segments[i]),
-                          child: _buildFormattedDraggableSegment(
-                            context,
-                            segments[i],
-                            i,
-                          ),
-                        ),
-                        if (i < segments.length - 1)
-                          SizedBox(
-                            height:
-                                _effectiveStyleSheet(context).blockSpacing ??
-                                    16,
-                          ),
-                      ],
-                    ],
-                  ),
-          ),
+          child: segments.isEmpty
+              ? SingleChildScrollView(
+                  key: _formattedScrollKey,
+                  controller: _formattedScrollController,
+                  padding: const EdgeInsets.all(16),
+                  child: _buildEmptyFormattedEditor(context),
+                )
+              : ListView.separated(
+                  key: _formattedScrollKey,
+                  controller: _formattedScrollController,
+                  cacheExtent: 800,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: segments.length,
+                  itemBuilder: (context, index) {
+                    final segment = segments[index];
+                    return KeyedSubtree(
+                      key: _formattedSegmentGlobalKey(segment),
+                      child: _buildFormattedDraggableSegment(
+                        context,
+                        segment,
+                        index,
+                      ),
+                    );
+                  },
+                  separatorBuilder: (context, index) =>
+                      SizedBox(height: blockSpacing),
+                ),
         ),
       ),
     );
@@ -4476,7 +4477,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       codeBuilder: widget.codeBuilder,
       useEnhancedComponents: widget.useEnhancedComponents,
       enableCache: widget.enableCache,
-      useRepaintBoundary: false,
+      useRepaintBoundary: true,
       plugins: _previewPlugins(),
       builderRegistry: _previewBuilderRegistry(),
     );
@@ -6976,18 +6977,70 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _sourceScrollController.jumpTo(target.toDouble());
   }
 
-  void _scrollFormattedBlockToTop(int blockIndex) {
+  void _scrollFormattedBlockToTop(
+    int blockIndex, {
+    bool retryAfterJump = true,
+  }) {
     final segments = _documentBlockSegments();
     if (segments.isEmpty) return;
     final clampedIndex = blockIndex.clamp(0, segments.length - 1).toInt();
     final context =
         _formattedSegmentGlobalKey(segments[clampedIndex]).currentContext;
-    if (context == null) return;
+    if (context == null) {
+      _jumpFormattedScrollNearBlock(clampedIndex, segments.length);
+      if (retryAfterJump) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _mode == MarkdownEditorMode.formatted) {
+            _scrollFormattedBlockToTop(
+              clampedIndex,
+              retryAfterJump: false,
+            );
+          }
+        });
+      }
+      return;
+    }
 
     Scrollable.ensureVisible(
       context,
       alignment: 0,
       duration: Duration.zero,
+    );
+  }
+
+  void _jumpFormattedScrollNearBlock(int blockIndex, int blockCount) {
+    if (!_formattedScrollController.hasClients || blockCount <= 1) return;
+
+    final position = _formattedScrollController.position;
+    final target = lerpDouble(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+      blockIndex / (blockCount - 1),
+    );
+    if (target == null) return;
+
+    _formattedScrollController.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
+  }
+
+  void _jumpFormattedScrollNearSourceOffset(int sourceOffset) {
+    if (!_formattedScrollController.hasClients || _controller.text.isEmpty) {
+      return;
+    }
+
+    final position = _formattedScrollController.position;
+    final textLength = _controller.text.length;
+    final fraction = sourceOffset.clamp(0, textLength).toDouble() / textLength;
+    final target = lerpDouble(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+      fraction,
+    );
+    if (target == null) return;
+
+    _formattedScrollController.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
     );
   }
 
@@ -8862,8 +8915,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   void _refreshSearchMatches() {
     final query = _searchController.text;
     final matches = _findSearchMatches(query);
+    final queryChanged = query != _lastSearchQuery;
     var nextIndex = _currentSearchMatchIndex;
-    if (query != _lastSearchQuery) {
+    if (queryChanged) {
       nextIndex = 0;
       _lastSearchQuery = query;
     }
@@ -8881,6 +8935,17 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     } else {
       _searchMatches = matches;
       _currentSearchMatchIndex = nextIndex;
+    }
+
+    if (queryChanged &&
+        matches.isNotEmpty &&
+        _mode == MarkdownEditorMode.formatted) {
+      final match = matches[nextIndex];
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _mode == MarkdownEditorMode.formatted) {
+          _scrollFormattedSearchMatchIntoView(match);
+        }
+      });
     }
   }
 
@@ -8918,6 +8983,31 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       }
     }
     _focusNode.requestFocus();
+  }
+
+  void _scrollFormattedSearchMatchIntoView(TextRange match) {
+    final segments = _documentBlockSegments();
+    if (segments.isEmpty) return;
+
+    final blockIndex = _blockIndexForSourceOffset(match.start);
+    final clampedIndex = blockIndex.clamp(0, segments.length - 1).toInt();
+    final context =
+        _formattedSegmentGlobalKey(segments[clampedIndex]).currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0,
+        duration: Duration.zero,
+      );
+      return;
+    }
+
+    _jumpFormattedScrollNearSourceOffset(match.start);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _mode == MarkdownEditorMode.formatted) {
+        _scrollFormattedBlockToTop(clampedIndex, retryAfterJump: false);
+      }
+    });
   }
 
   List<TextRange> _findSearchMatches(String query) {
