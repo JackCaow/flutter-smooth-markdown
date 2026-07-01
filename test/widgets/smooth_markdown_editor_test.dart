@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor_experimental.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -14,6 +15,33 @@ Finder _richTextContaining(String text) {
     },
     description: 'RichText containing "$text"',
   );
+}
+
+Color? _richTextColorContaining(WidgetTester tester, String text) {
+  for (final element in _richTextContaining(text).evaluate()) {
+    final widget = element.widget;
+    if (widget is RichText) {
+      final color = _spanColorContaining(widget.text, text);
+      if (color != null) return color;
+    }
+  }
+  return null;
+}
+
+Color? _spanColorContaining(InlineSpan span, String text) {
+  if (span is TextSpan) {
+    if ((span.text?.contains(text) ?? false) && span.style?.color != null) {
+      return span.style!.color;
+    }
+    for (final child in span.children ?? const <InlineSpan>[]) {
+      final color = _spanColorContaining(child, text);
+      if (color != null) return color;
+    }
+    if (span.toPlainText().contains(text)) {
+      return span.style?.color;
+    }
+  }
+  return null;
 }
 
 Finder _highlightedRichTextContaining(String text) {
@@ -61,6 +89,20 @@ bool _hasUnderlineSpan(InlineSpan span, String text) {
 
 Widget _wrap(Widget child) {
   return MaterialApp(
+    home: Scaffold(
+      body: Center(
+        child: SizedBox(
+          width: 900,
+          child: child,
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _wrapDark(Widget child) {
+  return MaterialApp(
+    theme: ThemeData.dark(),
     home: Scaffold(
       body: Center(
         child: SizedBox(
@@ -1010,6 +1052,29 @@ void main() {
       await tester.pump();
 
       expect(controller.text, '# Edited\n\nBody');
+    });
+
+    testWidgets('formatted preview defaults to dark theme colors',
+        (tester) async {
+      final controller = MarkdownEditorController(text: '# Title\n\nBody');
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrapDark(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 240,
+          ),
+        ),
+      );
+
+      final bodyColor = _richTextColorContaining(tester, 'Body');
+      final headingColor = _richTextColorContaining(tester, 'Title');
+
+      expect(bodyColor, isNotNull);
+      expect(headingColor, isNotNull);
+      expect(bodyColor!.computeLuminance(), greaterThan(0.5));
+      expect(headingColor!.computeLuminance(), greaterThan(0.5));
     });
 
     testWidgets('notifies host callbacks for text mode and focus changes',
@@ -8738,6 +8803,29 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.text, r'$$' '\na^2 + b^2 = c^2\n' r'$$');
+    });
+
+    testWidgets('formatted block math defaults to dark theme colors',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: r'$$' '\nE = mc^2\n' r'$$',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrapDark(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      final math = tester.widget<Math>(find.byType(Math));
+      final color = math.options?.color;
+
+      expect(color, isNotNull);
+      expect(color!.computeLuminance(), greaterThan(0.5));
     });
 
     testWidgets('formatted block math editor submits with Control Enter',

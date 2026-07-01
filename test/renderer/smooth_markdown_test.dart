@@ -16,6 +16,33 @@ Finder findRichTextContaining(String text) {
   );
 }
 
+Color? findRichTextColorContaining(WidgetTester tester, String text) {
+  for (final element in findRichTextContaining(text).evaluate()) {
+    final widget = element.widget;
+    if (widget is RichText) {
+      final color = _spanColorContaining(widget.text, text);
+      if (color != null) return color;
+    }
+  }
+  return null;
+}
+
+Color? _spanColorContaining(InlineSpan span, String text) {
+  if (span is TextSpan) {
+    if ((span.text?.contains(text) ?? false) && span.style?.color != null) {
+      return span.style!.color;
+    }
+    for (final child in span.children ?? const <InlineSpan>[]) {
+      final color = _spanColorContaining(child, text);
+      if (color != null) return color;
+    }
+    if (span.toPlainText().contains(text)) {
+      return span.style?.color;
+    }
+  }
+  return null;
+}
+
 void main() {
   group('SmoothMarkdown Widget Tests', () {
     testWidgets('should render simple text', (tester) async {
@@ -30,6 +57,26 @@ void main() {
       );
 
       expect(findRichTextContaining('Hello World'), findsOneWidget);
+    });
+
+    testWidgets('defaults to the surrounding dark theme', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: const Scaffold(
+            body: SmoothMarkdown(
+              data: 'Hello World',
+              useRepaintBoundary: false,
+              enableCache: false,
+            ),
+          ),
+        ),
+      );
+
+      final color = findRichTextColorContaining(tester, 'Hello World');
+
+      expect(color, isNotNull);
+      expect(color!.computeLuminance(), greaterThan(0.5));
     });
 
     testWidgets('should render header', (tester) async {

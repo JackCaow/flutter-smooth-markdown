@@ -177,7 +177,7 @@ class SmoothMarkdown extends StatelessWidget {
   /// All other parameters are optional and provide customization options:
   ///
   /// - [styleSheet]: Controls the visual styling of markdown elements. Defaults to
-  ///   [MarkdownStyleSheet.light] if not provided.
+  ///   [MarkdownStyleSheet.fromTheme] if not provided.
   /// - [config]: Configuration options for markdown parsing behavior. Most features
   ///   are enabled by default.
   /// - [onTapLink]: Callback function invoked when a link is tapped. Receives the
@@ -241,10 +241,10 @@ class SmoothMarkdown extends StatelessWidget {
 
   /// The style sheet used to control the visual appearance of rendered markdown.
   ///
-  /// If not provided, defaults to [MarkdownStyleSheet.light]. You can use one of the
+  /// If not provided, defaults to [MarkdownStyleSheet.fromTheme]. You can use one of the
   /// built-in factory constructors:
   ///
-  /// - [MarkdownStyleSheet.light] - Clean light theme (default)
+  /// - [MarkdownStyleSheet.light] - Clean light theme
   /// - [MarkdownStyleSheet.dark] - Dark theme for dark mode apps
   /// - [MarkdownStyleSheet.github] - GitHub-style light or dark theme
   /// - [MarkdownStyleSheet.vscode] - VS Code editor-style theme
@@ -714,8 +714,10 @@ class SmoothMarkdown extends StatelessWidget {
     }
 
     // Render nodes
+    final effectiveStyleSheet =
+        styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context));
     final renderer = MarkdownRenderer(
-      styleSheet: styleSheet ?? MarkdownStyleSheet.light(),
+      styleSheet: effectiveStyleSheet,
       builderRegistry: customRegistry,
     );
 

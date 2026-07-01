@@ -515,6 +515,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     );
   }
 
+  MarkdownStyleSheet _effectiveStyleSheet(BuildContext context) {
+    return widget.styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context));
+  }
+
   double _suggestionPanelMaxHeight(
     BuildContext context,
     BoxConstraints constraints,
@@ -1174,9 +1178,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                         ),
                         if (i < segments.length - 1)
                           SizedBox(
-                            height: widget.styleSheet?.blockSpacing ??
-                                MarkdownStyleSheet.light().blockSpacing ??
-                                16,
+                            height:
+                                _effectiveStyleSheet(context).blockSpacing ??
+                                    16,
                           ),
                       ],
                     ],
@@ -1379,7 +1383,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       onTap: widget.enabled ? () => _handleFormattedSegmentTap(segment) : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
-        child: _renderMarkdown(segment.source),
+        child: _renderMarkdown(context, segment.source),
       ),
     );
     final selectableChild = _buildFormattedDocumentSelectionDragTarget(
@@ -1530,10 +1534,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: itemSegment == null
-                      ? _renderMarkdown(item.toMarkdown())
+                      ? _renderMarkdown(context, item.toMarkdown())
                       : DefaultTextStyle.merge(
                           style: theme.textTheme.bodyMedium,
-                          child: _renderMarkdown(itemSegment.source),
+                          child: _renderMarkdown(context, itemSegment.source),
                         ),
                 ),
               );
@@ -1679,7 +1683,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           widget.enabled ? () => _activateFormattedSegment(childSegment) : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: _renderMarkdown(childSegment.source),
+        child: _renderMarkdown(context, childSegment.source),
       ),
     );
   }
@@ -1803,9 +1807,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
               ),
               if (index < blockquote.blocks.length - 1)
                 SizedBox(
-                  height: widget.styleSheet?.blockSpacing ??
-                      MarkdownStyleSheet.light().blockSpacing ??
-                      16,
+                  height: _effectiveStyleSheet(context).blockSpacing ?? 16,
                 ),
             ],
           ],
@@ -1850,7 +1852,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: _renderMarkdown(childSegment.source),
+        child: _renderMarkdown(context, childSegment.source),
       ),
     );
     final selectableChild = _buildFormattedDocumentSelectionDragTarget(
@@ -4190,7 +4192,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             padding: const EdgeInsets.all(12),
             child: showMermaidSource
                 ? _buildMermaidSourceView(context, segment, codeBlock)
-                : _renderMarkdown(segment.source),
+                : _renderMarkdown(context, segment.source),
           ),
         ],
       ),
@@ -4371,7 +4373,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           ),
           Padding(
             padding: const EdgeInsets.all(12),
-            child: _renderMarkdown(block.toMarkdown()),
+            child: _renderMarkdown(context, block.toMarkdown()),
           ),
         ],
       ),
@@ -4413,7 +4415,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           BoxDecoration(color: theme.colorScheme.surface),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: _renderMarkdown(_controller.text),
+        child: _renderMarkdown(context, _controller.text),
       ),
     );
   }
@@ -4445,10 +4447,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         theme.textTheme.bodyMedium?.copyWith(height: 1.5);
   }
 
-  Widget _renderMarkdown(String data) {
+  Widget _renderMarkdown(BuildContext context, String data) {
     return SmoothMarkdown(
       data: data,
-      styleSheet: widget.styleSheet,
+      styleSheet: _effectiveStyleSheet(context),
       config: widget.config,
       onTapLink: widget.onTapLink == null ? null : _handleEditorLinkTap,
       onTapImage: widget.onTapImage,
@@ -5073,7 +5075,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   Widget _renderBlockMath(BuildContext context, String latex) {
-    final styleSheet = widget.styleSheet ?? MarkdownStyleSheet.light();
+    final styleSheet = _effectiveStyleSheet(context);
     return const BlockMathBuilder().build(
       BlockMathNode(latex),
       styleSheet,

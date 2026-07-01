@@ -26,105 +26,99 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
 
   @override
   Widget build(BuildContext context) {
-    final previewTheme = ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-      useMaterial3: true,
-    );
+    final theme = Theme.of(context);
 
-    return Theme(
-      data: previewTheme,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Markdown Editor'),
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Markdown Editor'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Scratch-style editor preview',
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Toolbar, slash commands, wikilinks, Mermaid preview, math editing, search, focus mode, and copy/export menu.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final editorHeight = constraints.maxHeight > 56
+                      ? constraints.maxHeight - 56
+                      : constraints.maxHeight;
+                  return SmoothMarkdownEditor(
+                    controller: _controller,
+                    initialMode: MarkdownEditorMode.formatted,
+                    wikilinkSuggestions: const [
+                      'Daily Notes',
+                      'Project Plan',
+                      'Research Index',
+                      'Scratch Reference',
+                    ],
+                    onTapWikilink: (target) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Wikilink: $target')),
+                      );
+                    },
+                    onExportMarkdown: (markdown) {
+                      setState(() => _lastExport = markdown);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Markdown export requested'),
+                        ),
+                      );
+                    },
+                    onExportPdf: (markdown, _) {
+                      setState(
+                        () => _lastExport =
+                            'PDF export requested for ${markdown.length} characters',
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('PDF export callback requested'),
+                        ),
+                      );
+                    },
+                    onImportMarkdown: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Markdown import callback requested'),
+                        ),
+                      );
+                      return '## Imported markdown\n\nThis came from the host callback.';
+                    },
+                    onPickImage: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Image picker callback requested'),
+                        ),
+                      );
+                      return const MarkdownEditorImageSelection(
+                        url: 'https://picsum.photos/640/360',
+                        alt: 'Sample image',
+                        title: 'Demo image',
+                      );
+                    },
+                    height: editorHeight,
+                  );
+                },
+              ),
+            ),
+            if (_lastExport.isNotEmpty) ...[
+              const SizedBox(height: 12),
               Text(
-                'Scratch-style editor preview',
-                style: previewTheme.textTheme.titleLarge,
+                'Last export: ${_lastExport.length} characters',
+                style: theme.textTheme.bodySmall,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Toolbar, slash commands, wikilinks, Mermaid preview, math editing, search, focus mode, and copy/export menu.',
-                style: previewTheme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final editorHeight = constraints.maxHeight > 56
-                        ? constraints.maxHeight - 56
-                        : constraints.maxHeight;
-                    return SmoothMarkdownEditor(
-                      controller: _controller,
-                      initialMode: MarkdownEditorMode.formatted,
-                      wikilinkSuggestions: const [
-                        'Daily Notes',
-                        'Project Plan',
-                        'Research Index',
-                        'Scratch Reference',
-                      ],
-                      onTapWikilink: (target) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Wikilink: $target')),
-                        );
-                      },
-                      onExportMarkdown: (markdown) {
-                        setState(() => _lastExport = markdown);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Markdown export requested'),
-                          ),
-                        );
-                      },
-                      onExportPdf: (markdown, _) {
-                        setState(
-                          () => _lastExport =
-                              'PDF export requested for ${markdown.length} characters',
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('PDF export callback requested'),
-                          ),
-                        );
-                      },
-                      onImportMarkdown: () async {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Markdown import callback requested'),
-                          ),
-                        );
-                        return '## Imported markdown\n\nThis came from the host callback.';
-                      },
-                      onPickImage: () async {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Image picker callback requested'),
-                          ),
-                        );
-                        return const MarkdownEditorImageSelection(
-                          url: 'https://picsum.photos/640/360',
-                          alt: 'Sample image',
-                          title: 'Demo image',
-                        );
-                      },
-                      height: editorHeight,
-                    );
-                  },
-                ),
-              ),
-              if (_lastExport.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Last export: ${_lastExport.length} characters',
-                  style: previewTheme.textTheme.bodySmall,
-                ),
-              ],
             ],
-          ),
+          ],
         ),
       ),
     );
