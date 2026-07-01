@@ -1589,6 +1589,115 @@ void main() {
       expect(controller.text, '```mermaid\nvoid main() {}\n```');
     });
 
+    testWidgets('formatted code block edits code through document model',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '```dart\nprint("old");\n```',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byTooltip('Edit code'));
+      await tester.pump();
+
+      final activeFinder = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
+      );
+      expect(activeFinder, findsOneWidget);
+      expect(
+        tester.widget<TextField>(activeFinder).controller!.text,
+        'print("old");',
+      );
+
+      await tester.enterText(activeFinder, 'print("new");');
+      await tester.pump();
+
+      expect(_singleScratchContentBlock(controller), isA<MarkdownCodeBlock>());
+      expect(controller.text, '```dart\nprint("new");\n```');
+    });
+
+    testWidgets('formatted code block keeps source selection inside code',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '```dart\nprint("old");\n```',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byTooltip('Edit code'));
+      await tester.pump();
+
+      final activeFinder = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
+      );
+      await tester.showKeyboard(activeFinder);
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'print("new");',
+          selection: TextSelection.collapsed(offset: 11),
+        ),
+      );
+      await tester.pump();
+
+      expect(controller.text, '```dart\nprint("new");\n```');
+      expect(
+        controller.textController.selection,
+        const TextSelection.collapsed(offset: 19),
+      );
+    });
+
+    testWidgets('formatted Mermaid block edits source through document model',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '```mermaid\ngraph TD\n  A --> B\n```',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byTooltip('Edit code'));
+      await tester.pump();
+
+      final activeFinder = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
+      );
+      expect(activeFinder, findsOneWidget);
+      expect(
+        tester.widget<TextField>(activeFinder).controller!.text,
+        'graph TD\n  A --> B',
+      );
+
+      await tester.enterText(activeFinder, 'graph LR\n  A --> C');
+      await tester.pump();
+
+      expect(
+          _singleScratchContentBlock(controller), isA<MarkdownMermaidBlock>());
+      expect(controller.text, '```mermaid\ngraph LR\n  A --> C\n```');
+    });
+
     testWidgets('formatted language selector preserves tilde for Mermaid',
         (tester) async {
       final controller = MarkdownEditorController(
@@ -5460,13 +5569,22 @@ void main() {
       expect(
           _singleScratchContentBlock(controller), isA<MarkdownMermaidBlock>());
       expect(controller.text, '```mermaid\n\n```');
-      expect(
-        find.byKey(const ValueKey('smooth_markdown_editor_code_block_0')),
-        findsOneWidget,
+      final activeFinder = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
       );
       expect(
-        find.byKey(const ValueKey('smooth_markdown_editor_mermaid_source_0')),
+        activeFinder,
         findsOneWidget,
+      );
+      expect(tester.widget<TextField>(activeFinder).controller!.text, '');
+
+      await tester.enterText(activeFinder, 'graph TD\n  A --> B');
+      await tester.pump();
+
+      expect(controller.text, '```mermaid\ngraph TD\n  A --> B\n```');
+      expect(
+        find.byKey(const ValueKey('smooth_markdown_editor_mermaid_source_0')),
+        findsNothing,
       );
     });
 
@@ -5503,10 +5621,19 @@ void main() {
         '~~~',
       );
       expect(controller.text, '~~~mermaid\n\n~~~');
+      final activeFinder = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
+      );
       expect(
-        find.byKey(const ValueKey('smooth_markdown_editor_mermaid_source_0')),
+        activeFinder,
         findsOneWidget,
       );
+      expect(tester.widget<TextField>(activeFinder).controller!.text, '');
+
+      await tester.enterText(activeFinder, 'graph LR\n  A --> C');
+      await tester.pump();
+
+      expect(controller.text, '~~~mermaid\ngraph LR\n  A --> C\n~~~');
     });
 
     testWidgets('formatted input rule keeps extended code fence info as text',

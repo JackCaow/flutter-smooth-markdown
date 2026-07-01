@@ -1782,6 +1782,22 @@ class MarkdownDocumentEditor extends ChangeNotifier {
     return replaceTextRange(block.id, diff.range, diff.replacement);
   }
 
+  /// Replaces the editable source body of a fenced code or Mermaid block.
+  bool updateCodeBlockCode(String blockId, String code) {
+    final block = _document.blockById(blockId);
+    if (block is MarkdownCodeBlock) {
+      if (block.code == code) return true;
+      replaceBlock(block.copyWith(code: code));
+      return true;
+    }
+    if (block is MarkdownMermaidBlock) {
+      if (block.code == code) return true;
+      replaceBlock(block.copyWith(code: code));
+      return true;
+    }
+    return false;
+  }
+
   /// Applies Scratch-style Markdown input rules to [blockId].
   ///
   /// Returns null when no rule matched. The caller should only invoke this after

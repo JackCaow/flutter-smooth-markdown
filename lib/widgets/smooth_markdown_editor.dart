@@ -4452,6 +4452,13 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     MarkdownBlock? block,
   ) {
     final theme = Theme.of(context);
+    if (block is MarkdownCodeBlock || block is MarkdownMermaidBlock) {
+      return widget.textStyle ??
+          theme.textTheme.bodyMedium?.copyWith(
+            fontFamily: 'monospace',
+            height: 1.5,
+          );
+    }
     if (block is MarkdownHeadingBlock) {
       final style = switch (block.level) {
         1 => theme.textTheme.headlineMedium,
@@ -5211,6 +5218,14 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   void _handlePlainTextFormattedBlockChanged(TextRange range) {
     final block = _controller.document.blockById(_activeFormattedBlockId!);
     final replacement = _formattedBlockController.text;
+    if (block is MarkdownCodeBlock) {
+      _handleCodeFormattedBlockChanged(range, block, replacement);
+      return;
+    }
+    if (block is MarkdownMermaidBlock) {
+      _handleCodeFormattedBlockChanged(range, block, replacement);
+      return;
+    }
     if (_applyFormattedBlockImageInputRule(block, replacement)) {
       return;
     }
@@ -5280,6 +5295,64 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _formattedBlockController.block = nextBlock;
     _activeFormattedRange = _rangeForActiveContainer(range.start, nextBlock);
     _controller.textController.selection = globalSelection;
+  }
+
+  void _handleCodeFormattedBlockChanged(
+    TextRange range,
+    MarkdownBlock block,
+    String replacement,
+  ) {
+    if (block.plainText == replacement) {
+      final localSelection = _formattedBlockController.selection;
+      _controller.textController.selection =
+          _sourceSelectionForActiveFormattedPlainText(
+        range,
+        block,
+        localSelection,
+      );
+      return;
+    }
+
+    if (!_controller.documentEditor
+        .updateCodeBlockCode(block.id, replacement)) {
+      return;
+    }
+
+    final nextBlock = _controller.document.blockById(block.id);
+    if (nextBlock == null) return;
+
+    _formattedBlockController.block = nextBlock;
+    _activeFormattedRange = _rangeForActiveContainer(range.start, nextBlock);
+    final localSelection = _formattedBlockController.selection;
+    _controller.textController.selection =
+        _sourceSelectionForActiveFormattedPlainText(
+      range,
+      nextBlock,
+      localSelection,
+    );
+  }
+
+  TextSelection _sourceSelectionForActiveFormattedPlainText(
+    TextRange range,
+    MarkdownBlock block,
+    TextSelection localSelection,
+  ) {
+    final source = block.toMarkdown();
+    final sourceOffset = _activeFormattedBlockSourceOffset +
+        _plainTextSourceOffsetFor(
+          block,
+          source,
+        );
+    if (!localSelection.isValid) {
+      return TextSelection.collapsed(
+        offset: range.start + sourceOffset + block.plainText.length,
+      );
+    }
+
+    return TextSelection(
+      baseOffset: range.start + sourceOffset + localSelection.baseOffset,
+      extentOffset: range.start + sourceOffset + localSelection.extentOffset,
+    );
   }
 
   bool _applyFormattedStoredMarkInsertion(
@@ -6145,7 +6218,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   bool _usesPlainTextEditing(MarkdownBlock? block) {
-    return block is MarkdownParagraphBlock || block is MarkdownHeadingBlock;
+    return block is MarkdownParagraphBlock ||
+        block is MarkdownHeadingBlock ||
+        block is MarkdownCodeBlock ||
+        block is MarkdownMermaidBlock;
   }
 
   TextSelection _localSelectionForSegment(
@@ -6173,6 +6249,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       final match = RegExp(r'^(?: {0,3})#{1,6}[ \t]+').firstMatch(source);
       if (match != null) return match.end;
       if (block.plainText.isEmpty) return source.length;
+    }
+    if (block is MarkdownCodeBlock || block is MarkdownMermaidBlock) {
+      final firstLineEnd = source.indexOf('\n');
+      return firstLineEnd == -1 ? source.length : firstLineEnd + 1;
     }
     return 0;
   }
