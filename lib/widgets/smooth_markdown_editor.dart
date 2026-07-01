@@ -1906,121 +1906,135 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
             child: SizedBox(
               height: 40,
-              child: Row(
-                children: [
-                  const SizedBox(width: 8),
-                  IconButton(
-                    key: ValueKey(
-                      'smooth_markdown_editor_table_add_row_${segment.range.start}',
+              child: SingleChildScrollView(
+                key: ValueKey(
+                  'smooth_markdown_editor_table_toolbar_scroll_${segment.range.start}',
+                ),
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(width: 8),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_add_row_${segment.range.start}',
+                      ),
+                      tooltip: 'Add row below',
+                      icon: const Icon(Icons.add, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _insertTableRowAfterActive(table)
+                          : null,
                     ),
-                    tooltip: 'Add row below',
-                    icon: const Icon(Icons.add, size: 18),
-                    onPressed: widget.enabled
-                        ? () => _insertTableRowAfterActive(table)
-                        : null,
-                  ),
-                  IconButton(
-                    key: ValueKey(
-                      'smooth_markdown_editor_table_add_row_above_${segment.range.start}',
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_add_row_above_${segment.range.start}',
+                      ),
+                      tooltip: 'Add row above',
+                      icon: const Icon(Icons.vertical_align_top, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _insertTableRowBeforeActive(table)
+                          : null,
                     ),
-                    tooltip: 'Add row above',
-                    icon: const Icon(Icons.vertical_align_top, size: 18),
-                    onPressed: widget.enabled
-                        ? () => _insertTableRowBeforeActive(table)
-                        : null,
-                  ),
-                  IconButton(
-                    key: ValueKey(
-                      'smooth_markdown_editor_table_add_column_${segment.range.start}',
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_add_column_${segment.range.start}',
+                      ),
+                      tooltip: 'Add column after',
+                      icon: const Icon(Icons.view_column_outlined, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _insertTableColumnAfterActive(table)
+                          : null,
                     ),
-                    tooltip: 'Add column after',
-                    icon: const Icon(Icons.view_column_outlined, size: 18),
-                    onPressed: widget.enabled
-                        ? () => _insertTableColumnAfterActive(table)
-                        : null,
-                  ),
-                  IconButton(
-                    key: ValueKey(
-                      'smooth_markdown_editor_table_add_column_before_${segment.range.start}',
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_add_column_before_${segment.range.start}',
+                      ),
+                      tooltip: 'Add column before',
+                      icon: const Icon(Icons.keyboard_tab, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _insertTableColumnBeforeActive(table)
+                          : null,
                     ),
-                    tooltip: 'Add column before',
-                    icon: const Icon(Icons.keyboard_tab, size: 18),
-                    onPressed: widget.enabled
-                        ? () => _insertTableColumnBeforeActive(table)
-                        : null,
-                  ),
-                  IconButton(
-                    key: ValueKey(
-                      'smooth_markdown_editor_table_delete_row_${segment.range.start}',
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_delete_row_${segment.range.start}',
+                      ),
+                      tooltip: 'Delete row',
+                      icon: const Icon(Icons.table_rows_outlined, size: 18),
+                      onPressed:
+                          widget.enabled && _canDeleteActiveTableRow(table)
+                              ? () => _deleteActiveTableRow(table)
+                              : null,
                     ),
-                    tooltip: 'Delete row',
-                    icon: const Icon(Icons.table_rows_outlined, size: 18),
-                    onPressed: widget.enabled && _canDeleteActiveTableRow(table)
-                        ? () => _deleteActiveTableRow(table)
-                        : null,
-                  ),
-                  IconButton(
-                    key: ValueKey(
-                      'smooth_markdown_editor_table_delete_column_${segment.range.start}',
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_delete_column_${segment.range.start}',
+                      ),
+                      tooltip: 'Delete column',
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      onPressed:
+                          widget.enabled && _canDeleteActiveTableColumn(table)
+                              ? () => _deleteActiveTableColumn(table)
+                              : null,
                     ),
-                    tooltip: 'Delete column',
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    onPressed:
-                        widget.enabled && _canDeleteActiveTableColumn(table)
-                            ? () => _deleteActiveTableColumn(table)
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_toggle_header_row_${segment.range.start}',
+                      ),
+                      tooltip: table.headerRow
+                          ? 'Unset header row'
+                          : 'Set header row',
+                      icon: Icon(
+                        Icons.view_week_outlined,
+                        size: 18,
+                        color:
+                            table.headerRow ? theme.colorScheme.primary : null,
+                      ),
+                      onPressed: widget.enabled
+                          ? () => _toggleTableHeaderRow(table)
+                          : null,
+                    ),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_toggle_header_column_${segment.range.start}',
+                      ),
+                      tooltip: table.headerColumn
+                          ? 'Unset header column'
+                          : 'Set header column',
+                      icon: Icon(
+                        Icons.view_column_outlined,
+                        size: 18,
+                        color: table.headerColumn
+                            ? theme.colorScheme.primary
                             : null,
-                  ),
-                  IconButton(
-                    key: ValueKey(
-                      'smooth_markdown_editor_table_toggle_header_row_${segment.range.start}',
+                      ),
+                      onPressed: widget.enabled
+                          ? () => _toggleTableHeaderColumn(table)
+                          : null,
                     ),
-                    tooltip:
-                        table.headerRow ? 'Unset header row' : 'Set header row',
-                    icon: Icon(
-                      Icons.view_week_outlined,
-                      size: 18,
-                      color: table.headerRow ? theme.colorScheme.primary : null,
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_delete_${segment.range.start}',
+                      ),
+                      tooltip: 'Delete table',
+                      icon: const Icon(Icons.delete_forever_outlined, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _deleteActiveTable(table)
+                          : null,
                     ),
-                    onPressed: widget.enabled
-                        ? () => _toggleTableHeaderRow(table)
-                        : null,
-                  ),
-                  IconButton(
-                    key: ValueKey(
-                      'smooth_markdown_editor_table_toggle_header_column_${segment.range.start}',
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8, right: 12),
+                      child: Icon(Icons.table_chart_outlined, size: 18),
                     ),
-                    tooltip: table.headerColumn
-                        ? 'Unset header column'
-                        : 'Set header column',
-                    icon: Icon(
-                      Icons.view_column_outlined,
-                      size: 18,
-                      color:
-                          table.headerColumn ? theme.colorScheme.primary : null,
-                    ),
-                    onPressed: widget.enabled
-                        ? () => _toggleTableHeaderColumn(table)
-                        : null,
-                  ),
-                  IconButton(
-                    key: ValueKey(
-                      'smooth_markdown_editor_table_delete_${segment.range.start}',
-                    ),
-                    tooltip: 'Delete table',
-                    icon: const Icon(Icons.delete_forever_outlined, size: 18),
-                    onPressed:
-                        widget.enabled ? () => _deleteActiveTable(table) : null,
-                  ),
-                  const Spacer(),
-                  const Padding(
-                    padding: EdgeInsets.only(right: 12),
-                    child: Icon(Icons.table_chart_outlined, size: 18),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
           SingleChildScrollView(
+            key: ValueKey(
+              'smooth_markdown_editor_table_body_scroll_${segment.range.start}',
+            ),
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.all(12),
             child: Table(

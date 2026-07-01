@@ -100,6 +100,20 @@ Widget _wrap(Widget child) {
   );
 }
 
+Widget _wrapWithWidth(Widget child, {required double width}) {
+  return MaterialApp(
+    home: Scaffold(
+      body: Align(
+        alignment: Alignment.topLeft,
+        child: SizedBox(
+          width: width,
+          child: child,
+        ),
+      ),
+    ),
+  );
+}
+
 Widget _wrapDark(Widget child) {
   return MaterialApp(
     theme: ThemeData.dark(),
@@ -8078,6 +8092,45 @@ void main() {
         '| 1 |  | 2 |\n'
         '|  |  |  |',
       );
+    });
+
+    testWidgets('formatted table toolbar and body scroll on narrow viewports',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '| A | B | C | D |\n'
+            '| --- | --- | --- | --- |\n'
+            '| 1 | 2 | 3 | 4 |',
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrapWithWidth(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+          ),
+          width: 320,
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+
+      final toolbarScroll = find.byKey(
+        const ValueKey('smooth_markdown_editor_table_toolbar_scroll_0'),
+      );
+      final bodyScroll = find.byKey(
+        const ValueKey('smooth_markdown_editor_table_body_scroll_0'),
+      );
+
+      expect(toolbarScroll, findsOneWidget);
+      expect(bodyScroll, findsOneWidget);
+
+      await tester.drag(toolbarScroll, const Offset(-240, 0));
+      await tester.pump();
+      await tester.drag(bodyScroll, const Offset(-240, 0));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('formatted table toolbar toggles header row and column',
