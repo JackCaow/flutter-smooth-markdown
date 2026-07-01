@@ -1055,6 +1055,14 @@ gantt
     }
   }
 
+  void _openEditorPreview() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const EditorDemoPage(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final example = _examples[_selectedIndex];
@@ -1071,6 +1079,11 @@ gantt
           elevation: 0,
           title: const Text('Smooth Markdown Demo'),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.edit_note),
+              tooltip: 'Open editor preview',
+              onPressed: _openEditorPreview,
+            ),
             PopupMenuButton<MarkdownTheme>(
               icon: const Icon(Icons.palette),
               tooltip: AppLocalizations.of(context).translate('tooltip_theme'),
@@ -1161,11 +1174,7 @@ gantt
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const EditorDemoPage(),
-                    ),
-                  );
+                  _openEditorPreview();
                 },
               ),
               const Divider(),

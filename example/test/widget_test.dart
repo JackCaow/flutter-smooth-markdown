@@ -11,7 +11,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Smooth Markdown Demo'), findsOneWidget);
-    expect(find.byIcon(Icons.edit_note), findsNothing);
+    expect(find.byTooltip('Open editor preview'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Open editor preview'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Markdown Editor'), findsOneWidget);
+    expect(find.text('Scratch-style editor preview'), findsOneWidget);
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
