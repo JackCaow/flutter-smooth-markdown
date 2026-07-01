@@ -153,13 +153,22 @@ layout, `MarkdownEditorCapabilities` to disable built-in commands,
 or replace the toolbar, `enableKeyboardShortcuts` to turn off built-in
 shortcuts, and `onShortcut` to intercept keys before the editor handles them.
 
+Custom block integrations can pair parser plugins with editor builders. Provide
+`customBlockBuilder` to render unsupported/custom blocks in formatted mode and
+`customBlockEditorBuilder` to supply an editor that calls `replaceMarkdown()`,
+`finishEditing()`, or `delete()` from the supplied context. This lets host apps
+edit callouts, embeds, database cards, or app-specific directives without
+forking the core editor.
+
 File-oriented editor actions are intentionally callback-based so apps can choose
 their own desktop, mobile, or web integrations. When callbacks are omitted,
 `Export Markdown` copies Markdown to the clipboard, `Print as PDF` copies the
 generated HTML fallback, `Import Markdown` is hidden, and image insertion uses
 the built-in URL dialog. Provide `onExportMarkdown`, `onExportPdf`,
 `onImportMarkdown`, and `onPickImage` to connect file pickers, print/PDF
-packages, asset uploads, or platform share sheets.
+packages, asset uploads, or platform share sheets. Use `onImagePickEvent` to
+surface picking, cancellation, insertion, and failure states in host UI, such as
+upload progress banners or retry affordances.
 
 The core package does not ship default file picker, printing, share, upload, or
 platform image picker adapters; keep those integrations in the host app and

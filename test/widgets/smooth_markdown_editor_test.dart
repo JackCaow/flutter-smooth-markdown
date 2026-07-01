@@ -1834,6 +1834,68 @@ void main() {
       expect(controller.text, '```mermaid\nvoid main() {}\n```');
     });
 
+    testWidgets('formatted custom block delegates preview and editing to host',
+        (tester) async {
+      final controller = MarkdownEditorController();
+      addTearDown(controller.dispose);
+      controller.document = const MarkdownDocument(
+        blocks: [
+          MarkdownRawBlock(
+            id: 'custom',
+            markdown: ':::callout\nOriginal\n:::',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+            customBlockBuilder: (context, block) {
+              return Column(
+                key: const ValueKey('host_custom_block_preview'),
+                children: [
+                  Text('Host ${block.blockType}: ${block.markdown}'),
+                  TextButton(
+                    key: const ValueKey('host_custom_block_edit'),
+                    onPressed: block.edit,
+                    child: const Text('Edit custom'),
+                  ),
+                ],
+              );
+            },
+            customBlockEditorBuilder: (context, block) {
+              return TextButton(
+                key: const ValueKey('host_custom_block_save'),
+                onPressed: () => block.replaceMarkdown('## Edited'),
+                child: const Text('Save custom'),
+              );
+            },
+          ),
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('host_custom_block_preview')),
+          findsWidgets);
+      expect(find.textContaining('Host raw'), findsWidgets);
+
+      await tester
+          .tap(find.byKey(const ValueKey('host_custom_block_edit')).first);
+      await tester.pump();
+
+      expect(
+          find.byKey(const ValueKey('host_custom_block_save')), findsWidgets);
+
+      await tester
+          .tap(find.byKey(const ValueKey('host_custom_block_save')).first);
+      await tester.pump();
+
+      expect(controller.text, '## Edited');
+      expect(
+          _singleScratchContentBlock(controller), isA<MarkdownHeadingBlock>());
+    });
+
     testWidgets('formatted code block edits code through document model',
         (tester) async {
       final controller = MarkdownEditorController(
@@ -3717,6 +3779,84 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('image picker reports picking and inserted states',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Intro');
+      addTearDown(controller.dispose);
+      final events = <MarkdownEditorImagePickEvent>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 420,
+            onPickImage: () async {
+              return const MarkdownEditorImageSelection(
+                url: 'assets/state.png',
+                alt: 'State',
+              );
+            },
+            onImagePickEvent: events.add,
+          ),
+        ),
+      );
+
+      await _tapToolbarIcon(tester, Icons.image_outlined);
+      await tester.pump();
+
+      expect(
+        events.map((event) => event.status),
+        [
+          MarkdownEditorImagePickStatus.picking,
+          MarkdownEditorImagePickStatus.inserted,
+        ],
+      );
+      expect(events.last.selection?.url, 'assets/state.png');
+      expect(controller.text, 'Intro\n\n![State](assets/state.png)');
+    });
+
+    testWidgets('image picker reports cancellation and failures',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Intro');
+      addTearDown(controller.dispose);
+      final events = <MarkdownEditorImagePickEvent>[];
+      var fail = false;
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 420,
+            onPickImage: () {
+              if (fail) throw StateError('upload failed');
+              return null;
+            },
+            onImagePickEvent: events.add,
+          ),
+        ),
+      );
+
+      await _tapToolbarIcon(tester, Icons.image_outlined);
+      await tester.pump();
+
+      expect(
+        events.map((event) => event.status),
+        [
+          MarkdownEditorImagePickStatus.picking,
+          MarkdownEditorImagePickStatus.cancelled,
+        ],
+      );
+
+      fail = true;
+      await _tapToolbarIcon(tester, Icons.image_outlined);
+      await tester.pump();
+
+      expect(events[2].status, MarkdownEditorImagePickStatus.picking);
+      expect(events[3].status, MarkdownEditorImagePickStatus.failed);
+      expect(events[3].error, isA<StateError>());
+      expect(controller.text, 'Intro');
     });
 
     testWidgets('formatted image command exits a selected list item',

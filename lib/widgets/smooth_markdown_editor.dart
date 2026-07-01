@@ -110,6 +110,49 @@ typedef MarkdownEditorMarkdownImportCallback = FutureOr<String?> Function();
 typedef MarkdownEditorImagePickerCallback
     = FutureOr<MarkdownEditorImageSelection?> Function();
 
+/// Image picking/insertion lifecycle status reported to host apps.
+enum MarkdownEditorImagePickStatus {
+  /// The editor is asking the host to pick, upload, or otherwise create an image.
+  picking,
+
+  /// The host returned no image.
+  cancelled,
+
+  /// Picking or insertion failed.
+  failed,
+
+  /// The image was inserted into the Markdown document.
+  inserted,
+}
+
+/// Image picking/insertion lifecycle event.
+class MarkdownEditorImagePickEvent {
+  /// Creates an image picking/insertion lifecycle event.
+  const MarkdownEditorImagePickEvent({
+    required this.status,
+    this.selection,
+    this.error,
+    this.stackTrace,
+  });
+
+  /// Current lifecycle status.
+  final MarkdownEditorImagePickStatus status;
+
+  /// Selected image when available.
+  final MarkdownEditorImageSelection? selection;
+
+  /// Error thrown by a host picker/uploader when the status is failed.
+  final Object? error;
+
+  /// Stack trace associated with [error].
+  final StackTrace? stackTrace;
+}
+
+/// Called when image picking/insertion status changes.
+typedef MarkdownEditorImagePickEventCallback = void Function(
+  MarkdownEditorImagePickEvent event,
+);
+
 /// Host callback for editor keyboard shortcuts.
 typedef MarkdownEditorShortcutCallback = KeyEventResult Function(
   KeyEvent event,
@@ -121,6 +164,96 @@ typedef MarkdownEditorToolbarBuilder = Widget Function(
   BuildContext context,
   Widget defaultToolbar,
 );
+
+/// Builds a host-provided formatted view for a custom Markdown block.
+typedef MarkdownEditorCustomBlockBuilder = Widget? Function(
+  BuildContext context,
+  MarkdownEditorCustomBlockContext contextData,
+);
+
+/// Builds a host-provided editor for a custom Markdown block.
+typedef MarkdownEditorCustomBlockEditorBuilder = Widget? Function(
+  BuildContext context,
+  MarkdownEditorCustomBlockEditorContext contextData,
+);
+
+/// Context passed to [MarkdownEditorCustomBlockBuilder].
+class MarkdownEditorCustomBlockContext {
+  /// Creates context for a custom block view.
+  const MarkdownEditorCustomBlockContext({
+    required this.blockId,
+    required this.blockType,
+    required this.markdown,
+    required this.plainText,
+    required this.enabled,
+    required this.edit,
+    required this.replaceMarkdown,
+    required this.delete,
+  });
+
+  /// Stable document block id.
+  final String blockId;
+
+  /// Document block type.
+  final String blockType;
+
+  /// Markdown source for this block.
+  final String markdown;
+
+  /// Visible plain text for this block, when available.
+  final String plainText;
+
+  /// Whether editing commands are enabled.
+  final bool enabled;
+
+  /// Activates the formatted editor for this block.
+  final VoidCallback edit;
+
+  /// Replaces this block with [markdown].
+  final ValueChanged<String> replaceMarkdown;
+
+  /// Deletes this block.
+  final VoidCallback delete;
+}
+
+/// Context passed to [MarkdownEditorCustomBlockEditorBuilder].
+class MarkdownEditorCustomBlockEditorContext {
+  /// Creates context for a custom block editor.
+  const MarkdownEditorCustomBlockEditorContext({
+    required this.blockId,
+    required this.blockType,
+    required this.markdown,
+    required this.plainText,
+    required this.enabled,
+    required this.replaceMarkdown,
+    required this.finishEditing,
+    required this.delete,
+  });
+
+  /// Stable document block id.
+  final String blockId;
+
+  /// Document block type.
+  final String blockType;
+
+  /// Markdown source for this block.
+  final String markdown;
+
+  /// Visible plain text for this block, when available.
+  final String plainText;
+
+  /// Whether editing commands are enabled.
+  final bool enabled;
+
+  /// Replaces this block with [markdown].
+  final ValueChanged<String> replaceMarkdown;
+
+  /// Closes the custom editor without changing the source.
+  final VoidCallback finishEditing;
+
+  /// Deletes this block.
+  final VoidCallback delete;
+}
 
 /// Configures which built-in editor commands are available.
 class MarkdownEditorCapabilities {
@@ -161,8 +294,11 @@ class SmoothMarkdownEditor extends StatefulWidget {
     this.onTapLink,
     this.onTapImage,
     this.onPickImage,
+    this.onImagePickEvent,
     this.imageBuilder,
     this.codeBuilder,
+    this.customBlockBuilder,
+    this.customBlockEditorBuilder,
     this.useEnhancedComponents = true,
     this.enableCache = true,
     this.plugins,
@@ -239,11 +375,21 @@ class SmoothMarkdownEditor extends StatefulWidget {
   /// copying. If omitted, the editor falls back to the built-in URL dialog.
   final MarkdownEditorImagePickerCallback? onPickImage;
 
+  /// Called when image picking, upload, insertion, cancellation, or failure
+  /// state changes.
+  final MarkdownEditorImagePickEventCallback? onImagePickEvent;
+
   /// Image builder forwarded to [SmoothMarkdown].
   final Widget Function(String url, String? alt, String? title)? imageBuilder;
 
   /// Code block builder forwarded to [SmoothMarkdown].
   final Widget Function(String code, String? language)? codeBuilder;
+
+  /// Host-provided renderer for custom formatted blocks.
+  final MarkdownEditorCustomBlockBuilder? customBlockBuilder;
+
+  /// Host-provided editor for custom formatted blocks.
+  final MarkdownEditorCustomBlockEditorBuilder? customBlockEditorBuilder;
 
   /// Whether preview should use enhanced markdown components.
   final bool useEnhancedComponents;
@@ -1539,6 +1685,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             _activeFormattedRange?.end == segment.range.end;
 
     if (active) {
+      final customEditor = _buildCustomBlockEditorSegment(context, segment);
+      if (customEditor != null) return customEditor;
+    }
+
+    if (active) {
       return _buildActiveFormattedTextField(context, segment);
     }
 
@@ -1583,6 +1734,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (block is MarkdownBlockquoteBlock) {
       return _buildFormattedBlockquoteSegment(context, segment, block);
     }
+
+    final customBlock = _buildCustomBlockSegment(context, segment);
+    if (customBlock != null) return customBlock;
 
     final selected = _activeDocumentSelectionIncludes(segment);
     final child = InkWell(
@@ -4537,6 +4691,170 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     );
   }
 
+  Widget? _buildCustomBlockSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+  ) {
+    final block = segment.block;
+    if (block == null) return null;
+
+    final contextData = _customBlockContext(segment, block);
+    final custom = widget.customBlockBuilder?.call(context, contextData);
+    if (custom != null) return custom;
+    if (block is! MarkdownRawBlock) return null;
+
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      key: ValueKey(
+        'smooth_markdown_editor_custom_block_${segment.range.start}',
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.dividerColor.withOpacity(0.55)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+            child: SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  const Icon(Icons.extension_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Custom Block',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Edit custom block',
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    onPressed: widget.enabled
+                        ? () => _activateFormattedSegment(segment)
+                        : null,
+                  ),
+                  IconButton(
+                    tooltip: 'Delete custom block',
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    onPressed: widget.enabled ? contextData.delete : null,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              block.markdown,
+              style: _sourceTextStyle(context) ??
+                  theme.textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget? _buildCustomBlockEditorSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+  ) {
+    final block = segment.block;
+    if (block == null) return null;
+
+    final contextData = _customBlockEditorContext(segment, block);
+    return widget.customBlockEditorBuilder?.call(context, contextData);
+  }
+
+  MarkdownEditorCustomBlockContext _customBlockContext(
+    _MarkdownBlockSegment segment,
+    MarkdownBlock block,
+  ) {
+    return MarkdownEditorCustomBlockContext(
+      blockId: block.id,
+      blockType: block.type,
+      markdown: segment.source,
+      plainText: block.plainText,
+      enabled: widget.enabled,
+      edit: () => _activateFormattedSegment(segment),
+      replaceMarkdown: (markdown) => _replaceCustomBlockMarkdown(
+        segment,
+        markdown,
+      ),
+      delete: () => _deleteCustomBlock(segment),
+    );
+  }
+
+  MarkdownEditorCustomBlockEditorContext _customBlockEditorContext(
+    _MarkdownBlockSegment segment,
+    MarkdownBlock block,
+  ) {
+    return MarkdownEditorCustomBlockEditorContext(
+      blockId: block.id,
+      blockType: block.type,
+      markdown: segment.source,
+      plainText: block.plainText,
+      enabled: widget.enabled,
+      replaceMarkdown: (markdown) => _replaceCustomBlockMarkdown(
+        segment,
+        markdown,
+      ),
+      finishEditing: () {
+        setState(_clearActiveFormattedBlock);
+        _formattedPaneFocusNode.requestFocus();
+      },
+      delete: () => _deleteCustomBlock(segment),
+    );
+  }
+
+  void _replaceCustomBlockMarkdown(
+    _MarkdownBlockSegment segment,
+    String markdown,
+  ) {
+    if (!widget.enabled) return;
+
+    final block = segment.block;
+    if (block != null) {
+      final replaced = _controller.replaceBlockWithMarkdown(block.id, markdown);
+      if (replaced != null) {
+        setState(_clearActiveFormattedBlock);
+        _formattedPaneFocusNode.requestFocus();
+        return;
+      }
+    }
+
+    _controller.replaceRange(
+      segment.range,
+      markdown,
+      selection: TextSelection.collapsed(offset: segment.range.start),
+    );
+    setState(_clearActiveFormattedBlock);
+    _formattedPaneFocusNode.requestFocus();
+  }
+
+  void _deleteCustomBlock(_MarkdownBlockSegment segment) {
+    if (!widget.enabled) return;
+
+    final block = segment.block;
+    if (block != null) {
+      _controller.documentEditor.removeBlock(block.id);
+    } else {
+      _controller.replaceRange(segment.range, '');
+    }
+    setState(_clearActiveFormattedBlock);
+    _formattedPaneFocusNode.requestFocus();
+  }
+
   Widget _buildFormattedImageSegment(
     BuildContext context,
     _MarkdownBlockSegment segment,
@@ -5353,7 +5671,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       _activeTableSelection = null;
       _activeListItemSelection = null;
       _activeFormattedRange = segment.range;
-      _activeFormattedBlockId = plainTextEditing ? segment.block!.id : null;
+      _activeFormattedBlockId = segment.block?.id;
       _activeFormattedContainerBlockId = plainTextEditing
           ? segment.containerBlockId ?? segment.block!.id
           : null;
@@ -8756,22 +9074,60 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   Future<void> _insertImageCommand() async {
     final initialAlt = _selectedImageAltText();
-    final result = await _pickImageForInsert(initialAlt);
-    if (result == null || !mounted) {
+    _notifyImagePickEvent(
+      const MarkdownEditorImagePickEvent(
+        status: MarkdownEditorImagePickStatus.picking,
+      ),
+    );
+
+    late final _ImageEditorResult? result;
+    try {
+      result = await _pickImageForInsert(initialAlt);
+    } catch (error, stackTrace) {
+      _notifyImagePickEvent(
+        MarkdownEditorImagePickEvent(
+          status: MarkdownEditorImagePickStatus.failed,
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      );
+      _requestActiveEditorFocus();
+      return;
+    }
+    if (!mounted) return;
+
+    if (result == null) {
+      _notifyImagePickEvent(
+        const MarkdownEditorImagePickEvent(
+          status: MarkdownEditorImagePickStatus.cancelled,
+        ),
+      );
       _requestActiveEditorFocus();
       return;
     }
 
     final url = result.url.trim();
     if (url.isEmpty) {
+      _notifyImagePickEvent(
+        const MarkdownEditorImagePickEvent(
+          status: MarkdownEditorImagePickStatus.failed,
+          error: 'Image URL is empty',
+        ),
+      );
       _requestActiveEditorFocus();
       return;
     }
 
     final alt = result.alt.trim();
     final title = _normalizeOptionalMarkdownTitle(result.title);
+    final selection = MarkdownEditorImageSelection(
+      url: url,
+      alt: alt,
+      title: title,
+    );
     if (_mode == MarkdownEditorMode.formatted && _activeTableCell != null) {
       _insertImageInActiveTableCell(url: url, alt: alt, title: title);
+      _notifyImageInserted(selection);
       return;
     }
 
@@ -8779,6 +9135,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         _activeFormattedBlockId == null &&
         _controller.text.trim().isEmpty) {
       _insertFormattedImageIntoEmptyDocument(url: url, alt: alt, title: title);
+      _notifyImageInserted(selection);
       return;
     }
 
@@ -8786,10 +9143,25 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         _activeFormattedPlainText &&
         _activeFormattedBlockId != null) {
       _insertFormattedImageBlock(url: url, alt: alt, title: title);
+      _notifyImageInserted(selection);
       return;
     }
 
     _insertSourceImageBlock(url: url, alt: alt, title: title);
+    _notifyImageInserted(selection);
+  }
+
+  void _notifyImageInserted(MarkdownEditorImageSelection selection) {
+    _notifyImagePickEvent(
+      MarkdownEditorImagePickEvent(
+        status: MarkdownEditorImagePickStatus.inserted,
+        selection: selection,
+      ),
+    );
+  }
+
+  void _notifyImagePickEvent(MarkdownEditorImagePickEvent event) {
+    widget.onImagePickEvent?.call(event);
   }
 
   void _insertFormattedImageIntoEmptyDocument({
