@@ -99,6 +99,11 @@ void main() {
         isTrue,
       );
       expect(editor_api.MarkdownEditorMode.formatted.name, 'formatted');
+
+      const theme = editor_api.MarkdownEditorThemeData(
+        toolbarColor: Color(0xFF102030),
+      );
+      expect(theme.toolbarColor, const Color(0xFF102030));
     });
   });
 }

@@ -274,6 +274,413 @@ class MarkdownEditorCapabilities {
   }
 }
 
+/// Editor-specific visual styling.
+///
+/// Host apps can pass this directly to [SmoothMarkdownEditor.editorTheme] or
+/// install it globally with `ThemeData.extensions`.
+@immutable
+class MarkdownEditorThemeData extends ThemeExtension<MarkdownEditorThemeData> {
+  /// Creates editor-specific visual styling.
+  const MarkdownEditorThemeData({
+    this.decoration,
+    this.sourceDecoration,
+    this.previewDecoration,
+    this.sourceTextStyle,
+    this.toolbarColor,
+    this.toolbarIconColor,
+    this.toolbarActiveIconColor,
+    this.toolbarActiveBackgroundColor,
+    this.dividerColor,
+    this.searchBarColor,
+    this.suggestionPanelColor,
+    this.suggestionSelectedBackgroundColor,
+    this.selectionColor,
+    this.dropTargetColor,
+    this.dropTargetBorderColor,
+    this.blockBorderColor,
+    this.blockHeaderColor,
+    this.blockHeaderTextStyle,
+    this.tableBorderColor,
+    this.tableHeaderColor,
+    this.tableSelectionColor,
+    this.tableActiveBorderColor,
+    this.editorBorderRadius,
+    this.toolbarButtonRadius,
+    this.blockBorderRadius,
+    this.contentPadding,
+    this.sourcePadding,
+    this.previewPadding,
+    this.blockPadding,
+    this.tablePadding,
+  });
+
+  /// Builds editor styling from the ambient Flutter theme.
+  factory MarkdownEditorThemeData.fromTheme(ThemeData theme) {
+    final primary = theme.colorScheme.primary;
+    return MarkdownEditorThemeData(
+      toolbarColor: theme.colorScheme.surface,
+      toolbarActiveIconColor: primary,
+      toolbarActiveBackgroundColor: primary.withOpacity(0.12),
+      dividerColor: theme.dividerColor.withOpacity(0.6),
+      searchBarColor: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+      suggestionPanelColor: theme.colorScheme.surface,
+      suggestionSelectedBackgroundColor: primary.withOpacity(0.12),
+      selectionColor: primary.withOpacity(0.12),
+      dropTargetColor: primary.withOpacity(0.08),
+      dropTargetBorderColor: primary.withOpacity(0.65),
+      blockBorderColor: theme.dividerColor.withOpacity(0.55),
+      blockHeaderColor: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+      tableBorderColor: theme.dividerColor.withOpacity(0.55),
+      tableHeaderColor: theme.colorScheme.surfaceVariant.withOpacity(0.25),
+      tableSelectionColor: primary.withOpacity(0.12),
+      tableActiveBorderColor: primary.withOpacity(0.45),
+      editorBorderRadius: 8,
+      toolbarButtonRadius: 6,
+      blockBorderRadius: 8,
+      contentPadding: const EdgeInsets.all(16),
+      sourcePadding: const EdgeInsets.all(16),
+      previewPadding: const EdgeInsets.all(16),
+      blockPadding: const EdgeInsets.all(12),
+      tablePadding: const EdgeInsets.all(12),
+    );
+  }
+
+  /// Decoration for the whole editor.
+  final Decoration? decoration;
+
+  /// Decoration for source editing panes.
+  final Decoration? sourceDecoration;
+
+  /// Decoration for formatted and preview panes.
+  final Decoration? previewDecoration;
+
+  /// Text style used by Markdown source editors.
+  final TextStyle? sourceTextStyle;
+
+  /// Toolbar background color.
+  final Color? toolbarColor;
+
+  /// Default toolbar icon color.
+  final Color? toolbarIconColor;
+
+  /// Icon color for active toolbar commands and modes.
+  final Color? toolbarActiveIconColor;
+
+  /// Background color for active toolbar commands and modes.
+  final Color? toolbarActiveBackgroundColor;
+
+  /// Divider color for toolbar, split panes, and block chrome.
+  final Color? dividerColor;
+
+  /// Search bar background color.
+  final Color? searchBarColor;
+
+  /// Slash command and wikilink suggestion panel background.
+  final Color? suggestionPanelColor;
+
+  /// Selected suggestion row background.
+  final Color? suggestionSelectedBackgroundColor;
+
+  /// Selection highlight for formatted blocks, list items, and table cells.
+  final Color? selectionColor;
+
+  /// Drop target background for formatted block drag and drop.
+  final Color? dropTargetColor;
+
+  /// Drop target border for formatted block drag and drop.
+  final Color? dropTargetBorderColor;
+
+  /// Border color for editable block chrome.
+  final Color? blockBorderColor;
+
+  /// Header strip color for editable block chrome.
+  final Color? blockHeaderColor;
+
+  /// Header label style for editable block chrome.
+  final TextStyle? blockHeaderTextStyle;
+
+  /// Table grid border color.
+  final Color? tableBorderColor;
+
+  /// Table header row or header column background.
+  final Color? tableHeaderColor;
+
+  /// Selected table cell background.
+  final Color? tableSelectionColor;
+
+  /// Active table cell outline color.
+  final Color? tableActiveBorderColor;
+
+  /// Radius for the outer editor container.
+  final double? editorBorderRadius;
+
+  /// Radius for active toolbar buttons.
+  final double? toolbarButtonRadius;
+
+  /// Radius for editable block chrome.
+  final double? blockBorderRadius;
+
+  /// Padding for formatted editor content.
+  final EdgeInsetsGeometry? contentPadding;
+
+  /// Padding for source editor text.
+  final EdgeInsetsGeometry? sourcePadding;
+
+  /// Padding for preview content.
+  final EdgeInsetsGeometry? previewPadding;
+
+  /// Padding inside editable block chrome.
+  final EdgeInsetsGeometry? blockPadding;
+
+  /// Padding around editable table content.
+  final EdgeInsetsGeometry? tablePadding;
+
+  @override
+  MarkdownEditorThemeData copyWith({
+    Decoration? decoration,
+    Decoration? sourceDecoration,
+    Decoration? previewDecoration,
+    TextStyle? sourceTextStyle,
+    Color? toolbarColor,
+    Color? toolbarIconColor,
+    Color? toolbarActiveIconColor,
+    Color? toolbarActiveBackgroundColor,
+    Color? dividerColor,
+    Color? searchBarColor,
+    Color? suggestionPanelColor,
+    Color? suggestionSelectedBackgroundColor,
+    Color? selectionColor,
+    Color? dropTargetColor,
+    Color? dropTargetBorderColor,
+    Color? blockBorderColor,
+    Color? blockHeaderColor,
+    TextStyle? blockHeaderTextStyle,
+    Color? tableBorderColor,
+    Color? tableHeaderColor,
+    Color? tableSelectionColor,
+    Color? tableActiveBorderColor,
+    double? editorBorderRadius,
+    double? toolbarButtonRadius,
+    double? blockBorderRadius,
+    EdgeInsetsGeometry? contentPadding,
+    EdgeInsetsGeometry? sourcePadding,
+    EdgeInsetsGeometry? previewPadding,
+    EdgeInsetsGeometry? blockPadding,
+    EdgeInsetsGeometry? tablePadding,
+  }) {
+    return MarkdownEditorThemeData(
+      decoration: decoration ?? this.decoration,
+      sourceDecoration: sourceDecoration ?? this.sourceDecoration,
+      previewDecoration: previewDecoration ?? this.previewDecoration,
+      sourceTextStyle: sourceTextStyle ?? this.sourceTextStyle,
+      toolbarColor: toolbarColor ?? this.toolbarColor,
+      toolbarIconColor: toolbarIconColor ?? this.toolbarIconColor,
+      toolbarActiveIconColor:
+          toolbarActiveIconColor ?? this.toolbarActiveIconColor,
+      toolbarActiveBackgroundColor:
+          toolbarActiveBackgroundColor ?? this.toolbarActiveBackgroundColor,
+      dividerColor: dividerColor ?? this.dividerColor,
+      searchBarColor: searchBarColor ?? this.searchBarColor,
+      suggestionPanelColor: suggestionPanelColor ?? this.suggestionPanelColor,
+      suggestionSelectedBackgroundColor: suggestionSelectedBackgroundColor ??
+          this.suggestionSelectedBackgroundColor,
+      selectionColor: selectionColor ?? this.selectionColor,
+      dropTargetColor: dropTargetColor ?? this.dropTargetColor,
+      dropTargetBorderColor:
+          dropTargetBorderColor ?? this.dropTargetBorderColor,
+      blockBorderColor: blockBorderColor ?? this.blockBorderColor,
+      blockHeaderColor: blockHeaderColor ?? this.blockHeaderColor,
+      blockHeaderTextStyle: blockHeaderTextStyle ?? this.blockHeaderTextStyle,
+      tableBorderColor: tableBorderColor ?? this.tableBorderColor,
+      tableHeaderColor: tableHeaderColor ?? this.tableHeaderColor,
+      tableSelectionColor: tableSelectionColor ?? this.tableSelectionColor,
+      tableActiveBorderColor:
+          tableActiveBorderColor ?? this.tableActiveBorderColor,
+      editorBorderRadius: editorBorderRadius ?? this.editorBorderRadius,
+      toolbarButtonRadius: toolbarButtonRadius ?? this.toolbarButtonRadius,
+      blockBorderRadius: blockBorderRadius ?? this.blockBorderRadius,
+      contentPadding: contentPadding ?? this.contentPadding,
+      sourcePadding: sourcePadding ?? this.sourcePadding,
+      previewPadding: previewPadding ?? this.previewPadding,
+      blockPadding: blockPadding ?? this.blockPadding,
+      tablePadding: tablePadding ?? this.tablePadding,
+    );
+  }
+
+  /// Returns this theme with non-null values from [other] overriding it.
+  MarkdownEditorThemeData merge(MarkdownEditorThemeData? other) {
+    if (other == null) return this;
+    return copyWith(
+      decoration: other.decoration,
+      sourceDecoration: other.sourceDecoration,
+      previewDecoration: other.previewDecoration,
+      sourceTextStyle: other.sourceTextStyle,
+      toolbarColor: other.toolbarColor,
+      toolbarIconColor: other.toolbarIconColor,
+      toolbarActiveIconColor: other.toolbarActiveIconColor,
+      toolbarActiveBackgroundColor: other.toolbarActiveBackgroundColor,
+      dividerColor: other.dividerColor,
+      searchBarColor: other.searchBarColor,
+      suggestionPanelColor: other.suggestionPanelColor,
+      suggestionSelectedBackgroundColor:
+          other.suggestionSelectedBackgroundColor,
+      selectionColor: other.selectionColor,
+      dropTargetColor: other.dropTargetColor,
+      dropTargetBorderColor: other.dropTargetBorderColor,
+      blockBorderColor: other.blockBorderColor,
+      blockHeaderColor: other.blockHeaderColor,
+      blockHeaderTextStyle: other.blockHeaderTextStyle,
+      tableBorderColor: other.tableBorderColor,
+      tableHeaderColor: other.tableHeaderColor,
+      tableSelectionColor: other.tableSelectionColor,
+      tableActiveBorderColor: other.tableActiveBorderColor,
+      editorBorderRadius: other.editorBorderRadius,
+      toolbarButtonRadius: other.toolbarButtonRadius,
+      blockBorderRadius: other.blockBorderRadius,
+      contentPadding: other.contentPadding,
+      sourcePadding: other.sourcePadding,
+      previewPadding: other.previewPadding,
+      blockPadding: other.blockPadding,
+      tablePadding: other.tablePadding,
+    );
+  }
+
+  @override
+  MarkdownEditorThemeData lerp(
+    ThemeExtension<MarkdownEditorThemeData>? other,
+    double t,
+  ) {
+    if (other is! MarkdownEditorThemeData) return this;
+    return MarkdownEditorThemeData(
+      decoration: Decoration.lerp(decoration, other.decoration, t),
+      sourceDecoration:
+          Decoration.lerp(sourceDecoration, other.sourceDecoration, t),
+      previewDecoration:
+          Decoration.lerp(previewDecoration, other.previewDecoration, t),
+      sourceTextStyle:
+          TextStyle.lerp(sourceTextStyle, other.sourceTextStyle, t),
+      toolbarColor: Color.lerp(toolbarColor, other.toolbarColor, t),
+      toolbarIconColor: Color.lerp(toolbarIconColor, other.toolbarIconColor, t),
+      toolbarActiveIconColor:
+          Color.lerp(toolbarActiveIconColor, other.toolbarActiveIconColor, t),
+      toolbarActiveBackgroundColor: Color.lerp(
+        toolbarActiveBackgroundColor,
+        other.toolbarActiveBackgroundColor,
+        t,
+      ),
+      dividerColor: Color.lerp(dividerColor, other.dividerColor, t),
+      searchBarColor: Color.lerp(searchBarColor, other.searchBarColor, t),
+      suggestionPanelColor:
+          Color.lerp(suggestionPanelColor, other.suggestionPanelColor, t),
+      suggestionSelectedBackgroundColor: Color.lerp(
+        suggestionSelectedBackgroundColor,
+        other.suggestionSelectedBackgroundColor,
+        t,
+      ),
+      selectionColor: Color.lerp(selectionColor, other.selectionColor, t),
+      dropTargetColor: Color.lerp(dropTargetColor, other.dropTargetColor, t),
+      dropTargetBorderColor:
+          Color.lerp(dropTargetBorderColor, other.dropTargetBorderColor, t),
+      blockBorderColor: Color.lerp(blockBorderColor, other.blockBorderColor, t),
+      blockHeaderColor: Color.lerp(blockHeaderColor, other.blockHeaderColor, t),
+      blockHeaderTextStyle:
+          TextStyle.lerp(blockHeaderTextStyle, other.blockHeaderTextStyle, t),
+      tableBorderColor: Color.lerp(tableBorderColor, other.tableBorderColor, t),
+      tableHeaderColor: Color.lerp(tableHeaderColor, other.tableHeaderColor, t),
+      tableSelectionColor:
+          Color.lerp(tableSelectionColor, other.tableSelectionColor, t),
+      tableActiveBorderColor:
+          Color.lerp(tableActiveBorderColor, other.tableActiveBorderColor, t),
+      editorBorderRadius:
+          lerpDouble(editorBorderRadius, other.editorBorderRadius, t),
+      toolbarButtonRadius:
+          lerpDouble(toolbarButtonRadius, other.toolbarButtonRadius, t),
+      blockBorderRadius:
+          lerpDouble(blockBorderRadius, other.blockBorderRadius, t),
+      contentPadding:
+          EdgeInsetsGeometry.lerp(contentPadding, other.contentPadding, t),
+      sourcePadding:
+          EdgeInsetsGeometry.lerp(sourcePadding, other.sourcePadding, t),
+      previewPadding:
+          EdgeInsetsGeometry.lerp(previewPadding, other.previewPadding, t),
+      blockPadding:
+          EdgeInsetsGeometry.lerp(blockPadding, other.blockPadding, t),
+      tablePadding:
+          EdgeInsetsGeometry.lerp(tablePadding, other.tablePadding, t),
+    );
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+        decoration,
+        sourceDecoration,
+        previewDecoration,
+        sourceTextStyle,
+        toolbarColor,
+        toolbarIconColor,
+        toolbarActiveIconColor,
+        toolbarActiveBackgroundColor,
+        dividerColor,
+        searchBarColor,
+        suggestionPanelColor,
+        suggestionSelectedBackgroundColor,
+        selectionColor,
+        dropTargetColor,
+        dropTargetBorderColor,
+        blockBorderColor,
+        blockHeaderColor,
+        blockHeaderTextStyle,
+        tableBorderColor,
+        tableHeaderColor,
+        tableSelectionColor,
+        tableActiveBorderColor,
+        editorBorderRadius,
+        toolbarButtonRadius,
+        blockBorderRadius,
+        contentPadding,
+        sourcePadding,
+        previewPadding,
+        blockPadding,
+        tablePadding,
+      ]);
+
+  @override
+  bool operator ==(Object other) {
+    return other is MarkdownEditorThemeData &&
+        other.decoration == decoration &&
+        other.sourceDecoration == sourceDecoration &&
+        other.previewDecoration == previewDecoration &&
+        other.sourceTextStyle == sourceTextStyle &&
+        other.toolbarColor == toolbarColor &&
+        other.toolbarIconColor == toolbarIconColor &&
+        other.toolbarActiveIconColor == toolbarActiveIconColor &&
+        other.toolbarActiveBackgroundColor == toolbarActiveBackgroundColor &&
+        other.dividerColor == dividerColor &&
+        other.searchBarColor == searchBarColor &&
+        other.suggestionPanelColor == suggestionPanelColor &&
+        other.suggestionSelectedBackgroundColor ==
+            suggestionSelectedBackgroundColor &&
+        other.selectionColor == selectionColor &&
+        other.dropTargetColor == dropTargetColor &&
+        other.dropTargetBorderColor == dropTargetBorderColor &&
+        other.blockBorderColor == blockBorderColor &&
+        other.blockHeaderColor == blockHeaderColor &&
+        other.blockHeaderTextStyle == blockHeaderTextStyle &&
+        other.tableBorderColor == tableBorderColor &&
+        other.tableHeaderColor == tableHeaderColor &&
+        other.tableSelectionColor == tableSelectionColor &&
+        other.tableActiveBorderColor == tableActiveBorderColor &&
+        other.editorBorderRadius == editorBorderRadius &&
+        other.toolbarButtonRadius == toolbarButtonRadius &&
+        other.blockBorderRadius == blockBorderRadius &&
+        other.contentPadding == contentPadding &&
+        other.sourcePadding == sourcePadding &&
+        other.previewPadding == previewPadding &&
+        other.blockPadding == blockPadding &&
+        other.tablePadding == tablePadding;
+  }
+}
+
 /// A Markdown source editor with formatted editing, live preview, and
 /// Scratch-inspired commands.
 ///
@@ -289,6 +696,7 @@ class SmoothMarkdownEditor extends StatefulWidget {
     this.mode,
     this.initialMode = MarkdownEditorMode.formatted,
     this.onModeChanged,
+    this.editorTheme,
     this.styleSheet,
     this.config,
     this.onTapLink,
@@ -355,6 +763,12 @@ class SmoothMarkdownEditor extends StatefulWidget {
 
   /// Called when the display mode changes.
   final ValueChanged<MarkdownEditorMode>? onModeChanged;
+
+  /// Editor-specific visual styling.
+  ///
+  /// Values passed here override any [MarkdownEditorThemeData] installed in
+  /// `ThemeData.extensions`.
+  final MarkdownEditorThemeData? editorTheme;
 
   /// Style sheet forwarded to [SmoothMarkdown].
   final MarkdownStyleSheet? styleSheet;
@@ -717,12 +1131,16 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final borderColor = theme.dividerColor.withOpacity(0.55);
+    final editorTheme = _effectiveEditorTheme(context);
+    final borderColor =
+        editorTheme.blockBorderColor ?? theme.dividerColor.withOpacity(0.55);
+    final editorRadius = editorTheme.editorBorderRadius ?? 8;
     final editorDecoration = widget.decoration ??
+        editorTheme.decoration ??
         BoxDecoration(
           color: theme.colorScheme.surface,
           border: Border.all(color: borderColor),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(editorRadius),
         );
 
     return Focus(
@@ -730,7 +1148,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       child: DecoratedBox(
         decoration: editorDecoration,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(editorRadius),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final suggestionMaxHeight =
@@ -767,6 +1185,50 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return widget.styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context));
   }
 
+  MarkdownEditorThemeData _effectiveEditorTheme(BuildContext context) {
+    final theme = Theme.of(context);
+    return MarkdownEditorThemeData.fromTheme(theme)
+        .merge(theme.extension<MarkdownEditorThemeData>())
+        .merge(widget.editorTheme);
+  }
+
+  Color _editorDividerColor(BuildContext context) {
+    final theme = Theme.of(context);
+    return _effectiveEditorTheme(context).dividerColor ??
+        theme.dividerColor.withOpacity(0.6);
+  }
+
+  Color _editorBlockBorderColor(BuildContext context) {
+    final theme = Theme.of(context);
+    return _effectiveEditorTheme(context).blockBorderColor ??
+        theme.dividerColor.withOpacity(0.55);
+  }
+
+  Color _editorBlockHeaderColor(BuildContext context) {
+    final theme = Theme.of(context);
+    return _effectiveEditorTheme(context).blockHeaderColor ??
+        theme.colorScheme.surfaceVariant.withOpacity(0.35);
+  }
+
+  BorderRadius _editorBlockBorderRadius(BuildContext context) {
+    return BorderRadius.circular(
+      _effectiveEditorTheme(context).blockBorderRadius ?? 8,
+    );
+  }
+
+  BorderRadius _editorBlockHeaderRadius(BuildContext context) {
+    return BorderRadius.vertical(
+      top: Radius.circular(
+        _effectiveEditorTheme(context).blockBorderRadius ?? 8,
+      ),
+    );
+  }
+
+  EdgeInsetsGeometry _editorBlockPadding(BuildContext context) {
+    return _effectiveEditorTheme(context).blockPadding ??
+        const EdgeInsets.all(12);
+  }
+
   double _suggestionPanelMaxHeight(
     BuildContext context,
     BoxConstraints constraints,
@@ -790,86 +1252,90 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   Widget _buildToolbar(BuildContext context) {
-    final color = Theme.of(context).dividerColor.withOpacity(0.6);
+    final editorTheme = _effectiveEditorTheme(context);
+    final color = _editorDividerColor(context);
     final toolbar = Material(
-      color: Theme.of(context).colorScheme.surface,
-      child: SizedBox(
-        height: _toolbarHeight,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          children: [
-            ...widget.toolbarLeading,
-            _modeButton(
-              MarkdownEditorMode.formatted,
-              Icons.article_outlined,
-              'Formatted',
-            ),
-            _modeButton(
-              MarkdownEditorMode.source,
-              Icons.edit_note,
-              'Source',
-            ),
-            _modeButton(
-              MarkdownEditorMode.preview,
-              Icons.visibility_outlined,
-              'Preview',
-            ),
-            _modeButton(
-              MarkdownEditorMode.split,
-              Icons.splitscreen,
-              'Split',
-            ),
-            _separator(color),
-            _historyButton(
-              key: const ValueKey('smooth_markdown_editor_undo'),
-              icon: Icons.undo,
-              tooltip: 'Undo ($_shortcutModifierLabel+Z)',
-              enabled: _controller.canUndo,
-              onPressed: _undo,
-            ),
-            _historyButton(
-              key: const ValueKey('smooth_markdown_editor_redo'),
-              icon: Icons.redo,
-              tooltip: 'Redo ($_redoShortcutLabel)',
-              enabled: _controller.canRedo,
-              onPressed: _redo,
-            ),
-            _historyButton(
-              key: const ValueKey('smooth_markdown_editor_move_block_up'),
-              icon: Icons.keyboard_arrow_up,
-              tooltip: 'Move block up ($_shortcutModifierLabel+Alt+ArrowUp)',
-              enabled: _canMoveActiveTopLevelBlock(upward: true),
-              onPressed: () => _moveActiveTopLevelBlock(upward: true),
-            ),
-            _historyButton(
-              key: const ValueKey('smooth_markdown_editor_move_block_down'),
-              icon: Icons.keyboard_arrow_down,
-              tooltip:
-                  'Move block down ($_shortcutModifierLabel+Alt+ArrowDown)',
-              enabled: _canMoveActiveTopLevelBlock(upward: false),
-              onPressed: () => _moveActiveTopLevelBlock(upward: false),
-            ),
-            _separator(color),
-            ..._buildToolbarCommandWidgets(context, color),
-            _separator(color),
-            _buildCopyMenu(),
-            Tooltip(
-              message: 'Focus mode ($_shortcutModifierLabel+Shift+Enter)',
-              child: IconButton(
-                icon: const Icon(Icons.fullscreen),
-                onPressed: _toggleFocusMode,
+      color: editorTheme.toolbarColor ?? Theme.of(context).colorScheme.surface,
+      child: IconTheme.merge(
+        data: IconThemeData(color: editorTheme.toolbarIconColor),
+        child: SizedBox(
+          height: _toolbarHeight,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            children: [
+              ...widget.toolbarLeading,
+              _modeButton(
+                MarkdownEditorMode.formatted,
+                Icons.article_outlined,
+                'Formatted',
               ),
-            ),
-            Tooltip(
-              message: 'Find in note ($_shortcutModifierLabel+F)',
-              child: IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: _openSearch,
+              _modeButton(
+                MarkdownEditorMode.source,
+                Icons.edit_note,
+                'Source',
               ),
-            ),
-            ...widget.toolbarTrailing,
-          ],
+              _modeButton(
+                MarkdownEditorMode.preview,
+                Icons.visibility_outlined,
+                'Preview',
+              ),
+              _modeButton(
+                MarkdownEditorMode.split,
+                Icons.splitscreen,
+                'Split',
+              ),
+              _separator(color),
+              _historyButton(
+                key: const ValueKey('smooth_markdown_editor_undo'),
+                icon: Icons.undo,
+                tooltip: 'Undo ($_shortcutModifierLabel+Z)',
+                enabled: _controller.canUndo,
+                onPressed: _undo,
+              ),
+              _historyButton(
+                key: const ValueKey('smooth_markdown_editor_redo'),
+                icon: Icons.redo,
+                tooltip: 'Redo ($_redoShortcutLabel)',
+                enabled: _controller.canRedo,
+                onPressed: _redo,
+              ),
+              _historyButton(
+                key: const ValueKey('smooth_markdown_editor_move_block_up'),
+                icon: Icons.keyboard_arrow_up,
+                tooltip: 'Move block up ($_shortcutModifierLabel+Alt+ArrowUp)',
+                enabled: _canMoveActiveTopLevelBlock(upward: true),
+                onPressed: () => _moveActiveTopLevelBlock(upward: true),
+              ),
+              _historyButton(
+                key: const ValueKey('smooth_markdown_editor_move_block_down'),
+                icon: Icons.keyboard_arrow_down,
+                tooltip:
+                    'Move block down ($_shortcutModifierLabel+Alt+ArrowDown)',
+                enabled: _canMoveActiveTopLevelBlock(upward: false),
+                onPressed: () => _moveActiveTopLevelBlock(upward: false),
+              ),
+              _separator(color),
+              ..._buildToolbarCommandWidgets(context, color),
+              _separator(color),
+              _buildCopyMenu(),
+              Tooltip(
+                message: 'Focus mode ($_shortcutModifierLabel+Shift+Enter)',
+                child: IconButton(
+                  icon: const Icon(Icons.fullscreen),
+                  onPressed: _toggleFocusMode,
+                ),
+              ),
+              Tooltip(
+                message: 'Find in note ($_shortcutModifierLabel+F)',
+                child: IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: _openSearch,
+                ),
+              ),
+              ...widget.toolbarTrailing,
+            ],
+          ),
         ),
       ),
     );
@@ -1106,20 +1572,27 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   ) {
     final selected = _mode == mode;
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: selected
-              ? theme.colorScheme.primary.withOpacity(0.12)
+              ? editorTheme.toolbarActiveBackgroundColor ??
+                  theme.colorScheme.primary.withOpacity(0.12)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(
+            editorTheme.toolbarButtonRadius ?? 6,
+          ),
         ),
         child: Tooltip(
           message: tooltip,
           child: IconButton(
             icon: Icon(icon),
-            color: selected ? theme.colorScheme.primary : null,
+            color: selected
+                ? editorTheme.toolbarActiveIconColor ??
+                    theme.colorScheme.primary
+                : editorTheme.toolbarIconColor,
             onPressed: () => _setMode(mode),
           ),
         ),
@@ -1170,14 +1643,18 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   ) {
     final active = _isToolbarCommandActive(command);
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 6),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: active
-              ? theme.colorScheme.primary.withOpacity(0.12)
+              ? editorTheme.toolbarActiveBackgroundColor ??
+                  theme.colorScheme.primary.withOpacity(0.12)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(
+            editorTheme.toolbarButtonRadius ?? 6,
+          ),
         ),
         child: Tooltip(
           message: tooltip,
@@ -1186,7 +1663,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
               'smooth_markdown_editor_command_${command.name}',
             ),
             icon: Icon(icon),
-            color: active ? theme.colorScheme.primary : null,
+            color: active
+                ? editorTheme.toolbarActiveIconColor ??
+                    theme.colorScheme.primary
+                : editorTheme.toolbarIconColor,
             onPressed: widget.enabled ? () => _applyCommand(command) : null,
           ),
         ),
@@ -1308,6 +1788,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   Widget _buildTablePickerButton(BuildContext context) {
+    final editorTheme = _effectiveEditorTheme(context);
     return PopupMenuButton<_TableDimensions>(
       key: const ValueKey('smooth_markdown_editor_table_picker_button'),
       tooltip: 'Table',
@@ -1317,8 +1798,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         rows: dimensions.rows,
         columns: dimensions.columns,
       ),
-      itemBuilder: (context) => const [
-        _TablePickerMenuEntry(),
+      itemBuilder: (context) => [
+        _TablePickerMenuEntry(editorTheme: editorTheme),
       ],
     );
   }
@@ -1335,8 +1816,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   Widget _buildSearchBar(BuildContext context) {
+    final editorTheme = _effectiveEditorTheme(context);
     return Material(
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.35),
+      color: editorTheme.searchBarColor ??
+          Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.35),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
         child: Row(
@@ -1389,9 +1872,12 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     required double maxHeight,
   }) {
     final commands = _visibleSlashCommands();
+    final editorTheme = _effectiveEditorTheme(context);
     return _SuggestionPanel(
       label: 'Slash command suggestions',
       maxHeight: maxHeight,
+      backgroundColor: editorTheme.suggestionPanelColor,
+      selectedColor: editorTheme.suggestionSelectedBackgroundColor,
       children: [
         for (var index = 0; index < commands.length; index++)
           Semantics(
@@ -1417,9 +1903,12 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     required double maxHeight,
   }) {
     final suggestions = _visibleWikilinkSuggestions();
+    final editorTheme = _effectiveEditorTheme(context);
     return _SuggestionPanel(
       label: 'Wikilink suggestions',
       maxHeight: maxHeight,
+      backgroundColor: editorTheme.suggestionPanelColor,
+      selectedColor: editorTheme.suggestionSelectedBackgroundColor,
       children: [
         if (suggestions.isEmpty)
           Semantics(
@@ -1463,6 +1952,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   Widget _buildBody(BuildContext context) {
+    final dividerColor = _editorDividerColor(context);
     switch (_mode) {
       case MarkdownEditorMode.formatted:
         return _buildFormattedPane(context);
@@ -1478,7 +1968,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
               return Column(
                 children: [
                   Expanded(child: _buildSourcePane(context)),
-                  Divider(height: 1, color: Theme.of(context).dividerColor),
+                  Divider(height: 1, color: dividerColor),
                   Expanded(child: _buildPreviewPane(context)),
                 ],
               );
@@ -1487,8 +1977,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             return Row(
               children: [
                 Expanded(child: _buildSourcePane(context)),
-                VerticalDivider(
-                    width: 1, color: Theme.of(context).dividerColor),
+                VerticalDivider(width: 1, color: dividerColor),
                 Expanded(child: _buildPreviewPane(context)),
               ],
             );
@@ -1499,8 +1988,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   Widget _buildFormattedPane(BuildContext context) {
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     final segments = _documentBlockSegments();
     final blockSpacing = _effectiveStyleSheet(context).blockSpacing ?? 16;
+    final contentPadding =
+        editorTheme.contentPadding ?? const EdgeInsets.all(16);
 
     return Focus(
       focusNode: _formattedPaneFocusNode,
@@ -1513,19 +2005,20 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         child: DecoratedBox(
           key: _formattedViewportKey,
           decoration: widget.previewDecoration ??
+              editorTheme.previewDecoration ??
               BoxDecoration(color: theme.colorScheme.surface),
           child: segments.isEmpty
               ? SingleChildScrollView(
                   key: _formattedScrollKey,
                   controller: _formattedScrollController,
-                  padding: const EdgeInsets.all(16),
+                  padding: contentPadding,
                   child: _buildEmptyFormattedEditor(context),
                 )
               : ListView.separated(
                   key: _formattedScrollKey,
                   controller: _formattedScrollController,
                   cacheExtent: 800,
-                  padding: const EdgeInsets.all(16),
+                  padding: contentPadding,
                   itemCount: segments.length,
                   itemBuilder: (context, index) {
                     final segment = segments[index];
@@ -1571,6 +2064,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     int index,
   ) {
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
 
     return DragTarget<_FormattedBlockDragPayload>(
       key: ValueKey(
@@ -1584,14 +2078,18 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         return DecoratedBox(
           decoration: BoxDecoration(
             color: highlighted
-                ? theme.colorScheme.primary.withOpacity(0.08)
+                ? editorTheme.dropTargetColor ??
+                    theme.colorScheme.primary.withOpacity(0.08)
                 : Colors.transparent,
             border: Border.all(
               color: highlighted
-                  ? theme.colorScheme.primary.withOpacity(0.65)
+                  ? editorTheme.dropTargetBorderColor ??
+                      theme.colorScheme.primary.withOpacity(0.65)
                   : Colors.transparent,
             ),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(
+              editorTheme.blockBorderRadius ?? 6,
+            ),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1757,7 +2255,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+        color: _effectiveEditorTheme(context).selectionColor ??
+            Theme.of(context).colorScheme.primary.withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
       ),
       child: selectableChild,
@@ -1912,7 +2411,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final decoratedPrimaryContent = selected
         ? DecoratedBox(
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              color: _effectiveEditorTheme(context).selectionColor ??
+                  Theme.of(context).colorScheme.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(6),
             ),
             child: selectablePrimaryContent,
@@ -2144,6 +2644,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     MarkdownBlockquoteBlock blockquote,
   ) {
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     return DecoratedBox(
       key: ValueKey(
         'smooth_markdown_editor_blockquote_block_${segment.range.start}',
@@ -2151,7 +2652,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       decoration: BoxDecoration(
         border: Border(
           left: BorderSide(
-            color: theme.colorScheme.primary.withOpacity(0.45),
+            color: (editorTheme.toolbarActiveIconColor ??
+                    theme.colorScheme.primary)
+                .withOpacity(0.45),
             width: 3,
           ),
         ),
@@ -2226,7 +2729,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+        color: _effectiveEditorTheme(context).selectionColor ??
+            Theme.of(context).colorScheme.primary.withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
       ),
       child: selectableChild,
@@ -2254,19 +2758,20 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     MarkdownTableBlock table,
   ) {
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     return DecoratedBox(
       key:
           ValueKey('smooth_markdown_editor_table_block_${segment.range.start}'),
       decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor.withOpacity(0.55)),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Material(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
             child: SizedBox(
               height: 40,
               child: SingleChildScrollView(
@@ -2399,10 +2904,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
               'smooth_markdown_editor_table_body_scroll_${segment.range.start}',
             ),
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(12),
+            padding: editorTheme.tablePadding ?? _editorBlockPadding(context),
             child: Table(
               border: TableBorder.all(
-                color: theme.dividerColor.withOpacity(0.55),
+                color: editorTheme.tableBorderColor ??
+                    _editorBlockBorderColor(context),
               ),
               defaultColumnWidth: const IntrinsicColumnWidth(),
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
@@ -2410,7 +2916,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                 TableRow(
                   decoration: BoxDecoration(
                     color: table.headerRow
-                        ? theme.colorScheme.surfaceVariant.withOpacity(0.25)
+                        ? editorTheme.tableHeaderColor ??
+                            theme.colorScheme.surfaceVariant.withOpacity(0.25)
                         : null,
                   ),
                   children: [
@@ -2452,6 +2959,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     bool header = false,
   }) {
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     final children = _tableCellChildren(
       table,
       rowIndex: rowIndex,
@@ -2479,10 +2987,13 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         ? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)
         : theme.textTheme.bodyMedium;
     final baseCellColor = semanticHeader && !(header && table.headerRow)
-        ? theme.colorScheme.surfaceVariant.withOpacity(0.18)
+        ? editorTheme.tableHeaderColor ??
+            theme.colorScheme.surfaceVariant.withOpacity(0.18)
         : null;
-    final cellColor =
-        selected ? theme.colorScheme.primary.withOpacity(0.12) : baseCellColor;
+    final cellColor = selected
+        ? editorTheme.tableSelectionColor ??
+            theme.colorScheme.primary.withOpacity(0.12)
+        : baseCellColor;
     final textAlign = _tableCellTextAlign(table, columnIndex);
     final contentAlignment = _tableCellContentAlignment(table, columnIndex);
 
@@ -2517,11 +3028,26 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                 maxLines: null,
                 textAlign: textAlign,
                 style: textStyle,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: editorTheme.tableActiveBorderColor ??
+                          theme.colorScheme.primary.withOpacity(0.45),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: editorTheme.tableActiveBorderColor ??
+                          theme.colorScheme.primary,
+                      width: 1.5,
+                    ),
+                  ),
                   isDense: true,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                 ),
               ),
             ),
@@ -4420,6 +4946,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     MarkdownFrontmatterBlock block,
   ) {
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     final textStyle = _sourceTextStyle(context) ??
         theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace');
 
@@ -4428,29 +4955,32 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         'smooth_markdown_editor_frontmatter_block_${segment.range.start}',
       ),
       decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor.withOpacity(0.55)),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Material(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-            child: const SizedBox(
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
+            child: SizedBox(
               height: 40,
               child: Row(
                 children: [
-                  SizedBox(width: 12),
-                  Icon(Icons.data_object, size: 18),
-                  SizedBox(width: 8),
-                  Text('Frontmatter'),
+                  const SizedBox(width: 12),
+                  const Icon(Icons.data_object, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Frontmatter',
+                    style: editorTheme.blockHeaderTextStyle,
+                  ),
                 ],
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: _editorBlockPadding(context),
             child: _FrontmatterEditor(
               key: ValueKey(
                 'smooth_markdown_editor_frontmatter_editor_${block.id}',
@@ -4479,7 +5009,6 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _MarkdownBlockSegment segment,
     _FencedCodeBlock codeBlock,
   ) {
-    final theme = Theme.of(context);
     final selectedLanguage = _supportedCodeLanguages.any(
       (language) => language.value == codeBlock.language,
     )
@@ -4494,15 +5023,15 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return DecoratedBox(
       key: ValueKey('smooth_markdown_editor_code_block_${segment.range.start}'),
       decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor.withOpacity(0.55)),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Material(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
             child: SizedBox(
               height: 40,
               child: Row(
@@ -4570,7 +5099,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: _editorBlockPadding(context),
             child: showMermaidSource
                 ? _buildMermaidSourceView(context, segment, codeBlock)
                 : _renderMarkdown(context, segment.source),
@@ -4597,13 +5126,13 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       child: DecoratedBox(
         decoration: widget.styleSheet?.codeBlockDecoration ??
             BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+              color: _editorBlockHeaderColor(context),
               borderRadius: BorderRadius.circular(6),
             ),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding:
-              widget.styleSheet?.codeBlockPadding ?? const EdgeInsets.all(12),
+          padding: widget.styleSheet?.codeBlockPadding ??
+              _editorBlockPadding(context),
           child: Text(
             codeBlock.code.isEmpty ? ' ' : codeBlock.code,
             style: textStyle,
@@ -4618,10 +5147,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _MarkdownBlockSegment segment,
     String latex,
   ) {
-    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     final blockKey =
         ValueKey('smooth_markdown_editor_block_math_${segment.range.start}');
-    final borderRadius = BorderRadius.circular(8);
+    final borderRadius = _editorBlockBorderRadius(context);
     final openEditor =
         widget.enabled ? () => _showBlockMathEditor(segment, latex) : null;
 
@@ -4650,16 +5179,15 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           onTap: openEditor,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              border: Border.all(color: theme.dividerColor.withOpacity(0.55)),
+              border: Border.all(color: _editorBlockBorderColor(context)),
               borderRadius: borderRadius,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Material(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(8)),
+                  color: _editorBlockHeaderColor(context),
+                  borderRadius: _editorBlockHeaderRadius(context),
                   child: SizedBox(
                     height: 40,
                     child: Row(
@@ -4667,7 +5195,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                         const SizedBox(width: 12),
                         const Icon(Icons.functions, size: 18),
                         const SizedBox(width: 8),
-                        const Text('Block Math'),
+                        Text(
+                          'Block Math',
+                          style: editorTheme.blockHeaderTextStyle,
+                        ),
                         const Spacer(),
                         IconButton(
                           tooltip: 'Edit math',
@@ -4680,7 +5211,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: _editorBlockPadding(context),
                   child: _renderBlockMath(context, latex),
                 ),
               ],
@@ -4704,20 +5235,21 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (block is! MarkdownRawBlock) return null;
 
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     return DecoratedBox(
       key: ValueKey(
         'smooth_markdown_editor_custom_block_${segment.range.start}',
       ),
       decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor.withOpacity(0.55)),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Material(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
             child: SizedBox(
               height: 40,
               child: Row(
@@ -4730,7 +5262,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                       'Custom Block',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall,
+                      style: editorTheme.blockHeaderTextStyle ??
+                          theme.textTheme.titleSmall,
                     ),
                   ),
                   IconButton(
@@ -4751,7 +5284,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: _editorBlockPadding(context),
             child: Text(
               block.markdown,
               style: _sourceTextStyle(context) ??
@@ -4860,20 +5393,20 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _MarkdownBlockSegment segment,
     MarkdownImageBlock block,
   ) {
-    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     return DecoratedBox(
       key:
           ValueKey('smooth_markdown_editor_image_block_${segment.range.start}'),
       decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor.withOpacity(0.55)),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Material(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
             child: SizedBox(
               height: 40,
               child: Row(
@@ -4886,6 +5419,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
                       block.alt.isEmpty ? block.url : block.alt,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: editorTheme.blockHeaderTextStyle,
                     ),
                   ),
                   IconButton(
@@ -4917,7 +5451,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: _editorBlockPadding(context),
             child: _renderMarkdown(context, block.toMarkdown()),
           ),
         ],
@@ -4927,9 +5461,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   Widget _buildSourcePane(BuildContext context) {
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
 
     return DecoratedBox(
       decoration: widget.sourceDecoration ??
+          editorTheme.sourceDecoration ??
           BoxDecoration(color: theme.colorScheme.surface),
       child: TextField(
         key: _sourceKey,
@@ -4947,7 +5483,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: widget.placeholder,
-          contentPadding: const EdgeInsets.all(16),
+          contentPadding: editorTheme.sourcePadding ?? const EdgeInsets.all(16),
         ),
       ),
     );
@@ -4955,18 +5491,22 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   Widget _buildPreviewPane(BuildContext context) {
     final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
     return DecoratedBox(
       decoration: widget.previewDecoration ??
+          editorTheme.previewDecoration ??
           BoxDecoration(color: theme.colorScheme.surface),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: editorTheme.previewPadding ?? const EdgeInsets.all(16),
         child: _renderMarkdown(context, _controller.text),
       ),
     );
   }
 
   TextStyle? _sourceTextStyle(BuildContext context) {
+    final editorTheme = _effectiveEditorTheme(context);
     return widget.textStyle ??
+        editorTheme.sourceTextStyle ??
         Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontFamily: 'monospace',
               height: 1.5,
@@ -4979,11 +5519,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   ) {
     final theme = Theme.of(context);
     if (block is MarkdownCodeBlock || block is MarkdownMermaidBlock) {
-      return widget.textStyle ??
-          theme.textTheme.bodyMedium?.copyWith(
-            fontFamily: 'monospace',
-            height: 1.5,
-          );
+      return _sourceTextStyle(context);
     }
     if (block is MarkdownHeadingBlock) {
       final style = switch (block.level) {
@@ -11073,11 +11609,15 @@ class _SuggestionPanel extends StatelessWidget {
     required this.label,
     required this.maxHeight,
     required this.children,
+    this.backgroundColor,
+    this.selectedColor,
   });
 
   final String label;
   final double maxHeight;
   final List<Widget> children;
+  final Color? backgroundColor;
+  final Color? selectedColor;
 
   @override
   Widget build(BuildContext context) {
@@ -11086,14 +11626,17 @@ class _SuggestionPanel extends StatelessWidget {
       liveRegion: true,
       label: label,
       child: Material(
-        color: Theme.of(context).colorScheme.surface,
+        color: backgroundColor ?? Theme.of(context).colorScheme.surface,
         elevation: 3,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxHeight),
-          child: ListView(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            children: children,
+        child: ListTileTheme(
+          selectedTileColor: selectedColor,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: ListView(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              children: children,
+            ),
           ),
         ),
       ),
@@ -11338,7 +11881,9 @@ enum _TableContextAction {
 }
 
 class _TablePickerMenuEntry extends PopupMenuEntry<_TableDimensions> {
-  const _TablePickerMenuEntry();
+  const _TablePickerMenuEntry({required this.editorTheme});
+
+  final MarkdownEditorThemeData editorTheme;
 
   static const double _cellSize = 22;
   static const double _gap = 4;
@@ -11374,6 +11919,7 @@ class _TablePickerMenuEntryState extends State<_TablePickerMenuEntry> {
                   _TablePickerCell(
                     row: row,
                     column: column,
+                    editorTheme: widget.editorTheme,
                     highlighted:
                         row <= _hovered.rows && column <= _hovered.columns,
                     onHover: () => setState(
@@ -11410,6 +11956,7 @@ class _TablePickerCell extends StatelessWidget {
   const _TablePickerCell({
     required this.row,
     required this.column,
+    required this.editorTheme,
     required this.highlighted,
     required this.onHover,
     required this.onSelect,
@@ -11417,6 +11964,7 @@ class _TablePickerCell extends StatelessWidget {
 
   final int row;
   final int column;
+  final MarkdownEditorThemeData editorTheme;
   final bool highlighted;
   final VoidCallback onHover;
   final VoidCallback onSelect;
@@ -11425,11 +11973,13 @@ class _TablePickerCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = highlighted
-        ? theme.colorScheme.primary.withOpacity(0.18)
-        : theme.colorScheme.surface;
+        ? editorTheme.tableSelectionColor ??
+            theme.colorScheme.primary.withOpacity(0.18)
+        : editorTheme.suggestionPanelColor ?? theme.colorScheme.surface;
     final borderColor = highlighted
-        ? theme.colorScheme.primary.withOpacity(0.65)
-        : theme.dividerColor;
+        ? editorTheme.tableActiveBorderColor ??
+            theme.colorScheme.primary.withOpacity(0.65)
+        : editorTheme.tableBorderColor ?? theme.dividerColor;
 
     return MouseRegion(
       onEnter: (_) => onHover(),

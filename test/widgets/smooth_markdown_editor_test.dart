@@ -1182,6 +1182,123 @@ void main() {
       expect(headingColor!.computeLuminance(), greaterThan(0.5));
     });
 
+    testWidgets('uses editor theme parameter for core editor chrome',
+        (tester) async {
+      final controller = MarkdownEditorController(
+        text: '```dart\nvoid main() {}\n```',
+      );
+      addTearDown(controller.dispose);
+
+      const toolbarColor = Color(0xFF101820);
+      const activeColor = Color(0xFF223344);
+      const headerColor = Color(0xFF334455);
+      const borderColor = Color(0xFF445566);
+      const sourceColor = Color(0xFF556677);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 320,
+            editorTheme: const MarkdownEditorThemeData(
+              toolbarColor: toolbarColor,
+              toolbarActiveBackgroundColor: activeColor,
+              blockHeaderColor: headerColor,
+              blockBorderColor: borderColor,
+              sourceTextStyle: TextStyle(color: sourceColor),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Material && widget.color == toolbarColor,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Material && widget.color == headerColor,
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.byWidgetPredicate((widget) {
+          final decoration = widget is DecoratedBox ? widget.decoration : null;
+          return decoration is BoxDecoration && decoration.color == activeColor;
+        }),
+        findsWidgets,
+      );
+      expect(
+        find.byWidgetPredicate((widget) {
+          final decoration = widget is DecoratedBox ? widget.decoration : null;
+          final border = decoration is BoxDecoration ? decoration.border : null;
+          return border is Border &&
+              border.top.color == borderColor &&
+              border.right.color == borderColor &&
+              border.bottom.color == borderColor &&
+              border.left.color == borderColor;
+        }),
+        findsWidgets,
+      );
+
+      await tester.tap(find.byTooltip('Source'));
+      await tester.pump();
+
+      final sourceField = tester.widget<TextField>(
+        find.byKey(const ValueKey('smooth_markdown_editor_source')),
+      );
+      expect(sourceField.style?.color, sourceColor);
+    });
+
+    testWidgets('uses editor theme from ThemeData extensions', (tester) async {
+      final controller = MarkdownEditorController(
+        text: '```dart\nprint("theme");\n```',
+      );
+      addTearDown(controller.dispose);
+
+      const toolbarColor = Color(0xFF203040);
+      const headerColor = Color(0xFF304050);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(
+            extensions: const <ThemeExtension<dynamic>>[
+              MarkdownEditorThemeData(
+                toolbarColor: toolbarColor,
+                blockHeaderColor: headerColor,
+              ),
+            ],
+          ),
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 900,
+                child: SmoothMarkdownEditor(
+                  controller: controller,
+                  height: 320,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Material && widget.color == toolbarColor,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Material && widget.color == headerColor,
+        ),
+        findsWidgets,
+      );
+    });
+
     testWidgets('notifies host callbacks for text mode and focus changes',
         (tester) async {
       final controller = MarkdownEditorController(text: 'Draft');

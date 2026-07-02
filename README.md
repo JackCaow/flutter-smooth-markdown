@@ -153,6 +153,13 @@ layout, `MarkdownEditorCapabilities` to disable built-in commands,
 or replace the toolbar, `enableKeyboardShortcuts` to turn off built-in
 shortcuts, and `onShortcut` to intercept keys before the editor handles them.
 
+Editor chrome can be styled without forking the widget. Pass
+`editorTheme: MarkdownEditorThemeData(...)` to one editor, or install the same
+theme globally through `ThemeData.extensions`. The editor theme covers toolbar
+colors, active button states, search/suggestion panels, selection/drop
+highlights, block chrome, table grid/header/selection colors, source and preview
+decorations, source text style, radii, and content padding.
+
 Custom block integrations can pair parser plugins with editor builders. Provide
 `customBlockBuilder` to render unsupported/custom blocks in formatted mode and
 `customBlockEditorBuilder` to supply an editor that calls `replaceMarkdown()`,
