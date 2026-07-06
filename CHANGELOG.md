@@ -7,14 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-06-29
+## [0.8.0] - 2026-07-06
 
 ### Added
 - ✨ **Markdown editor** - Added `SmoothMarkdownEditor` with formatted/source/preview/split modes, formatting commands, slash commands, wikilinks, search, Markdown import/export callbacks, and Scratch-style example entry points.
 - ✨ **Formatted range selection** - Added Shift-click and pointer-drag selection, copy, delete, and inline formatting support for top-level text blocks, blockquote children, nested list items, and table cell ranges.
+- ✨ **Editor integration APIs** - Added stable controller APIs for save state, source selections, insertion/replacement, undo/redo, table helpers, mode control, toolbar customization, shortcuts, command interception, import/export, PDF export, and image picking callbacks.
+- ✨ **Editor theming API** - Added `MarkdownEditorThemeData` so host apps can customize editor toolbar, suggestions, search panel, block chrome, table editing, source/preview panes, highlights, radii, and content padding.
+- ✨ **Custom block editing** - Added custom block render/edit builders and image pick state hooks so apps can integrate app-specific blocks and upload flows without forking the editor.
+- ✨ **Example editor preview** - Exposed the editor demo in the example app and added a direct Chrome preview entry point.
+- 🎨 **Dark mode polish** - Adapted markdown rendering and editor preview chrome for dark themes.
+- ⚡ **Formatted editor rendering** - Reduced unnecessary formatted editor rebuild work while keeping source, preview, search, and selection state synchronized.
 - 🛡️ **Editor HTML export hardening** - Avoided protected-token collisions in copy/export HTML and tightened fenced code closing detection for longer fences.
 - 🧪 **Experimental editor model entry point** - Added `flutter_smooth_markdown_editor_experimental.dart` for low-level Markdown codec and editor model helpers while the main package root exports the supported editor widgets, controller, semantic document, selection, and transaction APIs.
 - 🧪 **Editor coverage** - Added document, controller, and widget tests for Markdown editing workflows.
+
+### Fixed
+- 🐛 **Formatted table editing** - Fixed table toolbar/body horizontal scrolling on narrow viewports and preserved table editability for wide tables.
+- 🐛 **Code block editing** - Fixed formatted code blocks so code content edits update the underlying Markdown source.
+- 🐛 **Block math editing** - Fixed formatted block math rendering and edit flows for supported math blocks.
 
 ## [0.7.4] - 2026-06-17
 
