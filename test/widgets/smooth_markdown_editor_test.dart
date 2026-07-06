@@ -441,6 +441,8 @@ void main() {
         const TextRange(start: 2, end: 4),
       );
       expect(controller.canUndo, isFalse);
+      expect(_singleScratchContentBlock(controller),
+          isA<MarkdownParagraphBlock>());
 
       controller.textController.value = const TextEditingValue(
         text: '# 标题',
@@ -1157,6 +1159,45 @@ void main() {
       await tester.pump();
 
       expect(controller.text, '# Edited\n\nBody');
+    });
+
+    testWidgets(
+        'reports performance snapshots and formatted segment cache hits',
+        (tester) async {
+      final controller = MarkdownEditorController(text: '# Title\n\nBody');
+      addTearDown(controller.dispose);
+      final snapshots = <MarkdownEditorPerformanceSnapshot>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 240,
+            onPerformanceSnapshot: snapshots.add,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(snapshots, isNotEmpty);
+      expect(snapshots.last.sourceLength, controller.text.length);
+      expect(snapshots.last.blockCount, controller.document.blocks.length);
+      expect(snapshots.last.formattedSegmentCount, greaterThanOrEqualTo(2));
+
+      snapshots.clear();
+      await _tapToolbarIcon(tester, Icons.search);
+      await tester.pump();
+      await tester.pump();
+
+      expect(snapshots, isNotEmpty);
+      expect(
+        snapshots.last.formattedSegmentCacheHit,
+        isTrue,
+      );
+      expect(
+        snapshots.last.retainedFormattedSegmentKeyCount,
+        greaterThanOrEqualTo(2),
+      );
     });
 
     testWidgets('formatted preview defaults to dark theme colors',

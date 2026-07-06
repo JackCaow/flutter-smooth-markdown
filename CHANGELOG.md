@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- ✨ **Editor performance telemetry** - Added `onPerformanceSnapshot` for host apps to observe source size, block/segment counts, segment cache hits, retained segment keys, editor mode, IME composing state, search matches, and suggestion visibility.
+
+### Fixed
+- 🐛 **Editor composing stability** - Deferred semantic document reparsing while an IME composing range is active so formatted editing does not disrupt in-progress input.
+- ⚡ **Formatted editor rebuilds** - Cached formatted block segmentation, pruned stale formatted segment keys, and avoided redundant search state rebuilds.
+
 ## [0.8.0] - 2026-07-06
 
 ### Added

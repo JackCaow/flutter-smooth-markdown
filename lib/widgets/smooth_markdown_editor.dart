@@ -153,6 +153,62 @@ typedef MarkdownEditorImagePickEventCallback = void Function(
   MarkdownEditorImagePickEvent event,
 );
 
+/// Lightweight editor performance snapshot for host telemetry.
+class MarkdownEditorPerformanceSnapshot {
+  /// Creates editor performance telemetry.
+  const MarkdownEditorPerformanceSnapshot({
+    required this.sourceLength,
+    required this.blockCount,
+    required this.formattedSegmentCount,
+    required this.formattedSegmentCacheHit,
+    required this.retainedFormattedSegmentKeyCount,
+    required this.mode,
+    required this.isComposing,
+    required this.searchMatchCount,
+    required this.slashSuggestionsVisible,
+    required this.wikilinkSuggestionsVisible,
+    required this.timestamp,
+  });
+
+  /// Current Markdown source length.
+  final int sourceLength;
+
+  /// Current semantic document block count.
+  final int blockCount;
+
+  /// Current formatted block segment count.
+  final int formattedSegmentCount;
+
+  /// Whether the latest formatted segment lookup reused cached segments.
+  final bool formattedSegmentCacheHit;
+
+  /// Number of retained global keys for formatted block anchoring.
+  final int retainedFormattedSegmentKeyCount;
+
+  /// Current editor display mode.
+  final MarkdownEditorMode mode;
+
+  /// Whether the source controller is inside an active IME composition range.
+  final bool isComposing;
+
+  /// Current find match count.
+  final int searchMatchCount;
+
+  /// Whether slash command suggestions are currently visible.
+  final bool slashSuggestionsVisible;
+
+  /// Whether wikilink suggestions are currently visible.
+  final bool wikilinkSuggestionsVisible;
+
+  /// Snapshot creation time.
+  final DateTime timestamp;
+}
+
+/// Called after editor state changes with lightweight performance telemetry.
+typedef MarkdownEditorPerformanceCallback = void Function(
+  MarkdownEditorPerformanceSnapshot snapshot,
+);
+
 /// Host callback for editor keyboard shortcuts.
 typedef MarkdownEditorShortcutCallback = KeyEventResult Function(
   KeyEvent event,
@@ -726,6 +782,7 @@ class SmoothMarkdownEditor extends StatefulWidget {
     this.onCommand,
     this.onSelectionChanged,
     this.onFocusChanged,
+    this.onPerformanceSnapshot,
     this.enableWikilinks = true,
     this.wikilinkSuggestions = const [],
     this.onTapWikilink,
@@ -867,6 +924,9 @@ class SmoothMarkdownEditor extends StatefulWidget {
   /// Called when the source editor focus changes.
   final ValueChanged<bool>? onFocusChanged;
 
+  /// Called after editor state changes with lightweight performance telemetry.
+  final MarkdownEditorPerformanceCallback? onPerformanceSnapshot;
+
   /// Whether preview parses and renders `[[wikilinks]]`.
   final bool enableWikilinks;
 
@@ -976,6 +1036,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   final ScrollController _sourceScrollController = ScrollController();
   final GlobalKey _formattedViewportKey = GlobalKey();
   final Map<String, GlobalKey> _formattedSegmentKeys = <String, GlobalKey>{};
+  String? _cachedBlockSegmentsText;
+  MarkdownDocument? _cachedBlockSegmentsDocument;
+  List<_MarkdownBlockSegment>? _cachedBlockSegments;
+  bool _lastFormattedSegmentCacheHit = false;
+  bool _performanceSnapshotScheduled = false;
 
   final TextEditingController _searchController = TextEditingController();
   final _FormattedBlockTextController _formattedBlockController =
@@ -1108,10 +1173,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   void _handleControllerChanged() {
     _refreshInlineSuggestions();
-    _refreshSearchMatches();
+    _refreshSearchMatches(notify: false);
     _clearActiveDocumentSelectionIfInvalid();
     _reportSelectionChanged();
     widget.onChanged?.call(_controller.text);
+    _schedulePerformanceSnapshot();
     if (mounted) {
       setState(() {});
     }
@@ -1119,6 +1185,37 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   void _handleFocusChanged() {
     widget.onFocusChanged?.call(_focusNode.hasFocus);
+  }
+
+  void _schedulePerformanceSnapshot({bool? formattedSegmentCacheHit}) {
+    if (formattedSegmentCacheHit != null) {
+      _lastFormattedSegmentCacheHit = formattedSegmentCacheHit;
+    }
+    if (widget.onPerformanceSnapshot == null || _performanceSnapshotScheduled) {
+      return;
+    }
+
+    _performanceSnapshotScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _performanceSnapshotScheduled = false;
+      widget.onPerformanceSnapshot?.call(
+        MarkdownEditorPerformanceSnapshot(
+          sourceLength: _controller.text.length,
+          blockCount: _controller.document.blocks.length,
+          formattedSegmentCount: _cachedBlockSegments?.length ??
+              _controller.document.blocks.length,
+          formattedSegmentCacheHit: _lastFormattedSegmentCacheHit,
+          retainedFormattedSegmentKeyCount: _formattedSegmentKeys.length,
+          mode: _mode,
+          isComposing: _hasActiveComposing(_controller.textController.value),
+          searchMatchCount: _searchMatches.length,
+          slashSuggestionsVisible: _slashMatch != null,
+          wikilinkSuggestionsVisible: _wikilinkMatch != null,
+          timestamp: DateTime.now(),
+        ),
+      );
+    });
   }
 
   void _reportSelectionChanged() {
@@ -1990,6 +2087,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final theme = Theme.of(context);
     final editorTheme = _effectiveEditorTheme(context);
     final segments = _documentBlockSegments();
+    _pruneFormattedSegmentKeys(segments);
     final blockSpacing = _effectiveStyleSheet(context).blockSpacing ?? 16;
     final contentPadding =
         editorTheme.contentPadding ?? const EdgeInsets.all(16);
@@ -8374,10 +8472,26 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _formattedScrollController.jumpTo(clampedTarget.toDouble());
   }
 
+  void _pruneFormattedSegmentKeys(List<_MarkdownBlockSegment> segments) {
+    if (_formattedSegmentKeys.isEmpty) return;
+    if (segments.isEmpty) {
+      _formattedSegmentKeys.clear();
+      return;
+    }
+
+    final retainedIds = <String>{
+      for (final segment in segments) _formattedSegmentKeyId(segment),
+    };
+    _formattedSegmentKeys.removeWhere((id, _) => !retainedIds.contains(id));
+  }
+
   GlobalKey _formattedSegmentGlobalKey(_MarkdownBlockSegment segment) {
-    final id =
-        '${segment.range.start}:${segment.range.end}:${segment.block?.id ?? ''}';
+    final id = _formattedSegmentKeyId(segment);
     return _formattedSegmentKeys.putIfAbsent(id, GlobalKey.new);
+  }
+
+  String _formattedSegmentKeyId(_MarkdownBlockSegment segment) {
+    return '${segment.range.start}:${segment.range.end}:${segment.block?.id ?? ''}';
   }
 
   _FormattedActivationTarget? _formattedActivationTargetForSelection(
@@ -10217,8 +10331,15 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _refreshSearchMatches();
   }
 
-  void _refreshSearchMatches() {
+  void _refreshSearchMatches({bool notify = true}) {
     final query = _searchController.text;
+    if (!_searchOpen &&
+        query.isEmpty &&
+        _lastSearchQuery.isEmpty &&
+        _searchMatches.isEmpty) {
+      return;
+    }
+
     final matches = _findSearchMatches(query);
     final queryChanged = query != _lastSearchQuery;
     var nextIndex = _currentSearchMatchIndex;
@@ -10232,7 +10353,12 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       nextIndex = matches.length - 1;
     }
 
-    if (mounted) {
+    final changed = queryChanged ||
+        nextIndex != _currentSearchMatchIndex ||
+        !listEquals(matches, _searchMatches);
+    if (!changed) return;
+
+    if (notify && mounted) {
       setState(() {
         _searchMatches = matches;
         _currentSearchMatchIndex = nextIndex;
@@ -11027,11 +11153,28 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   List<_MarkdownBlockSegment> _documentBlockSegments() {
     final text = _controller.text;
-    if (text.trim().isEmpty) return const [];
+    final document = _controller.document;
+    final cached = _cachedBlockSegments;
+    if (_cachedBlockSegmentsText == text &&
+        identical(_cachedBlockSegmentsDocument, document) &&
+        cached != null) {
+      _schedulePerformanceSnapshot(formattedSegmentCacheHit: true);
+      return cached;
+    }
+
+    if (text.trim().isEmpty) {
+      _cacheBlockSegments(text, document, const []);
+      _schedulePerformanceSnapshot(formattedSegmentCacheHit: false);
+      return const [];
+    }
 
     final sourceSegments = _markdownBlockSegments(text);
-    final blocks = _controller.document.blocks;
-    if (blocks.isEmpty) return sourceSegments;
+    final blocks = document.blocks;
+    if (blocks.isEmpty) {
+      _cacheBlockSegments(text, document, sourceSegments);
+      _schedulePerformanceSnapshot(formattedSegmentCacheHit: false);
+      return sourceSegments;
+    }
 
     final segments = <_MarkdownBlockSegment>[];
     var sourceIndex = 0;
@@ -11069,7 +11212,19 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       }
     }
 
+    _cacheBlockSegments(text, document, segments);
+    _schedulePerformanceSnapshot(formattedSegmentCacheHit: false);
     return segments;
+  }
+
+  void _cacheBlockSegments(
+    String text,
+    MarkdownDocument document,
+    List<_MarkdownBlockSegment> segments,
+  ) {
+    _cachedBlockSegmentsText = text;
+    _cachedBlockSegmentsDocument = document;
+    _cachedBlockSegments = segments;
   }
 
   TextRange _sourceRangeForDocumentBlock(

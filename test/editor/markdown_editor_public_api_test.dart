@@ -104,6 +104,21 @@ void main() {
         toolbarColor: Color(0xFF102030),
       );
       expect(theme.toolbarColor, const Color(0xFF102030));
+
+      final snapshot = editor_api.MarkdownEditorPerformanceSnapshot(
+        sourceLength: 4,
+        blockCount: 1,
+        formattedSegmentCount: 1,
+        formattedSegmentCacheHit: true,
+        retainedFormattedSegmentKeyCount: 1,
+        mode: editor_api.MarkdownEditorMode.formatted,
+        isComposing: false,
+        searchMatchCount: 0,
+        slashSuggestionsVisible: false,
+        wikilinkSuggestionsVisible: false,
+        timestamp: DateTime(2026),
+      );
+      expect(snapshot.formattedSegmentCacheHit, isTrue);
     });
   });
 }

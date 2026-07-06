@@ -832,10 +832,15 @@ class MarkdownEditorController extends ChangeNotifier {
     if (_syncingSourceFromDocument) return;
 
     final source = textController.text;
-    if (!_hasActiveComposing(textController.value)) {
+    final hasActiveComposing = _hasActiveComposing(textController.value);
+    if (!hasActiveComposing) {
       _recordSourceHistory(textController.value, coalesceEventLoop: true);
     }
     if (source != _lastParsedText) {
+      if (hasActiveComposing) {
+        notifyListeners();
+        return;
+      }
       _lastParsedText = source;
       _syncingDocumentFromSource = true;
       documentEditor.replaceDocument(
