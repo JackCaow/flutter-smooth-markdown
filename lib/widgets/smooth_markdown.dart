@@ -8,14 +8,18 @@ import '../src/parser/markdown_parser.dart';
 import '../src/parser/parse_cache.dart';
 import '../src/parser/parser_plugin.dart';
 import '../src/renderer/builders/artifact_builder.dart';
+import '../src/renderer/builders/block_math_builder.dart';
 import '../src/renderer/builders/details_builder.dart';
 import '../src/renderer/builders/enhanced_blockquote_builder.dart';
 import '../src/renderer/builders/enhanced_code_block_builder.dart';
 import '../src/renderer/builders/enhanced_header_builder.dart';
 import '../src/renderer/builders/enhanced_link_builder.dart';
+import '../src/renderer/builders/footnote_definition_builder.dart';
+import '../src/renderer/builders/footnote_reference_builder.dart';
 import '../src/renderer/builders/horizontal_rule_builder.dart';
 import '../src/renderer/builders/image_builder.dart';
 import '../src/renderer/builders/inline_code_builder.dart';
+import '../src/renderer/builders/inline_math_builder.dart';
 import '../src/renderer/builders/list_builder.dart';
 import '../src/renderer/builders/paragraph_builder.dart';
 import '../src/renderer/builders/table_builder.dart';
@@ -173,7 +177,7 @@ class SmoothMarkdown extends StatelessWidget {
   /// All other parameters are optional and provide customization options:
   ///
   /// - [styleSheet]: Controls the visual styling of markdown elements. Defaults to
-  ///   [MarkdownStyleSheet.light] if not provided.
+  ///   [MarkdownStyleSheet.fromTheme] if not provided.
   /// - [config]: Configuration options for markdown parsing behavior. Most features
   ///   are enabled by default.
   /// - [onTapLink]: Callback function invoked when a link is tapped. Receives the
@@ -237,10 +241,10 @@ class SmoothMarkdown extends StatelessWidget {
 
   /// The style sheet used to control the visual appearance of rendered markdown.
   ///
-  /// If not provided, defaults to [MarkdownStyleSheet.light]. You can use one of the
+  /// If not provided, defaults to [MarkdownStyleSheet.fromTheme]. You can use one of the
   /// built-in factory constructors:
   ///
-  /// - [MarkdownStyleSheet.light] - Clean light theme (default)
+  /// - [MarkdownStyleSheet.light] - Clean light theme
   /// - [MarkdownStyleSheet.dark] - Dark theme for dark mode apps
   /// - [MarkdownStyleSheet.github] - GitHub-style light or dark theme
   /// - [MarkdownStyleSheet.vscode] - VS Code editor-style theme
@@ -688,6 +692,10 @@ class SmoothMarkdown extends StatelessWidget {
         ..register('list', const ListBuilder())
         ..register('horizontal_rule', const HorizontalRuleBuilder())
         ..register('inline_code', const InlineCodeBuilder())
+        ..register('inline_math', const InlineMathBuilder())
+        ..register('block_math', const BlockMathBuilder())
+        ..register('footnote_reference', const FootnoteReferenceBuilder())
+        ..register('footnote_definition', const FootnoteDefinitionBuilder())
         ..register('bold', const BoldBuilder())
         ..register('italic', const ItalicBuilder())
         ..register('strikethrough', const StrikethroughBuilder())
@@ -706,8 +714,10 @@ class SmoothMarkdown extends StatelessWidget {
     }
 
     // Render nodes
+    final effectiveStyleSheet =
+        styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context));
     final renderer = MarkdownRenderer(
-      styleSheet: styleSheet ?? MarkdownStyleSheet.light(),
+      styleSheet: effectiveStyleSheet,
       builderRegistry: customRegistry,
     );
 

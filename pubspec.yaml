@@ -1,16 +1,16 @@
 name: flutter_smooth_markdown
-description: High-performance Flutter markdown renderer with syntax highlighting, LaTeX math, tables, footnotes, SVG images, and real-time streaming support.
-version: 0.7.4
+description: High-performance Flutter markdown renderer and editor with syntax highlighting, LaTeX math, tables, footnotes, SVG images, and real-time streaming support.
+version: 0.8.0
 homepage: https://github.com/JackCaow/flutter-smooth-markdown
 repository: https://github.com/JackCaow/flutter-smooth-markdown
 issue_tracker: https://github.com/JackCaow/flutter-smooth-markdown/issues
 
 topics:
   - markdown
+  - editor
   - renderer
   - syntax-highlighting
   - mermaid
-  - charts
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -32,9 +32,6 @@ dependencies:
 
   # Image handling
   cached_network_image: ^3.3.0
-
-  # URL handling
-  url_launcher: ^6.2.0
 
   # Math formula rendering
   flutter_math_fork: ^0.7.2

@@ -802,7 +802,7 @@ dependencies:
   flutter_highlight: ^0.7.0
   flutter_math_fork: ^0.7.2
   flutter_svg: ^2.0.10+1
-  url_launcher: ^6.2.0
+  # URL opening is handled by host app callbacks.
 
 dev_dependencies:
   flutter_test:

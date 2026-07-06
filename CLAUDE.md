@@ -144,7 +144,6 @@ flutter test       # All tests must pass
 **Production**:
 - `flutter_highlight` (^0.7.0): Syntax highlighting for code blocks
 - `cached_network_image` (^3.3.0): Image caching and network loading
-- `url_launcher` (^6.2.0): Handle URL taps
 - `flutter_math_fork` (^0.7.2): LaTeX math formula rendering
 - `flutter_svg` (^2.0.10+1): SVG image support
 

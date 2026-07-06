@@ -48,6 +48,8 @@ class ParagraphBuilder extends MarkdownWidgetBuilder {
         buffer.write(_extractText(node.children));
       } else if (node is InlineCodeNode) {
         buffer.write(node.code);
+      } else if (node is HardBreakNode) {
+        buffer.write('\n');
       } else if (node is LinkNode) {
         buffer.write(_extractText(node.children));
       }

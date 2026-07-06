@@ -332,7 +332,8 @@ Line 3
       expect(admonition.children.length, 1);
 
       final content = (admonition.children.first as ParagraphNode)
-          .children.first as TextNode;
+          .children
+          .first as TextNode;
       expect(content.content, contains('Line 1'));
       expect(content.content, contains('Line 2'));
       expect(content.content, contains('Line 3'));
@@ -375,6 +376,30 @@ Use plugins for custom syntax.
       expect(paragraph.children.whereType<MentionNode>().length, 1);
       expect(paragraph.children.whereType<EmojiNode>().length, 1);
       expect(paragraph.children.whereType<HashtagNode>().length, 1);
+    });
+  });
+
+  group('MermaidPlugin', () {
+    test('should preserve tilde fences on Mermaid diagrams', () {
+      final registry = ParserPluginRegistry()..register(const MermaidPlugin());
+      final parser = MarkdownParser(plugins: registry);
+
+      final nodes = parser.parse('''
+~~~mermaid theme=dark
+flowchart TD
+  A --> B
+~~~
+''');
+
+      expect(nodes, hasLength(1));
+      expect(nodes.single, isA<MermaidDiagramNode>());
+      final mermaid = nodes.single as MermaidDiagramNode;
+      expect(mermaid.theme, 'dark');
+      expect(mermaid.fence, '~~~');
+      expect(mermaid.info, 'mermaid theme=dark');
+      expect(mermaid.code, 'flowchart TD\n  A --> B');
+      expect(mermaid.toJson()['fence'], '~~~');
+      expect(mermaid.toJson()['info'], 'mermaid theme=dark');
     });
   });
 

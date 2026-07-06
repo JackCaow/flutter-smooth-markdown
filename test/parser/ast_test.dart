@@ -61,6 +61,7 @@ void main() {
         );
         expect(node.code, 'print("Hello")');
         expect(node.language, 'dart');
+        expect(node.fence, '```');
         expect(node.type, 'code_block');
       });
 
@@ -68,6 +69,28 @@ void main() {
         const node = CodeBlockNode(code: 'plain code');
         expect(node.code, 'plain code');
         expect(node.language, null);
+        expect(node.fence, '```');
+      });
+
+      test('should preserve a tilde fence', () {
+        const node = CodeBlockNode(
+          code: 'print("Hello")',
+          language: 'dart',
+          fence: '~~~',
+        );
+        expect(node.fence, '~~~');
+        expect(node.toJson()['fence'], '~~~');
+      });
+
+      test('should preserve a code fence info string', () {
+        const node = CodeBlockNode(
+          code: 'print("Hello")',
+          language: 'dart',
+          info: 'dart title=main.dart',
+        );
+        expect(node.language, 'dart');
+        expect(node.info, 'dart title=main.dart');
+        expect(node.toJson()['info'], 'dart title=main.dart');
       });
     });
 

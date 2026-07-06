@@ -16,6 +16,33 @@ Finder findRichTextContaining(String text) {
   );
 }
 
+Color? findRichTextColorContaining(WidgetTester tester, String text) {
+  for (final element in findRichTextContaining(text).evaluate()) {
+    final widget = element.widget;
+    if (widget is RichText) {
+      final color = _spanColorContaining(widget.text, text);
+      if (color != null) return color;
+    }
+  }
+  return null;
+}
+
+Color? _spanColorContaining(InlineSpan span, String text) {
+  if (span is TextSpan) {
+    if ((span.text?.contains(text) ?? false) && span.style?.color != null) {
+      return span.style!.color;
+    }
+    for (final child in span.children ?? const <InlineSpan>[]) {
+      final color = _spanColorContaining(child, text);
+      if (color != null) return color;
+    }
+    if (span.toPlainText().contains(text)) {
+      return span.style?.color;
+    }
+  }
+  return null;
+}
+
 void main() {
   group('SmoothMarkdown Widget Tests', () {
     testWidgets('should render simple text', (tester) async {
@@ -30,6 +57,26 @@ void main() {
       );
 
       expect(findRichTextContaining('Hello World'), findsOneWidget);
+    });
+
+    testWidgets('defaults to the surrounding dark theme', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: const Scaffold(
+            body: SmoothMarkdown(
+              data: 'Hello World',
+              useRepaintBoundary: false,
+              enableCache: false,
+            ),
+          ),
+        ),
+      );
+
+      final color = findRichTextColorContaining(tester, 'Hello World');
+
+      expect(color, isNotNull);
+      expect(color!.computeLuminance(), greaterThan(0.5));
     });
 
     testWidgets('should render header', (tester) async {
@@ -87,6 +134,40 @@ void main() {
 
       expect(findRichTextContaining('Code:'), findsOneWidget);
       expect(findRichTextContaining('var x = 1;'), findsOneWidget);
+    });
+
+    testWidgets('should render hard line breaks', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: SmoothMarkdown(
+            data: 'First\\\nSecond',
+            useRepaintBoundary: false,
+            enableCache: false,
+          ),
+        ),
+      );
+
+      expect(findRichTextContaining('First\nSecond'), findsOneWidget);
+    });
+
+    testWidgets('enhanced components should render math nodes', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: SmoothMarkdown(
+            data: r'Inline $x^2$.'
+                '\n\n'
+                r'$$'
+                '\nE = mc^2\n'
+                r'$$',
+            useEnhancedComponents: true,
+            useRepaintBoundary: false,
+            enableCache: false,
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Unknown node type'), findsNothing);
     });
 
     testWidgets('should render code block', (tester) async {
@@ -259,7 +340,8 @@ Text below
       );
 
       expect(findRichTextContaining('Big Header'), findsOneWidget);
-      final richTextWidget = tester.widget<RichText>(findRichTextContaining('Big Header'));
+      final richTextWidget =
+          tester.widget<RichText>(findRichTextContaining('Big Header'));
       final textSpan = richTextWidget.text as TextSpan;
       expect(textSpan.style?.fontSize, 48);
     });
@@ -315,6 +397,24 @@ void main() {
       );
 
       expect(find.textContaining('Custom: code'), findsOneWidget);
+    });
+
+    testWidgets('should expose only the first code info token as language',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SmoothMarkdown(
+            data: '```dart title=main.dart\ncode\n```',
+            useRepaintBoundary: false,
+            enableCache: false,
+            codeBuilder: (code, language) {
+              return Text('Custom: $code ($language)');
+            },
+          ),
+        ),
+      );
+
+      expect(find.text('Custom: code (dart)'), findsOneWidget);
     });
 
     testWidgets('should use custom image builder', (tester) async {

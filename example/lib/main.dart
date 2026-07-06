@@ -8,6 +8,7 @@ import 'chat_list_demo.dart';
 import 'footnote_demo.dart';
 import 'l10n/app_localizations.dart';
 import 'conversation_list_demo.dart';
+import 'editor_demo.dart';
 import 'math_demo.dart';
 import 'mermaid_demo.dart';
 import 'plugin_demo.dart';
@@ -1054,6 +1055,14 @@ gantt
     }
   }
 
+  void _openEditorPreview() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const EditorDemoPage(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final example = _examples[_selectedIndex];
@@ -1070,6 +1079,11 @@ gantt
           elevation: 0,
           title: const Text('Smooth Markdown Demo'),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.edit_note),
+              tooltip: 'Open editor preview',
+              onPressed: _openEditorPreview,
+            ),
             PopupMenuButton<MarkdownTheme>(
               icon: const Icon(Icons.palette),
               tooltip: AppLocalizations.of(context).translate('tooltip_theme'),
@@ -1145,6 +1159,25 @@ gantt
                   ],
                 ),
               ),
+              ListTile(
+                leading: Icon(
+                  Icons.edit_note,
+                  color: isDark ? Colors.white70 : null,
+                ),
+                title: Text(
+                  'Markdown Editor',
+                  style: TextStyle(color: isDark ? Colors.white : null),
+                ),
+                subtitle: Text(
+                  'Scratch-style editing preview',
+                  style: TextStyle(color: isDark ? Colors.white54 : null),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openEditorPreview();
+                },
+              ),
+              const Divider(),
               ...List.generate(_examples.length, (index) {
                 return ListTile(
                   leading: Icon(

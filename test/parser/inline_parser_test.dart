@@ -18,6 +18,18 @@ void main() {
         expect((result[0] as TextNode).content, 'Hello World');
       });
 
+      test('should parse hard breaks', () {
+        final backslashBreak = parser.parse('Hello\\\nWorld');
+        expect(backslashBreak, hasLength(3));
+        expect(backslashBreak[0], isA<TextNode>());
+        expect(backslashBreak[1], isA<HardBreakNode>());
+        expect(backslashBreak[2], isA<TextNode>());
+
+        final trailingSpaceBreak = parser.parse('Hello  \nWorld');
+        expect(trailingSpaceBreak, hasLength(3));
+        expect(trailingSpaceBreak[1], isA<HardBreakNode>());
+      });
+
       test('should handle empty string', () {
         final result = parser.parse('');
         expect(result, isEmpty);
@@ -130,7 +142,8 @@ void main() {
       });
 
       test('should parse link in text', () {
-        final result = parser.parse('Visit [this link](https://example.com) now');
+        final result =
+            parser.parse('Visit [this link](https://example.com) now');
         expect(result.length, 3);
         expect(result[0], isA<TextNode>());
         expect(result[1], isA<LinkNode>());
@@ -168,8 +181,7 @@ void main() {
       });
 
       test('should parse image in text', () {
-        final result =
-            parser.parse('Here is ![image](url.png) in text');
+        final result = parser.parse('Here is ![image](url.png) in text');
         expect(result.length, 3);
         expect(result[0], isA<TextNode>());
         expect(result[1], isA<ImageNode>());

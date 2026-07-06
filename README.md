@@ -17,6 +17,7 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 | Category | Features |
 |----------|----------|
 | **Rendering** | AST-based parsing, syntax highlighting, real-time streaming, text selection |
+| **Editing** | Formatted/source/preview/split editor, formatting toolbar, slash commands, wikilinks, find |
 | **Markdown** | Headers (with inline formatting), lists, tables, code blocks, blockquotes, links, images |
 | **Math & Charts** | LaTeX formulas, Mermaid diagrams (flowcharts, Gantt, Kanban, Timeline, Radar, XY Chart, pie, sequence) |
 | **Extras** | Footnotes, SVG support, collapsible sections, task lists |
@@ -41,6 +42,10 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 <img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/streaming.gif" width="600" alt="Real-time Streaming">
 
 > Run the example app: `cd example && flutter run`
+>
+> Run the editor preview directly in Chrome: `cd example && flutter run -d chrome -t lib/editor_preview_main.dart`
+>
+> The full example app also exposes the editor from the sidebar in `example/lib/editor_demo.dart`.
 
 ## Quick Start
 
@@ -48,7 +53,7 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 
 ```yaml
 dependencies:
-  flutter_smooth_markdown: ^0.7.4
+  flutter_smooth_markdown: ^0.8.0
 ```
 
 ```bash
@@ -80,6 +85,109 @@ SmoothMarkdown(
 ```
 
 Selection handles work across text and non-text blocks (images, tables, etc.). Copied content is automatically cleaned.
+
+### Markdown Editor
+
+```dart
+import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor.dart';
+
+final editorController = MarkdownEditorController(
+  text: '# Scratch note',
+  historyLimit: 200,
+);
+
+SmoothMarkdownEditor(
+  controller: editorController,
+  mode: MarkdownEditorMode.formatted,
+  wikilinkSuggestions: const ['Daily Notes', 'Project Plan'],
+  capabilities: const MarkdownEditorCapabilities(
+    disabledCommands: {
+      MarkdownEditorCommand.mermaidDiagram,
+      MarkdownEditorCommand.blockMath,
+    },
+  ),
+  toolbarCommands: const [
+    MarkdownEditorCommand.bold,
+    MarkdownEditorCommand.italic,
+    MarkdownEditorCommand.link,
+    MarkdownEditorCommand.image,
+    MarkdownEditorCommand.codeBlock,
+    MarkdownEditorCommand.table,
+  ],
+  toolbarTrailing: [
+    IconButton(
+      tooltip: 'Save',
+      icon: const Icon(Icons.save_outlined),
+      onPressed: () {
+        saveDraft(editorController.text);
+        editorController.markSaved();
+      },
+    ),
+  ],
+  onChanged: (markdown) => saveDraft(markdown),
+  onCommand: (command) => analytics.track('markdown_command', command.name),
+  onSelectionChanged: (selection) => updateSelectionState(selection),
+  onTapWikilink: (target) => openNote(target),
+  onExportMarkdown: (markdown) => saveMarkdownFile(markdown),
+)
+```
+
+`SmoothMarkdownEditor` keeps Markdown source as the document of record and renders
+the preview with `SmoothMarkdown`. It includes Scratch-inspired editor controls:
+formatting commands, `Cmd/Ctrl+B`, `Cmd/Ctrl+I`, `Cmd/Ctrl+K`, `Cmd/Ctrl+F`,
+`Cmd/Ctrl+Shift+M`, `Cmd/Ctrl+Shift+Enter`, `/` commands, `[[wikilink]]`
+autocomplete, formatted block editing, code-block language selection, Mermaid
+preview/source toggling, block math editing, copy-as-Markdown/plain-text/HTML,
+Markdown import/export callbacks, focus mode, and source, preview, or split layouts.
+
+Host apps can treat `MarkdownEditorController` as the stable integration point:
+use `text` for the Markdown source, `isDirty`/`markSaved()` for save state,
+`selection`/`getSelectionMarkdown()` for source selections, `insertMarkdown()`
+or `replaceSelection()` for integrations, `undo()`/`redo()` for custom UI, and
+the table helpers (`replaceTableCellText`, `insertTableRowAfter`,
+`insertTableColumnBefore`, `setTableColumnAlignment`, etc.) for host table
+controls. Use controlled `mode` + `onModeChanged` when the app owns editor
+layout, `MarkdownEditorCapabilities` to disable built-in commands,
+`toolbarCommands` to hide or reorder the built-in toolbar buttons,
+`toolbarLeading`/`toolbarTrailing` to add host actions, `toolbarBuilder` to wrap
+or replace the toolbar, `enableKeyboardShortcuts` to turn off built-in
+shortcuts, and `onShortcut` to intercept keys before the editor handles them.
+
+Editor chrome can be styled without forking the widget. Pass
+`editorTheme: MarkdownEditorThemeData(...)` to one editor, or install the same
+theme globally through `ThemeData.extensions`. The editor theme covers toolbar
+colors, active button states, search/suggestion panels, selection/drop
+highlights, block chrome, table grid/header/selection colors, source and preview
+decorations, source text style, radii, and content padding.
+
+Custom block integrations can pair parser plugins with editor builders. Provide
+`customBlockBuilder` to render unsupported/custom blocks in formatted mode and
+`customBlockEditorBuilder` to supply an editor that calls `replaceMarkdown()`,
+`finishEditing()`, or `delete()` from the supplied context. This lets host apps
+edit callouts, embeds, database cards, or app-specific directives without
+forking the core editor.
+
+File-oriented editor actions are intentionally callback-based so apps can choose
+their own desktop, mobile, or web integrations. When callbacks are omitted,
+`Export Markdown` copies Markdown to the clipboard, `Print as PDF` copies the
+generated HTML fallback, `Import Markdown` is hidden, and image insertion uses
+the built-in URL dialog. Provide `onExportMarkdown`, `onExportPdf`,
+`onImportMarkdown`, and `onPickImage` to connect file pickers, print/PDF
+packages, asset uploads, or platform share sheets. Use `onImagePickEvent` to
+surface picking, cancellation, insertion, and failure states in host UI, such as
+upload progress banners or retry affordances.
+
+The core package does not ship default file picker, printing, share, upload, or
+platform image picker adapters; keep those integrations in the host app and
+route them through the callbacks above. `flutter_smooth_markdown_editor.dart`
+is the stable editor-only entry point for app integrations. Lower-level document
+model, codec, and transaction helpers are still evolving; import the explicit
+experimental entry point when an integration needs those APIs and pin compatible
+package versions.
+
+```dart
+import 'package:flutter_smooth_markdown/flutter_smooth_markdown_editor_experimental.dart';
+```
 
 ### Programmatic Selection
 

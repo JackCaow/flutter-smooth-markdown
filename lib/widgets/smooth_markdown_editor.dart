@@ -1,0 +1,12509 @@
+// ignore_for_file: deprecated_member_use
+
+import 'dart:async';
+import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../src/config/markdown_config.dart';
+import '../src/config/style_sheet.dart';
+import '../src/editor/document/markdown_document.dart';
+import '../src/editor/document/markdown_document_codec.dart';
+import '../src/editor/document/markdown_document_editor.dart';
+import '../src/editor/markdown_editor_controller.dart';
+import '../src/editor/markdown_editor_export.dart';
+import '../src/editor/wikilink.dart';
+import '../src/parser/ast/markdown_node.dart';
+import '../src/parser/parser_plugin.dart';
+import '../src/parser/plugins/mermaid_plugin.dart';
+import '../src/renderer/builders/block_math_builder.dart';
+import '../src/renderer/builders/mermaid_builder.dart';
+import '../src/renderer/widget_builder.dart';
+import 'smooth_markdown.dart';
+
+/// Display mode for [SmoothMarkdownEditor].
+enum MarkdownEditorMode {
+  /// Rendered Markdown blocks that become editable when focused.
+  formatted,
+
+  /// Raw Markdown source only.
+  source,
+
+  /// Rendered Markdown preview only.
+  preview,
+
+  /// Source editor and rendered preview side by side when space allows.
+  split,
+}
+
+/// Image data returned by [SmoothMarkdownEditor.onPickImage].
+class MarkdownEditorImageSelection {
+  /// Creates image data for insertion.
+  const MarkdownEditorImageSelection({
+    required this.url,
+    this.alt = '',
+    this.title,
+  });
+
+  /// URL or asset path to write into the Markdown image.
+  final String url;
+
+  /// Optional alt text. When empty, the current selected text is used.
+  final String alt;
+
+  /// Optional Markdown image title.
+  final String? title;
+}
+
+/// Called when a custom slash command is selected.
+typedef MarkdownEditorSlashCommandCallback = FutureOr<String?> Function(
+  String query,
+);
+
+/// Host-provided slash command that inserts Markdown when selected.
+class MarkdownEditorSlashCommand {
+  /// Creates a custom slash command.
+  const MarkdownEditorSlashCommand({
+    required this.title,
+    required this.searchText,
+    required this.icon,
+    this.markdown,
+    this.onSelected,
+  }) : assert(markdown != null || onSelected != null);
+
+  /// Label shown in the slash menu.
+  final String title;
+
+  /// Lower-priority aliases used for slash-menu filtering.
+  final String searchText;
+
+  /// Icon shown next to [title].
+  final IconData icon;
+
+  /// Markdown inserted when selected.
+  final String? markdown;
+
+  /// Dynamic Markdown producer used when [markdown] is not fixed.
+  final MarkdownEditorSlashCommandCallback? onSelected;
+}
+
+/// Called when the editor requests a Scratch-style PDF/print export.
+///
+/// The callback receives the Markdown source and a simple HTML rendering so host
+/// apps can route the request to a platform print/PDF implementation.
+typedef MarkdownEditorPdfExportCallback = FutureOr<void> Function(
+  String markdown,
+  String html,
+);
+
+/// Called when the export menu requests a Markdown file export.
+typedef MarkdownEditorMarkdownExportCallback = FutureOr<void> Function(
+  String markdown,
+);
+
+/// Called when the editor should import Markdown from a host-provided file.
+typedef MarkdownEditorMarkdownImportCallback = FutureOr<String?> Function();
+
+/// Called when the image command should pick/import an image.
+typedef MarkdownEditorImagePickerCallback
+    = FutureOr<MarkdownEditorImageSelection?> Function();
+
+/// Image picking/insertion lifecycle status reported to host apps.
+enum MarkdownEditorImagePickStatus {
+  /// The editor is asking the host to pick, upload, or otherwise create an image.
+  picking,
+
+  /// The host returned no image.
+  cancelled,
+
+  /// Picking or insertion failed.
+  failed,
+
+  /// The image was inserted into the Markdown document.
+  inserted,
+}
+
+/// Image picking/insertion lifecycle event.
+class MarkdownEditorImagePickEvent {
+  /// Creates an image picking/insertion lifecycle event.
+  const MarkdownEditorImagePickEvent({
+    required this.status,
+    this.selection,
+    this.error,
+    this.stackTrace,
+  });
+
+  /// Current lifecycle status.
+  final MarkdownEditorImagePickStatus status;
+
+  /// Selected image when available.
+  final MarkdownEditorImageSelection? selection;
+
+  /// Error thrown by a host picker/uploader when the status is failed.
+  final Object? error;
+
+  /// Stack trace associated with [error].
+  final StackTrace? stackTrace;
+}
+
+/// Called when image picking/insertion status changes.
+typedef MarkdownEditorImagePickEventCallback = void Function(
+  MarkdownEditorImagePickEvent event,
+);
+
+/// Host callback for editor keyboard shortcuts.
+typedef MarkdownEditorShortcutCallback = KeyEventResult Function(
+  KeyEvent event,
+  MarkdownEditorController controller,
+);
+
+/// Wraps or replaces the default editor toolbar.
+typedef MarkdownEditorToolbarBuilder = Widget Function(
+  BuildContext context,
+  Widget defaultToolbar,
+);
+
+/// Builds a host-provided formatted view for a custom Markdown block.
+typedef MarkdownEditorCustomBlockBuilder = Widget? Function(
+  BuildContext context,
+  MarkdownEditorCustomBlockContext contextData,
+);
+
+/// Builds a host-provided editor for a custom Markdown block.
+typedef MarkdownEditorCustomBlockEditorBuilder = Widget? Function(
+  BuildContext context,
+  MarkdownEditorCustomBlockEditorContext contextData,
+);
+
+/// Context passed to [MarkdownEditorCustomBlockBuilder].
+class MarkdownEditorCustomBlockContext {
+  /// Creates context for a custom block view.
+  const MarkdownEditorCustomBlockContext({
+    required this.blockId,
+    required this.blockType,
+    required this.markdown,
+    required this.plainText,
+    required this.enabled,
+    required this.edit,
+    required this.replaceMarkdown,
+    required this.delete,
+  });
+
+  /// Stable document block id.
+  final String blockId;
+
+  /// Document block type.
+  final String blockType;
+
+  /// Markdown source for this block.
+  final String markdown;
+
+  /// Visible plain text for this block, when available.
+  final String plainText;
+
+  /// Whether editing commands are enabled.
+  final bool enabled;
+
+  /// Activates the formatted editor for this block.
+  final VoidCallback edit;
+
+  /// Replaces this block with [markdown].
+  final ValueChanged<String> replaceMarkdown;
+
+  /// Deletes this block.
+  final VoidCallback delete;
+}
+
+/// Context passed to [MarkdownEditorCustomBlockEditorBuilder].
+class MarkdownEditorCustomBlockEditorContext {
+  /// Creates context for a custom block editor.
+  const MarkdownEditorCustomBlockEditorContext({
+    required this.blockId,
+    required this.blockType,
+    required this.markdown,
+    required this.plainText,
+    required this.enabled,
+    required this.replaceMarkdown,
+    required this.finishEditing,
+    required this.delete,
+  });
+
+  /// Stable document block id.
+  final String blockId;
+
+  /// Document block type.
+  final String blockType;
+
+  /// Markdown source for this block.
+  final String markdown;
+
+  /// Visible plain text for this block, when available.
+  final String plainText;
+
+  /// Whether editing commands are enabled.
+  final bool enabled;
+
+  /// Replaces this block with [markdown].
+  final ValueChanged<String> replaceMarkdown;
+
+  /// Closes the custom editor without changing the source.
+  final VoidCallback finishEditing;
+
+  /// Deletes this block.
+  final VoidCallback delete;
+}
+
+/// Configures which built-in editor commands are available.
+class MarkdownEditorCapabilities {
+  /// Creates a command availability configuration.
+  const MarkdownEditorCapabilities({
+    this.disabledCommands = const <MarkdownEditorCommand>{},
+  });
+
+  /// Default configuration with every built-in command enabled.
+  static const all = MarkdownEditorCapabilities();
+
+  /// Built-in commands hidden from UI and ignored by shortcuts/slash commands.
+  final Set<MarkdownEditorCommand> disabledCommands;
+
+  /// Whether [command] is available to the editor.
+  bool supports(MarkdownEditorCommand command) {
+    return !disabledCommands.contains(command);
+  }
+}
+
+/// Editor-specific visual styling.
+///
+/// Host apps can pass this directly to [SmoothMarkdownEditor.editorTheme] or
+/// install it globally with `ThemeData.extensions`.
+@immutable
+class MarkdownEditorThemeData extends ThemeExtension<MarkdownEditorThemeData> {
+  /// Creates editor-specific visual styling.
+  const MarkdownEditorThemeData({
+    this.decoration,
+    this.sourceDecoration,
+    this.previewDecoration,
+    this.sourceTextStyle,
+    this.toolbarColor,
+    this.toolbarIconColor,
+    this.toolbarActiveIconColor,
+    this.toolbarActiveBackgroundColor,
+    this.dividerColor,
+    this.searchBarColor,
+    this.suggestionPanelColor,
+    this.suggestionSelectedBackgroundColor,
+    this.selectionColor,
+    this.dropTargetColor,
+    this.dropTargetBorderColor,
+    this.blockBorderColor,
+    this.blockHeaderColor,
+    this.blockHeaderTextStyle,
+    this.tableBorderColor,
+    this.tableHeaderColor,
+    this.tableSelectionColor,
+    this.tableActiveBorderColor,
+    this.editorBorderRadius,
+    this.toolbarButtonRadius,
+    this.blockBorderRadius,
+    this.contentPadding,
+    this.sourcePadding,
+    this.previewPadding,
+    this.blockPadding,
+    this.tablePadding,
+  });
+
+  /// Builds editor styling from the ambient Flutter theme.
+  factory MarkdownEditorThemeData.fromTheme(ThemeData theme) {
+    final primary = theme.colorScheme.primary;
+    return MarkdownEditorThemeData(
+      toolbarColor: theme.colorScheme.surface,
+      toolbarActiveIconColor: primary,
+      toolbarActiveBackgroundColor: primary.withOpacity(0.12),
+      dividerColor: theme.dividerColor.withOpacity(0.6),
+      searchBarColor: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+      suggestionPanelColor: theme.colorScheme.surface,
+      suggestionSelectedBackgroundColor: primary.withOpacity(0.12),
+      selectionColor: primary.withOpacity(0.12),
+      dropTargetColor: primary.withOpacity(0.08),
+      dropTargetBorderColor: primary.withOpacity(0.65),
+      blockBorderColor: theme.dividerColor.withOpacity(0.55),
+      blockHeaderColor: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+      tableBorderColor: theme.dividerColor.withOpacity(0.55),
+      tableHeaderColor: theme.colorScheme.surfaceVariant.withOpacity(0.25),
+      tableSelectionColor: primary.withOpacity(0.12),
+      tableActiveBorderColor: primary.withOpacity(0.45),
+      editorBorderRadius: 8,
+      toolbarButtonRadius: 6,
+      blockBorderRadius: 8,
+      contentPadding: const EdgeInsets.all(16),
+      sourcePadding: const EdgeInsets.all(16),
+      previewPadding: const EdgeInsets.all(16),
+      blockPadding: const EdgeInsets.all(12),
+      tablePadding: const EdgeInsets.all(12),
+    );
+  }
+
+  /// Decoration for the whole editor.
+  final Decoration? decoration;
+
+  /// Decoration for source editing panes.
+  final Decoration? sourceDecoration;
+
+  /// Decoration for formatted and preview panes.
+  final Decoration? previewDecoration;
+
+  /// Text style used by Markdown source editors.
+  final TextStyle? sourceTextStyle;
+
+  /// Toolbar background color.
+  final Color? toolbarColor;
+
+  /// Default toolbar icon color.
+  final Color? toolbarIconColor;
+
+  /// Icon color for active toolbar commands and modes.
+  final Color? toolbarActiveIconColor;
+
+  /// Background color for active toolbar commands and modes.
+  final Color? toolbarActiveBackgroundColor;
+
+  /// Divider color for toolbar, split panes, and block chrome.
+  final Color? dividerColor;
+
+  /// Search bar background color.
+  final Color? searchBarColor;
+
+  /// Slash command and wikilink suggestion panel background.
+  final Color? suggestionPanelColor;
+
+  /// Selected suggestion row background.
+  final Color? suggestionSelectedBackgroundColor;
+
+  /// Selection highlight for formatted blocks, list items, and table cells.
+  final Color? selectionColor;
+
+  /// Drop target background for formatted block drag and drop.
+  final Color? dropTargetColor;
+
+  /// Drop target border for formatted block drag and drop.
+  final Color? dropTargetBorderColor;
+
+  /// Border color for editable block chrome.
+  final Color? blockBorderColor;
+
+  /// Header strip color for editable block chrome.
+  final Color? blockHeaderColor;
+
+  /// Header label style for editable block chrome.
+  final TextStyle? blockHeaderTextStyle;
+
+  /// Table grid border color.
+  final Color? tableBorderColor;
+
+  /// Table header row or header column background.
+  final Color? tableHeaderColor;
+
+  /// Selected table cell background.
+  final Color? tableSelectionColor;
+
+  /// Active table cell outline color.
+  final Color? tableActiveBorderColor;
+
+  /// Radius for the outer editor container.
+  final double? editorBorderRadius;
+
+  /// Radius for active toolbar buttons.
+  final double? toolbarButtonRadius;
+
+  /// Radius for editable block chrome.
+  final double? blockBorderRadius;
+
+  /// Padding for formatted editor content.
+  final EdgeInsetsGeometry? contentPadding;
+
+  /// Padding for source editor text.
+  final EdgeInsetsGeometry? sourcePadding;
+
+  /// Padding for preview content.
+  final EdgeInsetsGeometry? previewPadding;
+
+  /// Padding inside editable block chrome.
+  final EdgeInsetsGeometry? blockPadding;
+
+  /// Padding around editable table content.
+  final EdgeInsetsGeometry? tablePadding;
+
+  @override
+  MarkdownEditorThemeData copyWith({
+    Decoration? decoration,
+    Decoration? sourceDecoration,
+    Decoration? previewDecoration,
+    TextStyle? sourceTextStyle,
+    Color? toolbarColor,
+    Color? toolbarIconColor,
+    Color? toolbarActiveIconColor,
+    Color? toolbarActiveBackgroundColor,
+    Color? dividerColor,
+    Color? searchBarColor,
+    Color? suggestionPanelColor,
+    Color? suggestionSelectedBackgroundColor,
+    Color? selectionColor,
+    Color? dropTargetColor,
+    Color? dropTargetBorderColor,
+    Color? blockBorderColor,
+    Color? blockHeaderColor,
+    TextStyle? blockHeaderTextStyle,
+    Color? tableBorderColor,
+    Color? tableHeaderColor,
+    Color? tableSelectionColor,
+    Color? tableActiveBorderColor,
+    double? editorBorderRadius,
+    double? toolbarButtonRadius,
+    double? blockBorderRadius,
+    EdgeInsetsGeometry? contentPadding,
+    EdgeInsetsGeometry? sourcePadding,
+    EdgeInsetsGeometry? previewPadding,
+    EdgeInsetsGeometry? blockPadding,
+    EdgeInsetsGeometry? tablePadding,
+  }) {
+    return MarkdownEditorThemeData(
+      decoration: decoration ?? this.decoration,
+      sourceDecoration: sourceDecoration ?? this.sourceDecoration,
+      previewDecoration: previewDecoration ?? this.previewDecoration,
+      sourceTextStyle: sourceTextStyle ?? this.sourceTextStyle,
+      toolbarColor: toolbarColor ?? this.toolbarColor,
+      toolbarIconColor: toolbarIconColor ?? this.toolbarIconColor,
+      toolbarActiveIconColor:
+          toolbarActiveIconColor ?? this.toolbarActiveIconColor,
+      toolbarActiveBackgroundColor:
+          toolbarActiveBackgroundColor ?? this.toolbarActiveBackgroundColor,
+      dividerColor: dividerColor ?? this.dividerColor,
+      searchBarColor: searchBarColor ?? this.searchBarColor,
+      suggestionPanelColor: suggestionPanelColor ?? this.suggestionPanelColor,
+      suggestionSelectedBackgroundColor: suggestionSelectedBackgroundColor ??
+          this.suggestionSelectedBackgroundColor,
+      selectionColor: selectionColor ?? this.selectionColor,
+      dropTargetColor: dropTargetColor ?? this.dropTargetColor,
+      dropTargetBorderColor:
+          dropTargetBorderColor ?? this.dropTargetBorderColor,
+      blockBorderColor: blockBorderColor ?? this.blockBorderColor,
+      blockHeaderColor: blockHeaderColor ?? this.blockHeaderColor,
+      blockHeaderTextStyle: blockHeaderTextStyle ?? this.blockHeaderTextStyle,
+      tableBorderColor: tableBorderColor ?? this.tableBorderColor,
+      tableHeaderColor: tableHeaderColor ?? this.tableHeaderColor,
+      tableSelectionColor: tableSelectionColor ?? this.tableSelectionColor,
+      tableActiveBorderColor:
+          tableActiveBorderColor ?? this.tableActiveBorderColor,
+      editorBorderRadius: editorBorderRadius ?? this.editorBorderRadius,
+      toolbarButtonRadius: toolbarButtonRadius ?? this.toolbarButtonRadius,
+      blockBorderRadius: blockBorderRadius ?? this.blockBorderRadius,
+      contentPadding: contentPadding ?? this.contentPadding,
+      sourcePadding: sourcePadding ?? this.sourcePadding,
+      previewPadding: previewPadding ?? this.previewPadding,
+      blockPadding: blockPadding ?? this.blockPadding,
+      tablePadding: tablePadding ?? this.tablePadding,
+    );
+  }
+
+  /// Returns this theme with non-null values from [other] overriding it.
+  MarkdownEditorThemeData merge(MarkdownEditorThemeData? other) {
+    if (other == null) return this;
+    return copyWith(
+      decoration: other.decoration,
+      sourceDecoration: other.sourceDecoration,
+      previewDecoration: other.previewDecoration,
+      sourceTextStyle: other.sourceTextStyle,
+      toolbarColor: other.toolbarColor,
+      toolbarIconColor: other.toolbarIconColor,
+      toolbarActiveIconColor: other.toolbarActiveIconColor,
+      toolbarActiveBackgroundColor: other.toolbarActiveBackgroundColor,
+      dividerColor: other.dividerColor,
+      searchBarColor: other.searchBarColor,
+      suggestionPanelColor: other.suggestionPanelColor,
+      suggestionSelectedBackgroundColor:
+          other.suggestionSelectedBackgroundColor,
+      selectionColor: other.selectionColor,
+      dropTargetColor: other.dropTargetColor,
+      dropTargetBorderColor: other.dropTargetBorderColor,
+      blockBorderColor: other.blockBorderColor,
+      blockHeaderColor: other.blockHeaderColor,
+      blockHeaderTextStyle: other.blockHeaderTextStyle,
+      tableBorderColor: other.tableBorderColor,
+      tableHeaderColor: other.tableHeaderColor,
+      tableSelectionColor: other.tableSelectionColor,
+      tableActiveBorderColor: other.tableActiveBorderColor,
+      editorBorderRadius: other.editorBorderRadius,
+      toolbarButtonRadius: other.toolbarButtonRadius,
+      blockBorderRadius: other.blockBorderRadius,
+      contentPadding: other.contentPadding,
+      sourcePadding: other.sourcePadding,
+      previewPadding: other.previewPadding,
+      blockPadding: other.blockPadding,
+      tablePadding: other.tablePadding,
+    );
+  }
+
+  @override
+  MarkdownEditorThemeData lerp(
+    ThemeExtension<MarkdownEditorThemeData>? other,
+    double t,
+  ) {
+    if (other is! MarkdownEditorThemeData) return this;
+    return MarkdownEditorThemeData(
+      decoration: Decoration.lerp(decoration, other.decoration, t),
+      sourceDecoration:
+          Decoration.lerp(sourceDecoration, other.sourceDecoration, t),
+      previewDecoration:
+          Decoration.lerp(previewDecoration, other.previewDecoration, t),
+      sourceTextStyle:
+          TextStyle.lerp(sourceTextStyle, other.sourceTextStyle, t),
+      toolbarColor: Color.lerp(toolbarColor, other.toolbarColor, t),
+      toolbarIconColor: Color.lerp(toolbarIconColor, other.toolbarIconColor, t),
+      toolbarActiveIconColor:
+          Color.lerp(toolbarActiveIconColor, other.toolbarActiveIconColor, t),
+      toolbarActiveBackgroundColor: Color.lerp(
+        toolbarActiveBackgroundColor,
+        other.toolbarActiveBackgroundColor,
+        t,
+      ),
+      dividerColor: Color.lerp(dividerColor, other.dividerColor, t),
+      searchBarColor: Color.lerp(searchBarColor, other.searchBarColor, t),
+      suggestionPanelColor:
+          Color.lerp(suggestionPanelColor, other.suggestionPanelColor, t),
+      suggestionSelectedBackgroundColor: Color.lerp(
+        suggestionSelectedBackgroundColor,
+        other.suggestionSelectedBackgroundColor,
+        t,
+      ),
+      selectionColor: Color.lerp(selectionColor, other.selectionColor, t),
+      dropTargetColor: Color.lerp(dropTargetColor, other.dropTargetColor, t),
+      dropTargetBorderColor:
+          Color.lerp(dropTargetBorderColor, other.dropTargetBorderColor, t),
+      blockBorderColor: Color.lerp(blockBorderColor, other.blockBorderColor, t),
+      blockHeaderColor: Color.lerp(blockHeaderColor, other.blockHeaderColor, t),
+      blockHeaderTextStyle:
+          TextStyle.lerp(blockHeaderTextStyle, other.blockHeaderTextStyle, t),
+      tableBorderColor: Color.lerp(tableBorderColor, other.tableBorderColor, t),
+      tableHeaderColor: Color.lerp(tableHeaderColor, other.tableHeaderColor, t),
+      tableSelectionColor:
+          Color.lerp(tableSelectionColor, other.tableSelectionColor, t),
+      tableActiveBorderColor:
+          Color.lerp(tableActiveBorderColor, other.tableActiveBorderColor, t),
+      editorBorderRadius:
+          lerpDouble(editorBorderRadius, other.editorBorderRadius, t),
+      toolbarButtonRadius:
+          lerpDouble(toolbarButtonRadius, other.toolbarButtonRadius, t),
+      blockBorderRadius:
+          lerpDouble(blockBorderRadius, other.blockBorderRadius, t),
+      contentPadding:
+          EdgeInsetsGeometry.lerp(contentPadding, other.contentPadding, t),
+      sourcePadding:
+          EdgeInsetsGeometry.lerp(sourcePadding, other.sourcePadding, t),
+      previewPadding:
+          EdgeInsetsGeometry.lerp(previewPadding, other.previewPadding, t),
+      blockPadding:
+          EdgeInsetsGeometry.lerp(blockPadding, other.blockPadding, t),
+      tablePadding:
+          EdgeInsetsGeometry.lerp(tablePadding, other.tablePadding, t),
+    );
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+        decoration,
+        sourceDecoration,
+        previewDecoration,
+        sourceTextStyle,
+        toolbarColor,
+        toolbarIconColor,
+        toolbarActiveIconColor,
+        toolbarActiveBackgroundColor,
+        dividerColor,
+        searchBarColor,
+        suggestionPanelColor,
+        suggestionSelectedBackgroundColor,
+        selectionColor,
+        dropTargetColor,
+        dropTargetBorderColor,
+        blockBorderColor,
+        blockHeaderColor,
+        blockHeaderTextStyle,
+        tableBorderColor,
+        tableHeaderColor,
+        tableSelectionColor,
+        tableActiveBorderColor,
+        editorBorderRadius,
+        toolbarButtonRadius,
+        blockBorderRadius,
+        contentPadding,
+        sourcePadding,
+        previewPadding,
+        blockPadding,
+        tablePadding,
+      ]);
+
+  @override
+  bool operator ==(Object other) {
+    return other is MarkdownEditorThemeData &&
+        other.decoration == decoration &&
+        other.sourceDecoration == sourceDecoration &&
+        other.previewDecoration == previewDecoration &&
+        other.sourceTextStyle == sourceTextStyle &&
+        other.toolbarColor == toolbarColor &&
+        other.toolbarIconColor == toolbarIconColor &&
+        other.toolbarActiveIconColor == toolbarActiveIconColor &&
+        other.toolbarActiveBackgroundColor == toolbarActiveBackgroundColor &&
+        other.dividerColor == dividerColor &&
+        other.searchBarColor == searchBarColor &&
+        other.suggestionPanelColor == suggestionPanelColor &&
+        other.suggestionSelectedBackgroundColor ==
+            suggestionSelectedBackgroundColor &&
+        other.selectionColor == selectionColor &&
+        other.dropTargetColor == dropTargetColor &&
+        other.dropTargetBorderColor == dropTargetBorderColor &&
+        other.blockBorderColor == blockBorderColor &&
+        other.blockHeaderColor == blockHeaderColor &&
+        other.blockHeaderTextStyle == blockHeaderTextStyle &&
+        other.tableBorderColor == tableBorderColor &&
+        other.tableHeaderColor == tableHeaderColor &&
+        other.tableSelectionColor == tableSelectionColor &&
+        other.tableActiveBorderColor == tableActiveBorderColor &&
+        other.editorBorderRadius == editorBorderRadius &&
+        other.toolbarButtonRadius == toolbarButtonRadius &&
+        other.blockBorderRadius == blockBorderRadius &&
+        other.contentPadding == contentPadding &&
+        other.sourcePadding == sourcePadding &&
+        other.previewPadding == previewPadding &&
+        other.blockPadding == blockPadding &&
+        other.tablePadding == tablePadding;
+  }
+}
+
+/// A Markdown source editor with formatted editing, live preview, and
+/// Scratch-inspired commands.
+///
+/// The document source remains plain Markdown. Formatting buttons and keyboard
+/// shortcuts edit that source, while [SmoothMarkdown] renders preview output.
+class SmoothMarkdownEditor extends StatefulWidget {
+  /// Creates a Markdown editor.
+  const SmoothMarkdownEditor({
+    super.key,
+    this.controller,
+    this.data = '',
+    this.onChanged,
+    this.mode,
+    this.initialMode = MarkdownEditorMode.formatted,
+    this.onModeChanged,
+    this.editorTheme,
+    this.styleSheet,
+    this.config,
+    this.onTapLink,
+    this.onTapImage,
+    this.onPickImage,
+    this.onImagePickEvent,
+    this.imageBuilder,
+    this.codeBuilder,
+    this.customBlockBuilder,
+    this.customBlockEditorBuilder,
+    this.useEnhancedComponents = true,
+    this.enableCache = true,
+    this.plugins,
+    this.builderRegistry,
+    this.showToolbar = true,
+    this.initialFocusMode = false,
+    this.onFocusModeChanged,
+    this.enableSlashCommands = true,
+    this.customSlashCommands = const [],
+    this.capabilities = MarkdownEditorCapabilities.all,
+    this.toolbarCommands,
+    this.toolbarLeading = const <Widget>[],
+    this.toolbarTrailing = const <Widget>[],
+    this.toolbarBuilder,
+    this.enableKeyboardShortcuts = true,
+    this.onShortcut,
+    this.onCommand,
+    this.onSelectionChanged,
+    this.onFocusChanged,
+    this.enableWikilinks = true,
+    this.wikilinkSuggestions = const [],
+    this.onTapWikilink,
+    this.onExportMarkdown,
+    this.onExportPdf,
+    this.onImportMarkdown,
+    this.height,
+    this.minHeight = 360,
+    this.autofocus = false,
+    this.enabled = true,
+    this.focusNode,
+    this.textStyle,
+    this.placeholder,
+    this.decoration,
+    this.sourceDecoration,
+    this.previewDecoration,
+  });
+
+  /// Optional controller. If omitted, the editor owns an internal controller.
+  final MarkdownEditorController? controller;
+
+  /// Initial Markdown text used when [controller] is omitted.
+  final String data;
+
+  /// Called whenever the Markdown source changes.
+  final ValueChanged<String>? onChanged;
+
+  /// Controlled editor display mode.
+  ///
+  /// When null, the editor owns its mode and starts from [initialMode].
+  final MarkdownEditorMode? mode;
+
+  /// Initial editor display mode.
+  final MarkdownEditorMode initialMode;
+
+  /// Called when the display mode changes.
+  final ValueChanged<MarkdownEditorMode>? onModeChanged;
+
+  /// Editor-specific visual styling.
+  ///
+  /// Values passed here override any [MarkdownEditorThemeData] installed in
+  /// `ThemeData.extensions`.
+  final MarkdownEditorThemeData? editorTheme;
+
+  /// Style sheet forwarded to [SmoothMarkdown].
+  final MarkdownStyleSheet? styleSheet;
+
+  /// Parser config forwarded to [SmoothMarkdown].
+  final MarkdownConfig? config;
+
+  /// Called when an external link is activated with Scratch's Cmd/Ctrl+click
+  /// editor gesture.
+  final void Function(String url)? onTapLink;
+
+  /// Image tap callback forwarded to [SmoothMarkdown].
+  final void Function(String url, String? alt, String? title)? onTapImage;
+
+  /// Called when the image command should pick/import an image.
+  ///
+  /// This lets host apps provide Scratch-style local file picking and asset
+  /// copying. If omitted, the editor falls back to the built-in URL dialog.
+  final MarkdownEditorImagePickerCallback? onPickImage;
+
+  /// Called when image picking, upload, insertion, cancellation, or failure
+  /// state changes.
+  final MarkdownEditorImagePickEventCallback? onImagePickEvent;
+
+  /// Image builder forwarded to [SmoothMarkdown].
+  final Widget Function(String url, String? alt, String? title)? imageBuilder;
+
+  /// Code block builder forwarded to [SmoothMarkdown].
+  final Widget Function(String code, String? language)? codeBuilder;
+
+  /// Host-provided renderer for custom formatted blocks.
+  final MarkdownEditorCustomBlockBuilder? customBlockBuilder;
+
+  /// Host-provided editor for custom formatted blocks.
+  final MarkdownEditorCustomBlockEditorBuilder? customBlockEditorBuilder;
+
+  /// Whether preview should use enhanced markdown components.
+  final bool useEnhancedComponents;
+
+  /// Whether preview parsing may use the shared cache.
+  final bool enableCache;
+
+  /// Parser plugins forwarded to [SmoothMarkdown].
+  final ParserPluginRegistry? plugins;
+
+  /// Builder registry forwarded to [SmoothMarkdown].
+  final BuilderRegistry? builderRegistry;
+
+  /// Whether to show the formatting toolbar.
+  final bool showToolbar;
+
+  /// Whether the editor starts in distraction-free focus mode.
+  final bool initialFocusMode;
+
+  /// Called when focus mode changes.
+  final ValueChanged<bool>? onFocusModeChanged;
+
+  /// Whether `/` at the start of the current line opens command suggestions.
+  final bool enableSlashCommands;
+
+  /// Extra host-provided slash commands appended after built-in commands.
+  final List<MarkdownEditorSlashCommand> customSlashCommands;
+
+  /// Built-in command availability for toolbar, shortcuts, and slash commands.
+  final MarkdownEditorCapabilities capabilities;
+
+  /// Built-in command buttons to show, in order.
+  ///
+  /// When null, Scratch-style defaults are used. Disabled commands are removed
+  /// from this list automatically.
+  final List<MarkdownEditorCommand>? toolbarCommands;
+
+  /// Host-provided widgets inserted before the built-in toolbar controls.
+  final List<Widget> toolbarLeading;
+
+  /// Host-provided widgets inserted after the built-in toolbar controls.
+  final List<Widget> toolbarTrailing;
+
+  /// Wraps or replaces the default toolbar widget.
+  final MarkdownEditorToolbarBuilder? toolbarBuilder;
+
+  /// Whether built-in keyboard shortcuts are handled.
+  final bool enableKeyboardShortcuts;
+
+  /// Host-provided shortcut hook.
+  ///
+  /// Return [KeyEventResult.handled] to suppress built-in handling for that key.
+  final MarkdownEditorShortcutCallback? onShortcut;
+
+  /// Called after a built-in editor command is accepted.
+  final ValueChanged<MarkdownEditorCommand>? onCommand;
+
+  /// Called when the source selection changes.
+  final ValueChanged<TextSelection>? onSelectionChanged;
+
+  /// Called when the source editor focus changes.
+  final ValueChanged<bool>? onFocusChanged;
+
+  /// Whether preview parses and renders `[[wikilinks]]`.
+  final bool enableWikilinks;
+
+  /// Candidate note titles for `[[` autocomplete.
+  final List<String> wikilinkSuggestions;
+
+  /// Called when a rendered wikilink is tapped.
+  final void Function(String target)? onTapWikilink;
+
+  /// Called when the export menu requests a Markdown file export.
+  ///
+  /// If omitted, the export action copies the Markdown source to the clipboard.
+  final MarkdownEditorMarkdownExportCallback? onExportMarkdown;
+
+  /// Called when the export menu or Cmd/Ctrl+Shift+P requests PDF/print export.
+  ///
+  /// If omitted, the action copies an HTML rendering to the clipboard as a
+  /// platform-neutral fallback.
+  final MarkdownEditorPdfExportCallback? onExportPdf;
+
+  /// Called when the import menu requests host-provided Markdown content.
+  ///
+  /// Host apps can wire this to file picker, paste, or drop integrations and
+  /// return the Markdown text that should be inserted at the active selection.
+  final MarkdownEditorMarkdownImportCallback? onImportMarkdown;
+
+  /// Fixed source/preview area height. Defaults to [minHeight].
+  final double? height;
+
+  /// Default content area height when [height] is omitted.
+  final double minHeight;
+
+  /// Whether the source editor should autofocus.
+  final bool autofocus;
+
+  /// Whether source editing and commands are enabled.
+  final bool enabled;
+
+  /// Optional focus node for the source editor.
+  final FocusNode? focusNode;
+
+  /// Source text style.
+  final TextStyle? textStyle;
+
+  /// Source editor placeholder.
+  final String? placeholder;
+
+  /// Decoration for the whole editor.
+  final Decoration? decoration;
+
+  /// Decoration for the source pane.
+  final Decoration? sourceDecoration;
+
+  /// Decoration for the preview pane.
+  final Decoration? previewDecoration;
+
+  @override
+  State<SmoothMarkdownEditor> createState() => _SmoothMarkdownEditorState();
+}
+
+class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
+  static const _sourceKey = ValueKey('smooth_markdown_editor_source');
+  static const _formattedScrollKey =
+      ValueKey('smooth_markdown_editor_formatted_scroll');
+  static const _codeCopyFeedbackDuration = Duration(milliseconds: 1500);
+  static const _toolbarHeight = 48.0;
+  static const _searchBarHeight = 64.0;
+
+  late MarkdownEditorController _controller;
+  late FocusNode _focusNode;
+  late MarkdownEditorMode _mode;
+  MarkdownEditorMode _lastNonSourceMode = MarkdownEditorMode.formatted;
+  bool _ownsController = false;
+  bool _ownsFocusNode = false;
+  bool _searchOpen = false;
+  late bool _focusMode;
+  List<TextRange> _searchMatches = const [];
+  var _currentSearchMatchIndex = 0;
+  var _lastSearchQuery = '';
+  _TriggerMatch? _slashMatch;
+  _TriggerMatch? _wikilinkMatch;
+  var _slashSelectedIndex = 0;
+  var _wikilinkSelectedIndex = 0;
+  TextRange? _activeFormattedRange;
+  String? _activeFormattedBlockId;
+  String? _activeFormattedContainerBlockId;
+  var _activeFormattedBlockSourceOffset = 0;
+  bool _activeFormattedPlainText = false;
+  MarkdownDocumentSelection? _activeDocumentSelection;
+  _TableCellSelection? _activeTableCell;
+  MarkdownTableCellSelection? _activeTableSelection;
+  MarkdownListItemSelection? _activeListItemSelection;
+  TextSelection? _lastReportedSelection;
+  bool _syncingFormattedBlock = false;
+  bool _syncingTableCell = false;
+  _StoredMarkTarget? _storedMarkTarget;
+  Set<MarkdownEditorCommand> _storedMarks = const {};
+  String? _draggingFormattedBlockId;
+  final Set<int> _mermaidSourceBlocks = <int>{};
+  final MenuController _copyMenuController = MenuController();
+  int? _copiedCodeBlockStart;
+  Timer? _copiedCodeBlockResetTimer;
+  Timer? _formattedRangeAutoScrollTimer;
+  Offset? _formattedRangeDragGlobalPosition;
+  bool _formattedRangeDragActive = false;
+  final ScrollController _formattedScrollController = ScrollController();
+  final ScrollController _sourceScrollController = ScrollController();
+  final GlobalKey _formattedViewportKey = GlobalKey();
+  final Map<String, GlobalKey> _formattedSegmentKeys = <String, GlobalKey>{};
+
+  final TextEditingController _searchController = TextEditingController();
+  final _FormattedBlockTextController _formattedBlockController =
+      _FormattedBlockTextController();
+  final _FormattedInlineTextController _tableCellController =
+      _FormattedInlineTextController();
+  final FocusNode _formattedBlockFocusNode = FocusNode();
+  final FocusNode _formattedPaneFocusNode = FocusNode();
+  final FocusNode _tableCellFocusNode = FocusNode();
+  final FocusNode _searchFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _mode = widget.mode ?? widget.initialMode;
+    _focusMode = widget.initialFocusMode;
+    if (_mode != MarkdownEditorMode.source) {
+      _lastNonSourceMode = _mode;
+    }
+    _attachController(widget.controller);
+    _attachFocusNode(widget.focusNode);
+    _formattedBlockFocusNode.onKeyEvent = _handleFormattedBlockKeyEvent;
+    _tableCellFocusNode.onKeyEvent = _handleTableCellKeyEvent;
+    _searchFocusNode.onKeyEvent = _handleSearchKeyEvent;
+    _formattedBlockController.addListener(_handleFormattedBlockChanged);
+    _tableCellController.addListener(_handleTableCellChanged);
+    _searchController.addListener(_refreshSearchMatches);
+    _refreshInlineSuggestions();
+  }
+
+  @override
+  void didUpdateWidget(covariant SmoothMarkdownEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final shouldRecreateOwnedControllerForPlugins =
+        oldWidget.controller == null &&
+            widget.controller == null &&
+            oldWidget.plugins != widget.plugins;
+    if (oldWidget.controller != widget.controller ||
+        shouldRecreateOwnedControllerForPlugins) {
+      final preservedText =
+          shouldRecreateOwnedControllerForPlugins ? _controller.text : null;
+      _detachController();
+      _attachController(widget.controller, text: preservedText);
+    } else if (widget.controller == null &&
+        oldWidget.data != widget.data &&
+        _controller.text != widget.data) {
+      _controller.text = widget.data;
+    }
+
+    if (oldWidget.focusNode != widget.focusNode) {
+      _detachFocusNode();
+      _attachFocusNode(widget.focusNode);
+    }
+
+    if (widget.mode != null && widget.mode != _mode) {
+      _setMode(widget.mode!, notify: false);
+    }
+
+    if (oldWidget.wikilinkSuggestions != widget.wikilinkSuggestions) {
+      _refreshInlineSuggestions();
+    }
+  }
+
+  @override
+  void dispose() {
+    _copiedCodeBlockResetTimer?.cancel();
+    _stopFormattedRangeAutoScroll();
+    _detachController();
+    _detachFocusNode();
+    _formattedScrollController.dispose();
+    _sourceScrollController.dispose();
+    _formattedBlockController
+      ..removeListener(_handleFormattedBlockChanged)
+      ..dispose();
+    _formattedBlockFocusNode.dispose();
+    _formattedPaneFocusNode.dispose();
+    _tableCellController
+      ..removeListener(_handleTableCellChanged)
+      ..dispose();
+    _tableCellFocusNode
+      ..onKeyEvent = null
+      ..dispose();
+    _searchFocusNode
+      ..onKeyEvent = null
+      ..dispose();
+    _searchController
+      ..removeListener(_refreshSearchMatches)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _attachController(MarkdownEditorController? controller, {String? text}) {
+    _controller = controller ??
+        MarkdownEditorController(
+          text: text ?? widget.data,
+          plugins: widget.plugins,
+        );
+    _ownsController = controller == null;
+    _controller.addListener(_handleControllerChanged);
+  }
+
+  void _detachController() {
+    _controller.removeListener(_handleControllerChanged);
+    if (_ownsController) {
+      _controller.dispose();
+    }
+  }
+
+  void _attachFocusNode(FocusNode? focusNode) {
+    _focusNode = focusNode ?? FocusNode();
+    _ownsFocusNode = focusNode == null;
+    _focusNode.addListener(_handleFocusChanged);
+  }
+
+  void _detachFocusNode() {
+    _focusNode.removeListener(_handleFocusChanged);
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+  }
+
+  bool _hasActiveComposing(TextEditingValue value) {
+    final composing = value.composing;
+    return composing.isValid &&
+        !composing.isCollapsed &&
+        composing.start >= 0 &&
+        composing.end <= value.text.length;
+  }
+
+  void _handleControllerChanged() {
+    _refreshInlineSuggestions();
+    _refreshSearchMatches();
+    _clearActiveDocumentSelectionIfInvalid();
+    _reportSelectionChanged();
+    widget.onChanged?.call(_controller.text);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _handleFocusChanged() {
+    widget.onFocusChanged?.call(_focusNode.hasFocus);
+  }
+
+  void _reportSelectionChanged() {
+    final selection = _controller.selection;
+    if (_lastReportedSelection == selection) return;
+    _lastReportedSelection = selection;
+    widget.onSelectionChanged?.call(selection);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    final borderColor =
+        editorTheme.blockBorderColor ?? theme.dividerColor.withOpacity(0.55);
+    final editorRadius = editorTheme.editorBorderRadius ?? 8;
+    final editorDecoration = widget.decoration ??
+        editorTheme.decoration ??
+        BoxDecoration(
+          color: theme.colorScheme.surface,
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(editorRadius),
+        );
+
+    return Focus(
+      onKeyEvent: _handleKeyEvent,
+      child: DecoratedBox(
+        decoration: editorDecoration,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(editorRadius),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final suggestionMaxHeight =
+                  _suggestionPanelMaxHeight(context, constraints);
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.showToolbar && !_focusMode) _buildToolbar(context),
+                  if (_searchOpen) _buildSearchBar(context),
+                  if (_shouldShowSlashCommands)
+                    _buildSlashCommands(
+                      context,
+                      maxHeight: suggestionMaxHeight,
+                    ),
+                  if (_shouldShowWikilinkSuggestions)
+                    _buildWikilinkSuggestions(
+                      context,
+                      maxHeight: suggestionMaxHeight,
+                    ),
+                  SizedBox(
+                    height: widget.height ?? widget.minHeight,
+                    child: _buildBody(context),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  MarkdownStyleSheet _effectiveStyleSheet(BuildContext context) {
+    return widget.styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context));
+  }
+
+  MarkdownEditorThemeData _effectiveEditorTheme(BuildContext context) {
+    final theme = Theme.of(context);
+    return MarkdownEditorThemeData.fromTheme(theme)
+        .merge(theme.extension<MarkdownEditorThemeData>())
+        .merge(widget.editorTheme);
+  }
+
+  Color _editorDividerColor(BuildContext context) {
+    final theme = Theme.of(context);
+    return _effectiveEditorTheme(context).dividerColor ??
+        theme.dividerColor.withOpacity(0.6);
+  }
+
+  Color _editorBlockBorderColor(BuildContext context) {
+    final theme = Theme.of(context);
+    return _effectiveEditorTheme(context).blockBorderColor ??
+        theme.dividerColor.withOpacity(0.55);
+  }
+
+  Color _editorBlockHeaderColor(BuildContext context) {
+    final theme = Theme.of(context);
+    return _effectiveEditorTheme(context).blockHeaderColor ??
+        theme.colorScheme.surfaceVariant.withOpacity(0.35);
+  }
+
+  BorderRadius _editorBlockBorderRadius(BuildContext context) {
+    return BorderRadius.circular(
+      _effectiveEditorTheme(context).blockBorderRadius ?? 8,
+    );
+  }
+
+  BorderRadius _editorBlockHeaderRadius(BuildContext context) {
+    return BorderRadius.vertical(
+      top: Radius.circular(
+        _effectiveEditorTheme(context).blockBorderRadius ?? 8,
+      ),
+    );
+  }
+
+  EdgeInsetsGeometry _editorBlockPadding(BuildContext context) {
+    return _effectiveEditorTheme(context).blockPadding ??
+        const EdgeInsets.all(12);
+  }
+
+  double _suggestionPanelMaxHeight(
+    BuildContext context,
+    BoxConstraints constraints,
+  ) {
+    final viewportHeight = MediaQuery.maybeOf(context)?.size.height ?? 700;
+    final fallback = (viewportHeight * 0.4).clamp(160.0, 280.0).toDouble();
+    if (!constraints.hasBoundedHeight) {
+      return fallback;
+    }
+
+    var occupiedHeight = widget.height ?? widget.minHeight;
+    if (widget.showToolbar && !_focusMode) {
+      occupiedHeight += _toolbarHeight;
+    }
+    if (_searchOpen) {
+      occupiedHeight += _searchBarHeight;
+    }
+
+    final availableHeight = constraints.maxHeight - occupiedHeight;
+    return availableHeight.clamp(0.0, fallback).toDouble();
+  }
+
+  Widget _buildToolbar(BuildContext context) {
+    final editorTheme = _effectiveEditorTheme(context);
+    final color = _editorDividerColor(context);
+    final toolbar = Material(
+      color: editorTheme.toolbarColor ?? Theme.of(context).colorScheme.surface,
+      child: IconTheme.merge(
+        data: IconThemeData(color: editorTheme.toolbarIconColor),
+        child: SizedBox(
+          height: _toolbarHeight,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            children: [
+              ...widget.toolbarLeading,
+              _modeButton(
+                MarkdownEditorMode.formatted,
+                Icons.article_outlined,
+                'Formatted',
+              ),
+              _modeButton(
+                MarkdownEditorMode.source,
+                Icons.edit_note,
+                'Source',
+              ),
+              _modeButton(
+                MarkdownEditorMode.preview,
+                Icons.visibility_outlined,
+                'Preview',
+              ),
+              _modeButton(
+                MarkdownEditorMode.split,
+                Icons.splitscreen,
+                'Split',
+              ),
+              _separator(color),
+              _historyButton(
+                key: const ValueKey('smooth_markdown_editor_undo'),
+                icon: Icons.undo,
+                tooltip: 'Undo ($_shortcutModifierLabel+Z)',
+                enabled: _controller.canUndo,
+                onPressed: _undo,
+              ),
+              _historyButton(
+                key: const ValueKey('smooth_markdown_editor_redo'),
+                icon: Icons.redo,
+                tooltip: 'Redo ($_redoShortcutLabel)',
+                enabled: _controller.canRedo,
+                onPressed: _redo,
+              ),
+              _historyButton(
+                key: const ValueKey('smooth_markdown_editor_move_block_up'),
+                icon: Icons.keyboard_arrow_up,
+                tooltip: 'Move block up ($_shortcutModifierLabel+Alt+ArrowUp)',
+                enabled: _canMoveActiveTopLevelBlock(upward: true),
+                onPressed: () => _moveActiveTopLevelBlock(upward: true),
+              ),
+              _historyButton(
+                key: const ValueKey('smooth_markdown_editor_move_block_down'),
+                icon: Icons.keyboard_arrow_down,
+                tooltip:
+                    'Move block down ($_shortcutModifierLabel+Alt+ArrowDown)',
+                enabled: _canMoveActiveTopLevelBlock(upward: false),
+                onPressed: () => _moveActiveTopLevelBlock(upward: false),
+              ),
+              _separator(color),
+              ..._buildToolbarCommandWidgets(context, color),
+              _separator(color),
+              _buildCopyMenu(),
+              Tooltip(
+                message: 'Focus mode ($_shortcutModifierLabel+Shift+Enter)',
+                child: IconButton(
+                  icon: const Icon(Icons.fullscreen),
+                  onPressed: _toggleFocusMode,
+                ),
+              ),
+              Tooltip(
+                message: 'Find in note ($_shortcutModifierLabel+F)',
+                child: IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: _openSearch,
+                ),
+              ),
+              ...widget.toolbarTrailing,
+            ],
+          ),
+        ),
+      ),
+    );
+    return widget.toolbarBuilder?.call(context, toolbar) ?? toolbar;
+  }
+
+  List<Widget> _buildToolbarCommandWidgets(
+    BuildContext context,
+    Color separatorColor,
+  ) {
+    final configured = widget.toolbarCommands;
+    if (configured != null) {
+      return [
+        for (final command in configured)
+          if (_isCommandEnabled(command))
+            _toolbarCommandWidget(context, command),
+      ];
+    }
+
+    return [
+      if (_isCommandEnabled(MarkdownEditorCommand.bold))
+        _commandButton(Icons.format_bold, 'Bold', MarkdownEditorCommand.bold),
+      if (_isCommandEnabled(MarkdownEditorCommand.italic))
+        _commandButton(
+          Icons.format_italic,
+          'Italic',
+          MarkdownEditorCommand.italic,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.strikethrough))
+        _commandButton(
+          Icons.strikethrough_s,
+          'Strikethrough ($_shortcutModifierLabel+Shift+S)',
+          MarkdownEditorCommand.strikethrough,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.inlineCode))
+        _commandButton(
+            Icons.code, 'Inline code', MarkdownEditorCommand.inlineCode),
+      _separator(separatorColor),
+      if (_hasAnyEnabledHeadingCommand()) _buildHeadingMenuButton(),
+      if (_isCommandEnabled(MarkdownEditorCommand.unorderedList))
+        _commandButton(
+          Icons.format_list_bulleted,
+          'Bulleted list',
+          MarkdownEditorCommand.unorderedList,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.orderedList))
+        _commandButton(
+          Icons.format_list_numbered,
+          'Numbered list',
+          MarkdownEditorCommand.orderedList,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.taskList))
+        _commandButton(
+          Icons.check_box_outlined,
+          'Task list',
+          MarkdownEditorCommand.taskList,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.blockquote))
+        _commandButton(
+            Icons.format_quote, 'Quote', MarkdownEditorCommand.blockquote),
+      _separator(separatorColor),
+      if (_isCommandEnabled(MarkdownEditorCommand.link))
+        _commandButton(Icons.link, 'Link', MarkdownEditorCommand.link),
+      if (_isCommandEnabled(MarkdownEditorCommand.image))
+        _commandButton(
+            Icons.image_outlined, 'Image', MarkdownEditorCommand.image),
+      if (_isCommandEnabled(MarkdownEditorCommand.codeBlock))
+        _commandButton(
+            Icons.data_object, 'Code Block', MarkdownEditorCommand.codeBlock),
+      if (_isCommandEnabled(MarkdownEditorCommand.blockMath))
+        _commandButton(
+            Icons.functions, 'Block Math', MarkdownEditorCommand.blockMath),
+      if (_isCommandEnabled(MarkdownEditorCommand.mermaidDiagram))
+        _commandButton(
+          Icons.account_tree_outlined,
+          'Mermaid Diagram',
+          MarkdownEditorCommand.mermaidDiagram,
+        ),
+      if (_isCommandEnabled(MarkdownEditorCommand.table))
+        _buildTablePickerButton(context),
+      if (_isCommandEnabled(MarkdownEditorCommand.horizontalRule))
+        _commandButton(
+          Icons.horizontal_rule,
+          'Horizontal rule',
+          MarkdownEditorCommand.horizontalRule,
+        ),
+    ];
+  }
+
+  Widget _toolbarCommandWidget(
+    BuildContext context,
+    MarkdownEditorCommand command,
+  ) {
+    if (command == MarkdownEditorCommand.table) {
+      return _buildTablePickerButton(context);
+    }
+    return _commandButton(
+      _toolbarIconForCommand(command),
+      _toolbarTooltipForCommand(command),
+      command,
+    );
+  }
+
+  IconData _toolbarIconForCommand(MarkdownEditorCommand command) {
+    return switch (command) {
+      MarkdownEditorCommand.bold => Icons.format_bold,
+      MarkdownEditorCommand.italic => Icons.format_italic,
+      MarkdownEditorCommand.strikethrough => Icons.strikethrough_s,
+      MarkdownEditorCommand.inlineCode => Icons.code,
+      MarkdownEditorCommand.heading1 ||
+      MarkdownEditorCommand.heading2 ||
+      MarkdownEditorCommand.heading3 ||
+      MarkdownEditorCommand.heading4 ||
+      MarkdownEditorCommand.heading5 ||
+      MarkdownEditorCommand.heading6 =>
+        Icons.title,
+      MarkdownEditorCommand.unorderedList => Icons.format_list_bulleted,
+      MarkdownEditorCommand.orderedList => Icons.format_list_numbered,
+      MarkdownEditorCommand.taskList => Icons.check_box_outlined,
+      MarkdownEditorCommand.blockquote => Icons.format_quote,
+      MarkdownEditorCommand.link => Icons.link,
+      MarkdownEditorCommand.image => Icons.image_outlined,
+      MarkdownEditorCommand.codeBlock => Icons.data_object,
+      MarkdownEditorCommand.blockMath => Icons.functions,
+      MarkdownEditorCommand.mermaidDiagram => Icons.account_tree_outlined,
+      MarkdownEditorCommand.table => Icons.table_chart_outlined,
+      MarkdownEditorCommand.horizontalRule => Icons.horizontal_rule,
+      MarkdownEditorCommand.wikilink => Icons.notes_outlined,
+      MarkdownEditorCommand.paragraph => Icons.notes_outlined,
+    };
+  }
+
+  String _toolbarTooltipForCommand(MarkdownEditorCommand command) {
+    return switch (command) {
+      MarkdownEditorCommand.bold => 'Bold',
+      MarkdownEditorCommand.italic => 'Italic',
+      MarkdownEditorCommand.strikethrough =>
+        'Strikethrough ($_shortcutModifierLabel+Shift+S)',
+      MarkdownEditorCommand.inlineCode => 'Inline code',
+      MarkdownEditorCommand.heading1 => 'Heading 1',
+      MarkdownEditorCommand.heading2 => 'Heading 2',
+      MarkdownEditorCommand.heading3 => 'Heading 3',
+      MarkdownEditorCommand.heading4 => 'Heading 4',
+      MarkdownEditorCommand.heading5 => 'Heading 5',
+      MarkdownEditorCommand.heading6 => 'Heading 6',
+      MarkdownEditorCommand.unorderedList => 'Bulleted list',
+      MarkdownEditorCommand.orderedList => 'Numbered list',
+      MarkdownEditorCommand.taskList => 'Task list',
+      MarkdownEditorCommand.blockquote => 'Quote',
+      MarkdownEditorCommand.link => 'Link',
+      MarkdownEditorCommand.image => 'Image',
+      MarkdownEditorCommand.codeBlock => 'Code Block',
+      MarkdownEditorCommand.blockMath => 'Block Math',
+      MarkdownEditorCommand.mermaidDiagram => 'Mermaid Diagram',
+      MarkdownEditorCommand.table => 'Table',
+      MarkdownEditorCommand.horizontalRule => 'Horizontal rule',
+      MarkdownEditorCommand.wikilink => 'Wikilink',
+      MarkdownEditorCommand.paragraph => 'Paragraph',
+    };
+  }
+
+  Widget _buildCopyMenu() {
+    return MenuAnchor(
+      controller: _copyMenuController,
+      menuChildren: [
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.copy),
+          onPressed: () {
+            _copyMarkdown();
+          },
+          child: const Text('Copy Markdown'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.notes_outlined),
+          onPressed: () {
+            _copyPlainText();
+          },
+          child: const Text('Copy Plain Text'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.code),
+          onPressed: () {
+            _copyHtml();
+          },
+          child: const Text('Copy HTML'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.picture_as_pdf_outlined),
+          onPressed: () {
+            _exportPdf();
+          },
+          child: const Text('Print as PDF'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.file_download_outlined),
+          onPressed: () {
+            _exportMarkdown();
+          },
+          child: const Text('Export Markdown'),
+        ),
+        if (widget.onImportMarkdown != null)
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.upload_file_outlined),
+            onPressed: widget.enabled
+                ? () {
+                    unawaited(_importMarkdown());
+                  }
+                : null,
+            child: const Text('Import Markdown'),
+          ),
+      ],
+      builder: (context, controller, child) {
+        return Tooltip(
+          message: 'Export ($_shortcutModifierLabel+Shift+C)',
+          child: IconButton(
+            icon: const Icon(Icons.ios_share_outlined),
+            onPressed: () {
+              if (controller.isOpen) {
+                controller.close();
+              } else {
+                controller.open();
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _modeButton(
+    MarkdownEditorMode mode,
+    IconData icon,
+    String tooltip,
+  ) {
+    final selected = _mode == mode;
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: selected
+              ? editorTheme.toolbarActiveBackgroundColor ??
+                  theme.colorScheme.primary.withOpacity(0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(
+            editorTheme.toolbarButtonRadius ?? 6,
+          ),
+        ),
+        child: Tooltip(
+          message: tooltip,
+          child: IconButton(
+            icon: Icon(icon),
+            color: selected
+                ? editorTheme.toolbarActiveIconColor ??
+                    theme.colorScheme.primary
+                : editorTheme.toolbarIconColor,
+            onPressed: () => _setMode(mode),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String get _shortcutModifierLabel {
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.iOS || TargetPlatform.macOS => 'Cmd',
+      _ => 'Ctrl',
+    };
+  }
+
+  String get _redoShortcutLabel {
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.iOS ||
+      TargetPlatform.macOS =>
+        '$_shortcutModifierLabel+Shift+Z',
+      _ => '$_shortcutModifierLabel+Shift+Z / $_shortcutModifierLabel+Y',
+    };
+  }
+
+  Widget _historyButton({
+    required Key key,
+    required IconData icon,
+    required String tooltip,
+    required bool enabled,
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 6),
+      child: Tooltip(
+        message: tooltip,
+        child: IconButton(
+          key: key,
+          icon: Icon(icon),
+          onPressed: widget.enabled && enabled ? onPressed : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _commandButton(
+    IconData icon,
+    String tooltip,
+    MarkdownEditorCommand command,
+  ) {
+    final active = _isToolbarCommandActive(command);
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 6),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: active
+              ? editorTheme.toolbarActiveBackgroundColor ??
+                  theme.colorScheme.primary.withOpacity(0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(
+            editorTheme.toolbarButtonRadius ?? 6,
+          ),
+        ),
+        child: Tooltip(
+          message: tooltip,
+          child: IconButton(
+            key: ValueKey(
+              'smooth_markdown_editor_command_${command.name}',
+            ),
+            icon: Icon(icon),
+            color: active
+                ? editorTheme.toolbarActiveIconColor ??
+                    theme.colorScheme.primary
+                : editorTheme.toolbarIconColor,
+            onPressed: widget.enabled ? () => _applyCommand(command) : null,
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _isToolbarCommandActive(MarkdownEditorCommand command) {
+    final storedMarkActive = _storedMarkToolbarActive(command);
+    if (storedMarkActive != null) return storedMarkActive;
+
+    return switch (command) {
+      MarkdownEditorCommand.bold => _activeInlineSelectionContains(
+          (node) => node is MarkdownStrong,
+        ),
+      MarkdownEditorCommand.italic => _activeInlineSelectionContains(
+          (node) => node is MarkdownEmphasis,
+        ),
+      MarkdownEditorCommand.strikethrough => _activeInlineSelectionContains(
+          (node) => node is MarkdownStrikethrough,
+        ),
+      MarkdownEditorCommand.inlineCode => _activeInlineSelectionContains(
+          (node) => node is MarkdownInlineCode,
+        ),
+      MarkdownEditorCommand.link => _activeInlineSelectionContains(
+          (node) => node is MarkdownLink,
+        ),
+      MarkdownEditorCommand.image => _activeInlineSelectionContains(
+          (node) => node is MarkdownImage,
+        ),
+      MarkdownEditorCommand.unorderedList =>
+        _activeListKind() == MarkdownListKind.bullet,
+      MarkdownEditorCommand.orderedList =>
+        _activeListKind() == MarkdownListKind.ordered,
+      MarkdownEditorCommand.taskList =>
+        _activeListKind() == MarkdownListKind.task,
+      MarkdownEditorCommand.blockquote =>
+        _activeTopLevelBlock() is MarkdownBlockquoteBlock,
+      MarkdownEditorCommand.codeBlock =>
+        _activeTopLevelBlock() is MarkdownCodeBlock,
+      MarkdownEditorCommand.mermaidDiagram =>
+        _activeTopLevelBlock() is MarkdownMermaidBlock,
+      MarkdownEditorCommand.blockMath =>
+        _activeTopLevelBlock() is MarkdownBlockMathBlock,
+      MarkdownEditorCommand.table =>
+        _activeTopLevelBlock() is MarkdownTableBlock,
+      MarkdownEditorCommand.heading1 => _activeHeadingLevel() == 1,
+      MarkdownEditorCommand.heading2 => _activeHeadingLevel() == 2,
+      MarkdownEditorCommand.heading3 => _activeHeadingLevel() == 3,
+      MarkdownEditorCommand.heading4 => _activeHeadingLevel() == 4,
+      MarkdownEditorCommand.heading5 => _activeHeadingLevel() == 5,
+      MarkdownEditorCommand.heading6 => _activeHeadingLevel() == 6,
+      MarkdownEditorCommand.paragraph =>
+        _activeEditableBlock() is MarkdownParagraphBlock,
+      MarkdownEditorCommand.horizontalRule ||
+      MarkdownEditorCommand.wikilink =>
+        false,
+    };
+  }
+
+  bool? _storedMarkToolbarActive(MarkdownEditorCommand command) {
+    if (!_isStoredMarkCommand(command)) return null;
+    if (!_storedMarkTargetMatchesCurrentSelection()) return null;
+    return _storedMarks.contains(command);
+  }
+
+  bool _isCommandEnabled(MarkdownEditorCommand command) {
+    return widget.capabilities.supports(command);
+  }
+
+  bool _hasAnyEnabledHeadingCommand() {
+    return _isCommandEnabled(MarkdownEditorCommand.heading1) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading2) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading3) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading4) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading5) ||
+        _isCommandEnabled(MarkdownEditorCommand.heading6);
+  }
+
+  Widget _buildHeadingMenuButton() {
+    return PopupMenuButton<MarkdownEditorCommand>(
+      tooltip: 'Headings',
+      enabled: widget.enabled,
+      icon: const Icon(Icons.title),
+      onSelected: _applyCommand,
+      itemBuilder: (context) => [
+        if (_isCommandEnabled(MarkdownEditorCommand.heading1))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading1,
+            child: _HeadingMenuItem(label: 'H1', title: 'Heading 1'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading2))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading2,
+            child: _HeadingMenuItem(label: 'H2', title: 'Heading 2'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading3))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading3,
+            child: _HeadingMenuItem(label: 'H3', title: 'Heading 3'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading4))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading4,
+            child: _HeadingMenuItem(label: 'H4', title: 'Heading 4'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading5))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading5,
+            child: _HeadingMenuItem(label: 'H5', title: 'Heading 5'),
+          ),
+        if (_isCommandEnabled(MarkdownEditorCommand.heading6))
+          const PopupMenuItem(
+            value: MarkdownEditorCommand.heading6,
+            child: _HeadingMenuItem(label: 'H6', title: 'Heading 6'),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTablePickerButton(BuildContext context) {
+    final editorTheme = _effectiveEditorTheme(context);
+    return PopupMenuButton<_TableDimensions>(
+      key: const ValueKey('smooth_markdown_editor_table_picker_button'),
+      tooltip: 'Table',
+      enabled: widget.enabled,
+      icon: const Icon(Icons.table_chart_outlined),
+      onSelected: (dimensions) => _insertTable(
+        rows: dimensions.rows,
+        columns: dimensions.columns,
+      ),
+      itemBuilder: (context) => [
+        _TablePickerMenuEntry(editorTheme: editorTheme),
+      ],
+    );
+  }
+
+  Widget _separator(Color color) {
+    return Center(
+      child: Container(
+        width: 1,
+        height: 24,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        color: color,
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(BuildContext context) {
+    final editorTheme = _effectiveEditorTheme(context);
+    return Material(
+      color: editorTheme.searchBarColor ??
+          Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.35),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 220,
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Find in note...',
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: (_) => _selectNextSearchMatch(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _searchMatches.isEmpty
+                  ? 'Not found'
+                  : '${_currentSearchMatchIndex + 1}/${_searchMatches.length}',
+            ),
+            IconButton(
+              tooltip: 'Previous match',
+              icon: const Icon(Icons.keyboard_arrow_up),
+              onPressed:
+                  _searchMatches.isEmpty ? null : _selectPreviousSearchMatch,
+            ),
+            IconButton(
+              tooltip: 'Next match',
+              icon: const Icon(Icons.keyboard_arrow_down),
+              onPressed: _searchMatches.isEmpty ? null : _selectNextSearchMatch,
+            ),
+            IconButton(
+              tooltip: 'Close find',
+              icon: const Icon(Icons.close),
+              onPressed: () => setState(() => _searchOpen = false),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSlashCommands(
+    BuildContext context, {
+    required double maxHeight,
+  }) {
+    final commands = _visibleSlashCommands();
+    final editorTheme = _effectiveEditorTheme(context);
+    return _SuggestionPanel(
+      label: 'Slash command suggestions',
+      maxHeight: maxHeight,
+      backgroundColor: editorTheme.suggestionPanelColor,
+      selectedColor: editorTheme.suggestionSelectedBackgroundColor,
+      children: [
+        for (var index = 0; index < commands.length; index++)
+          Semantics(
+            key: ValueKey('smooth_markdown_editor_slash_command_$index'),
+            selected: index == _slashSelectedIndex,
+            button: true,
+            label: commands[index].title,
+            onTap: () => _runSlashCommand(commands[index]),
+            child: ListTile(
+              dense: true,
+              selected: index == _slashSelectedIndex,
+              leading: Icon(commands[index].icon),
+              title: Text(commands[index].title),
+              onTap: () => _runSlashCommand(commands[index]),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildWikilinkSuggestions(
+    BuildContext context, {
+    required double maxHeight,
+  }) {
+    final suggestions = _visibleWikilinkSuggestions();
+    final editorTheme = _effectiveEditorTheme(context);
+    return _SuggestionPanel(
+      label: 'Wikilink suggestions',
+      maxHeight: maxHeight,
+      backgroundColor: editorTheme.suggestionPanelColor,
+      selectedColor: editorTheme.suggestionSelectedBackgroundColor,
+      children: [
+        if (suggestions.isEmpty)
+          Semantics(
+            key: const ValueKey(
+              'smooth_markdown_editor_wikilink_empty_state',
+            ),
+            label: 'No matching notes',
+            liveRegion: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: ExcludeSemantics(
+                child: Text(
+                  'No matching notes',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ),
+            ),
+          )
+        else
+          for (var index = 0; index < suggestions.length; index++)
+            Semantics(
+              key: ValueKey(
+                'smooth_markdown_editor_wikilink_suggestion_$index',
+              ),
+              selected: index == _wikilinkSelectedIndex,
+              button: true,
+              label: suggestions[index],
+              onTap: () => _insertWikilinkSuggestion(suggestions[index]),
+              child: ListTile(
+                dense: true,
+                selected: index == _wikilinkSelectedIndex,
+                leading: const Icon(Icons.notes_outlined),
+                title: Text(suggestions[index]),
+                onTap: () => _insertWikilinkSuggestion(suggestions[index]),
+              ),
+            ),
+      ],
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    final dividerColor = _editorDividerColor(context);
+    switch (_mode) {
+      case MarkdownEditorMode.formatted:
+        return _buildFormattedPane(context);
+      case MarkdownEditorMode.source:
+        return _buildSourcePane(context);
+      case MarkdownEditorMode.preview:
+        return _buildPreviewPane(context);
+      case MarkdownEditorMode.split:
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 720;
+            if (narrow) {
+              return Column(
+                children: [
+                  Expanded(child: _buildSourcePane(context)),
+                  Divider(height: 1, color: dividerColor),
+                  Expanded(child: _buildPreviewPane(context)),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: _buildSourcePane(context)),
+                VerticalDivider(width: 1, color: dividerColor),
+                Expanded(child: _buildPreviewPane(context)),
+              ],
+            );
+          },
+        );
+    }
+  }
+
+  Widget _buildFormattedPane(BuildContext context) {
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    final segments = _documentBlockSegments();
+    final blockSpacing = _effectiveStyleSheet(context).blockSpacing ?? 16;
+    final contentPadding =
+        editorTheme.contentPadding ?? const EdgeInsets.all(16);
+
+    return Focus(
+      focusNode: _formattedPaneFocusNode,
+      onKeyEvent: _handleFormattedPaneKeyEvent,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerMove: _handleFormattedRangeSelectionPointerMove,
+        onPointerUp: (_) => _stopFormattedRangeAutoScroll(),
+        onPointerCancel: (_) => _stopFormattedRangeAutoScroll(),
+        child: DecoratedBox(
+          key: _formattedViewportKey,
+          decoration: widget.previewDecoration ??
+              editorTheme.previewDecoration ??
+              BoxDecoration(color: theme.colorScheme.surface),
+          child: segments.isEmpty
+              ? SingleChildScrollView(
+                  key: _formattedScrollKey,
+                  controller: _formattedScrollController,
+                  padding: contentPadding,
+                  child: _buildEmptyFormattedEditor(context),
+                )
+              : ListView.separated(
+                  key: _formattedScrollKey,
+                  controller: _formattedScrollController,
+                  cacheExtent: 800,
+                  padding: contentPadding,
+                  itemCount: segments.length,
+                  itemBuilder: (context, index) {
+                    final segment = segments[index];
+                    return KeyedSubtree(
+                      key: _formattedSegmentGlobalKey(segment),
+                      child: _buildFormattedDraggableSegment(
+                        context,
+                        segment,
+                        index,
+                      ),
+                    );
+                  },
+                  separatorBuilder: (context, index) =>
+                      SizedBox(height: blockSpacing),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyFormattedEditor(BuildContext context) {
+    return TextField(
+      key: _sourceKey,
+      controller: _controller.textController,
+      focusNode: _focusNode,
+      enabled: widget.enabled,
+      autofocus: widget.autofocus,
+      minLines: 8,
+      maxLines: null,
+      textAlignVertical: TextAlignVertical.top,
+      style: _sourceTextStyle(context),
+      keyboardType: TextInputType.multiline,
+      decoration: InputDecoration(
+        border: InputBorder.none,
+        hintText: widget.placeholder ?? 'Start writing...',
+      ),
+    );
+  }
+
+  Widget _buildFormattedDraggableSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    int index,
+  ) {
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+
+    return DragTarget<_FormattedBlockDragPayload>(
+      key: ValueKey(
+        'smooth_markdown_editor_formatted_drop_${segment.range.start}',
+      ),
+      onWillAccept: (payload) =>
+          payload != null && _canDropFormattedBlockAt(payload, index),
+      onAccept: (payload) => _moveFormattedBlockToIndex(payload, index),
+      builder: (context, candidateData, rejectedData) {
+        final highlighted = candidateData.isNotEmpty;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: highlighted
+                ? editorTheme.dropTargetColor ??
+                    theme.colorScheme.primary.withOpacity(0.08)
+                : Colors.transparent,
+            border: Border.all(
+              color: highlighted
+                  ? editorTheme.dropTargetBorderColor ??
+                      theme.colorScheme.primary.withOpacity(0.65)
+                  : Colors.transparent,
+            ),
+            borderRadius: BorderRadius.circular(
+              editorTheme.blockBorderRadius ?? 6,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 32,
+                  child: _buildFormattedBlockDragHandle(
+                    context,
+                    segment,
+                  ),
+                ),
+                Expanded(child: _buildFormattedSegment(context, segment)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFormattedBlockDragHandle(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+  ) {
+    final block = segment.block;
+    if (block == null || !_canDragFormattedSegment(segment)) {
+      return const SizedBox(height: 32);
+    }
+
+    final theme = Theme.of(context);
+    final dragging = _draggingFormattedBlockId == block.id;
+    final color = theme.iconTheme.color?.withOpacity(dragging ? 0.35 : 0.62);
+    final child = MouseRegion(
+      cursor: SystemMouseCursors.grab,
+      child: Tooltip(
+        message: 'Move block',
+        child: SizedBox(
+          key: ValueKey(
+            'smooth_markdown_editor_drag_handle_${segment.range.start}',
+          ),
+          height: 32,
+          child: Center(
+            child: Icon(
+              Icons.drag_indicator,
+              size: 20,
+              color: color,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Draggable<_FormattedBlockDragPayload>(
+      data: _FormattedBlockDragPayload(
+        blockId: block.id,
+      ),
+      axis: Axis.vertical,
+      feedback: Material(
+        type: MaterialType.transparency,
+        child: Icon(
+          Icons.drag_indicator,
+          size: 22,
+          color: theme.colorScheme.primary,
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.35, child: child),
+      onDragStarted: () {
+        setState(() => _draggingFormattedBlockId = block.id);
+      },
+      onDragEnd: (_) {
+        if (mounted) setState(() => _draggingFormattedBlockId = null);
+      },
+      child: child,
+    );
+  }
+
+  Widget _buildFormattedSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+  ) {
+    final block = segment.block;
+    if (block is MarkdownFrontmatterBlock) {
+      return _buildFormattedFrontmatterSegment(context, segment, block);
+    }
+
+    final active = block?.id != null
+        ? _activeFormattedBlockId == block!.id
+        : _activeFormattedRange?.start == segment.range.start &&
+            _activeFormattedRange?.end == segment.range.end;
+
+    if (active) {
+      final customEditor = _buildCustomBlockEditorSegment(context, segment);
+      if (customEditor != null) return customEditor;
+    }
+
+    if (active) {
+      return _buildActiveFormattedTextField(context, segment);
+    }
+
+    final codeBlock = switch (block) {
+      MarkdownCodeBlock() => _FencedCodeBlock(
+          fence: block.fence,
+          language: block.language,
+          info: block.info,
+          code: block.code,
+        ),
+      MarkdownMermaidBlock() => _FencedCodeBlock(
+          fence: block.fence,
+          language: 'mermaid',
+          info: block.info ?? 'mermaid',
+          code: block.code,
+        ),
+      _ => _parseFencedCodeSegment(segment.source),
+    };
+    if (codeBlock != null) {
+      return _buildFormattedCodeBlockSegment(context, segment, codeBlock);
+    }
+
+    final blockMath = block is MarkdownBlockMathBlock
+        ? block.latex
+        : _parseBlockMathSegment(segment.source);
+    if (blockMath != null) {
+      return _buildFormattedBlockMathSegment(context, segment, blockMath);
+    }
+
+    if (block is MarkdownImageBlock) {
+      return _buildFormattedImageSegment(context, segment, block);
+    }
+
+    if (block is MarkdownTableBlock) {
+      return _buildFormattedTableSegment(context, segment, block);
+    }
+
+    if (block is MarkdownListBlock) {
+      return _buildFormattedListSegment(context, segment, block);
+    }
+
+    if (block is MarkdownBlockquoteBlock) {
+      return _buildFormattedBlockquoteSegment(context, segment, block);
+    }
+
+    final customBlock = _buildCustomBlockSegment(context, segment);
+    if (customBlock != null) return customBlock;
+
+    final selected = _activeDocumentSelectionIncludes(segment);
+    final child = InkWell(
+      key: ValueKey(
+          'smooth_markdown_editor_formatted_block_${segment.range.start}'),
+      borderRadius: BorderRadius.circular(6),
+      onTap: widget.enabled ? () => _handleFormattedSegmentTap(segment) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: _renderMarkdown(context, segment.source),
+      ),
+    );
+    final selectableChild = _buildFormattedDocumentSelectionDragTarget(
+      segment,
+      child,
+    );
+    if (!selected) return selectableChild;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _effectiveEditorTheme(context).selectionColor ??
+            Theme.of(context).colorScheme.primary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: selectableChild,
+    );
+  }
+
+  Widget _buildFormattedDocumentSelectionDragTarget(
+    _MarkdownBlockSegment segment,
+    Widget child,
+  ) {
+    if (!widget.enabled || !_isSelectableDocumentTextSegment(segment)) {
+      return child;
+    }
+
+    return DragTarget<_FormattedRangeSelectionDragPayload>(
+      onWillAccept: (payload) =>
+          payload?.kind == _FormattedRangeSelectionDragKind.document,
+      onMove: _handleFormattedRangeSelectionDragTargetMove,
+      onAccept: (_) => _selectFormattedDocumentRangeTo(segment),
+      builder: (context, candidateData, rejectedData) {
+        return Draggable<_FormattedRangeSelectionDragPayload>(
+          data: const _FormattedRangeSelectionDragPayload(
+            kind: _FormattedRangeSelectionDragKind.document,
+          ),
+          maxSimultaneousDrags: 1,
+          feedback: const SizedBox(width: 1, height: 1),
+          childWhenDragging: child,
+          onDragStarted: () {
+            _beginFormattedDocumentRangeSelection(segment);
+            _beginFormattedRangeDragAutoScroll();
+          },
+          onDragUpdate: _handleFormattedRangeSelectionDragUpdate,
+          onDragEnd: (_) => _stopFormattedRangeAutoScroll(),
+          onDragCompleted: _stopFormattedRangeAutoScroll,
+          onDraggableCanceled: (_, __) => _stopFormattedRangeAutoScroll(),
+          child: child,
+        );
+      },
+    );
+  }
+
+  Widget _buildActiveFormattedTextField(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+  ) {
+    return TextField(
+      key: ValueKey(
+        'smooth_markdown_editor_formatted_active_${segment.range.start}',
+      ),
+      controller: _formattedBlockController,
+      focusNode: _formattedBlockFocusNode,
+      enabled: widget.enabled,
+      autofocus: true,
+      minLines: 1,
+      maxLines: null,
+      style: _formattedEditingTextStyle(context, segment.block),
+      keyboardType: TextInputType.multiline,
+      decoration: const InputDecoration(
+        border: OutlineInputBorder(),
+        isDense: true,
+        contentPadding: EdgeInsets.all(12),
+      ),
+    );
+  }
+
+  Widget _buildFormattedListSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    MarkdownListBlock list, {
+    String? keyPrefix,
+  }) {
+    final effectiveKeyPrefix = keyPrefix ?? '${segment.range.start}';
+    return Column(
+      key: ValueKey('smooth_markdown_editor_list_block_$effectiveKeyPrefix'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var index = 0; index < list.items.length; index++)
+          _buildFormattedListItem(
+            context,
+            segment,
+            list,
+            index,
+            keyPrefix: effectiveKeyPrefix,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFormattedListItem(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    MarkdownListBlock list,
+    int index, {
+    required String keyPrefix,
+  }) {
+    final item = list.items[index];
+    final editableBlock = _firstEditableListItemBlock(item);
+    final primaryBlockId = editableBlock?.id ??
+        (item.blocks.isEmpty ? null : item.blocks.first.id);
+    final itemSegment = editableBlock == null
+        ? null
+        : _MarkdownBlockSegment(
+            range: segment.range,
+            source: editableBlock.toMarkdown(),
+            block: editableBlock,
+            containerBlockId: segment.containerBlockId ?? list.id,
+            blockSourceOffset: segment.blockSourceOffset +
+                _listItemPrimaryBlockSourceOffset(list, index),
+          );
+    final active =
+        editableBlock != null && _activeFormattedBlockId == editableBlock.id;
+    final selected = _activeListItemSelectionIncludes(list, item);
+    final theme = Theme.of(context);
+    final primaryContent = active && itemSegment != null
+        ? _buildActiveFormattedTextField(context, itemSegment)
+        : editableBlock == null && item.blocks.isNotEmpty
+            ? _buildFormattedListItemChildBlock(
+                context,
+                segment,
+                list,
+                itemIndex: index,
+                childIndex: 0,
+                keyPrefix: keyPrefix,
+              )
+            : InkWell(
+                key: ValueKey(
+                  'smooth_markdown_editor_list_item_${keyPrefix}_$index',
+                ),
+                borderRadius: BorderRadius.circular(6),
+                onTap: widget.enabled && itemSegment != null
+                    ? () => _handleFormattedListItemTap(
+                          list,
+                          index,
+                          itemSegment,
+                        )
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: itemSegment == null
+                      ? _renderMarkdown(context, item.toMarkdown())
+                      : DefaultTextStyle.merge(
+                          style: theme.textTheme.bodyMedium,
+                          child: _renderMarkdown(context, itemSegment.source),
+                        ),
+                ),
+              );
+    final selectablePrimaryContent = _buildFormattedListItemSelectionDragTarget(
+      list,
+      index,
+      primaryContent,
+    );
+    final decoratedPrimaryContent = selected
+        ? DecoratedBox(
+            decoration: BoxDecoration(
+              color: _effectiveEditorTheme(context).selectionColor ??
+                  Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: selectablePrimaryContent,
+          )
+        : selectablePrimaryContent;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 36,
+            child: _buildListMarker(context, list, item, index),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                decoratedPrimaryContent,
+                if (editableBlock != null)
+                  for (var childIndex = 0;
+                      childIndex < item.blocks.length;
+                      childIndex++)
+                    if (item.blocks[childIndex].id != primaryBlockId)
+                      _buildFormattedListItemChildBlock(
+                        context,
+                        segment,
+                        list,
+                        itemIndex: index,
+                        childIndex: childIndex,
+                        keyPrefix: keyPrefix,
+                      ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormattedListItemSelectionDragTarget(
+    MarkdownListBlock list,
+    int itemIndex,
+    Widget child,
+  ) {
+    if (!widget.enabled || itemIndex < 0 || itemIndex >= list.items.length) {
+      return child;
+    }
+
+    return DragTarget<_FormattedRangeSelectionDragPayload>(
+      onWillAccept: (payload) =>
+          payload?.kind == _FormattedRangeSelectionDragKind.listItem &&
+          payload?.listId == list.id,
+      onMove: _handleFormattedRangeSelectionDragTargetMove,
+      onAccept: (_) => _selectFormattedListItemRangeTo(list, itemIndex),
+      builder: (context, candidateData, rejectedData) {
+        return Draggable<_FormattedRangeSelectionDragPayload>(
+          data: _FormattedRangeSelectionDragPayload(
+            kind: _FormattedRangeSelectionDragKind.listItem,
+            listId: list.id,
+          ),
+          maxSimultaneousDrags: 1,
+          feedback: const SizedBox(width: 1, height: 1),
+          childWhenDragging: child,
+          onDragStarted: () {
+            _beginFormattedListItemRangeSelection(list, itemIndex);
+            _beginFormattedRangeDragAutoScroll();
+          },
+          onDragUpdate: _handleFormattedRangeSelectionDragUpdate,
+          onDragEnd: (_) => _stopFormattedRangeAutoScroll(),
+          onDragCompleted: _stopFormattedRangeAutoScroll,
+          onDraggableCanceled: (_, __) => _stopFormattedRangeAutoScroll(),
+          child: child,
+        );
+      },
+    );
+  }
+
+  Widget _buildFormattedListItemChildBlock(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    MarkdownListBlock list, {
+    required int itemIndex,
+    required int childIndex,
+    required String keyPrefix,
+  }) {
+    final child = list.items[itemIndex].blocks[childIndex];
+    final childSegment = _MarkdownBlockSegment(
+      range: segment.range,
+      source: child.toMarkdown(),
+      block: child,
+      containerBlockId: segment.containerBlockId ?? list.id,
+      blockSourceOffset: segment.blockSourceOffset +
+          _listItemChildBlockSourceOffset(list, itemIndex, childIndex),
+    );
+
+    if (child is MarkdownListBlock) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: _buildFormattedListSegment(
+          context,
+          childSegment,
+          child,
+          keyPrefix: '${keyPrefix}_${child.id}',
+        ),
+      );
+    }
+
+    if (!_usesPlainTextEditing(child)) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: _buildFormattedSegment(context, childSegment),
+      );
+    }
+
+    final active = _activeFormattedBlockId == child.id;
+    if (active) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: _buildActiveFormattedTextField(context, childSegment),
+      );
+    }
+
+    return InkWell(
+      key: ValueKey(
+        'smooth_markdown_editor_list_child_${keyPrefix}_${itemIndex}_$childIndex',
+      ),
+      borderRadius: BorderRadius.circular(6),
+      onTap:
+          widget.enabled ? () => _activateFormattedSegment(childSegment) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: _renderMarkdown(context, childSegment.source),
+      ),
+    );
+  }
+
+  Widget _buildListMarker(
+    BuildContext context,
+    MarkdownListBlock list,
+    MarkdownListItem item,
+    int index,
+  ) {
+    if (list.kind == MarkdownListKind.task) {
+      return Checkbox(
+        key: ValueKey('smooth_markdown_editor_task_checkbox_${list.id}_$index'),
+        value: item.checked,
+        onChanged: widget.enabled
+            ? (checked) {
+                _controller.documentEditor.updateListItemChecked(
+                  item.id,
+                  checked ?? false,
+                );
+              }
+            : null,
+        visualDensity: VisualDensity.compact,
+      );
+    }
+
+    final marker = list.kind == MarkdownListKind.ordered
+        ? '${list.startIndex + index}.'
+        : '•';
+    return Padding(
+      padding: const EdgeInsets.only(top: 7),
+      child: Text(
+        marker,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+    );
+  }
+
+  MarkdownBlock? _firstEditableListItemBlock(MarkdownListItem item) {
+    for (final block in item.blocks) {
+      if (_usesPlainTextEditing(block)) return block;
+    }
+    return null;
+  }
+
+  int _listItemPrimaryBlockSourceOffset(MarkdownListBlock list, int itemIndex) {
+    var offset = 0;
+    for (var index = 0; index < itemIndex; index++) {
+      offset += _serializedListItemLines(list, index)
+          .map((line) => line.length + 1)
+          .fold<int>(0, (sum, length) => sum + length);
+    }
+    return offset + _listMarkerSource(list, itemIndex).length;
+  }
+
+  int _listItemChildBlockSourceOffset(
+    MarkdownListBlock list,
+    int itemIndex,
+    int childIndex,
+  ) {
+    final item = list.items[itemIndex];
+    var offset = _listItemPrimaryBlockSourceOffset(list, itemIndex);
+    for (var index = 0; index < childIndex; index++) {
+      final current = item.blocks[index];
+      final next = item.blocks[index + 1];
+      offset += current.toMarkdown().length;
+      offset +=
+          current is MarkdownListBlock || next is MarkdownListBlock ? 1 : 2;
+      offset += 2;
+    }
+    return offset;
+  }
+
+  List<String> _serializedListItemLines(MarkdownListBlock list, int index) {
+    final itemMarkdown = list.items[index].toMarkdown();
+    final itemLines = itemMarkdown.isEmpty ? [''] : itemMarkdown.split('\n');
+    return [
+      '${_listMarkerSource(list, index)}${itemLines.first}',
+      for (final line in itemLines.skip(1)) '  $line',
+    ];
+  }
+
+  String _listMarkerSource(MarkdownListBlock list, int index) {
+    return switch (list.kind) {
+      MarkdownListKind.bullet => '- ',
+      MarkdownListKind.ordered => '${list.startIndex + index}. ',
+      MarkdownListKind.task => list.items[index].checked ? '- [x] ' : '- [ ] ',
+    };
+  }
+
+  Widget _buildFormattedBlockquoteSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    MarkdownBlockquoteBlock blockquote,
+  ) {
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    return DecoratedBox(
+      key: ValueKey(
+        'smooth_markdown_editor_blockquote_block_${segment.range.start}',
+      ),
+      decoration: BoxDecoration(
+        border: Border(
+          left: BorderSide(
+            color: (editorTheme.toolbarActiveIconColor ??
+                    theme.colorScheme.primary)
+                .withOpacity(0.45),
+            width: 3,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var index = 0; index < blockquote.blocks.length; index++) ...[
+              _buildFormattedBlockquoteChild(
+                context,
+                segment,
+                blockquote,
+                index,
+              ),
+              if (index < blockquote.blocks.length - 1)
+                SizedBox(
+                  height: _effectiveStyleSheet(context).blockSpacing ?? 16,
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormattedBlockquoteChild(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    MarkdownBlockquoteBlock blockquote,
+    int index,
+  ) {
+    final child = blockquote.blocks[index];
+    final childSegment = _MarkdownBlockSegment(
+      range: segment.range,
+      source: child.toMarkdown(),
+      block: child,
+      containerBlockId: blockquote.id,
+      blockSourceOffset: segment.blockSourceOffset +
+          _blockquoteChildSourceOffset(blockquote, index),
+    );
+    final active = _activeFormattedBlockId == child.id;
+
+    if (!_usesPlainTextEditing(child)) {
+      return _buildFormattedSegment(context, childSegment);
+    }
+
+    if (active) {
+      return _buildActiveFormattedTextField(context, childSegment);
+    }
+
+    final selected = _activeDocumentSelectionIncludes(childSegment);
+    final childWidget = InkWell(
+      key: ValueKey(
+        'smooth_markdown_editor_blockquote_child_${segment.range.start}_$index',
+      ),
+      borderRadius: BorderRadius.circular(6),
+      onTap: widget.enabled
+          ? () => _handleFormattedSegmentTap(childSegment)
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: _renderMarkdown(context, childSegment.source),
+      ),
+    );
+    final selectableChild = _buildFormattedDocumentSelectionDragTarget(
+      childSegment,
+      childWidget,
+    );
+    if (!selected) return selectableChild;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _effectiveEditorTheme(context).selectionColor ??
+            Theme.of(context).colorScheme.primary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: selectableChild,
+    );
+  }
+
+  int _blockquoteChildSourceOffset(
+    MarkdownBlockquoteBlock blockquote,
+    int childIndex,
+  ) {
+    var offset = 0;
+    for (var index = 0; index < childIndex; index++) {
+      final quotedBlock = MarkdownBlockquoteBlock(
+        id: '${blockquote.id}-offset-$index',
+        blocks: [blockquote.blocks[index]],
+      ).toMarkdown();
+      offset += quotedBlock.length + 3;
+    }
+    return offset + 2;
+  }
+
+  Widget _buildFormattedTableSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    MarkdownTableBlock table,
+  ) {
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    return DecoratedBox(
+      key:
+          ValueKey('smooth_markdown_editor_table_block_${segment.range.start}'),
+      decoration: BoxDecoration(
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
+            child: SizedBox(
+              height: 40,
+              child: SingleChildScrollView(
+                key: ValueKey(
+                  'smooth_markdown_editor_table_toolbar_scroll_${segment.range.start}',
+                ),
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(width: 8),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_add_row_${segment.range.start}',
+                      ),
+                      tooltip: 'Add row below',
+                      icon: const Icon(Icons.add, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _insertTableRowAfterActive(table)
+                          : null,
+                    ),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_add_row_above_${segment.range.start}',
+                      ),
+                      tooltip: 'Add row above',
+                      icon: const Icon(Icons.vertical_align_top, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _insertTableRowBeforeActive(table)
+                          : null,
+                    ),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_add_column_${segment.range.start}',
+                      ),
+                      tooltip: 'Add column after',
+                      icon: const Icon(Icons.view_column_outlined, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _insertTableColumnAfterActive(table)
+                          : null,
+                    ),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_add_column_before_${segment.range.start}',
+                      ),
+                      tooltip: 'Add column before',
+                      icon: const Icon(Icons.keyboard_tab, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _insertTableColumnBeforeActive(table)
+                          : null,
+                    ),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_delete_row_${segment.range.start}',
+                      ),
+                      tooltip: 'Delete row',
+                      icon: const Icon(Icons.table_rows_outlined, size: 18),
+                      onPressed:
+                          widget.enabled && _canDeleteActiveTableRow(table)
+                              ? () => _deleteActiveTableRow(table)
+                              : null,
+                    ),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_delete_column_${segment.range.start}',
+                      ),
+                      tooltip: 'Delete column',
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      onPressed:
+                          widget.enabled && _canDeleteActiveTableColumn(table)
+                              ? () => _deleteActiveTableColumn(table)
+                              : null,
+                    ),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_toggle_header_row_${segment.range.start}',
+                      ),
+                      tooltip: table.headerRow
+                          ? 'Unset header row'
+                          : 'Set header row',
+                      icon: Icon(
+                        Icons.view_week_outlined,
+                        size: 18,
+                        color:
+                            table.headerRow ? theme.colorScheme.primary : null,
+                      ),
+                      onPressed: widget.enabled
+                          ? () => _toggleTableHeaderRow(table)
+                          : null,
+                    ),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_toggle_header_column_${segment.range.start}',
+                      ),
+                      tooltip: table.headerColumn
+                          ? 'Unset header column'
+                          : 'Set header column',
+                      icon: Icon(
+                        Icons.view_column_outlined,
+                        size: 18,
+                        color: table.headerColumn
+                            ? theme.colorScheme.primary
+                            : null,
+                      ),
+                      onPressed: widget.enabled
+                          ? () => _toggleTableHeaderColumn(table)
+                          : null,
+                    ),
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_table_delete_${segment.range.start}',
+                      ),
+                      tooltip: 'Delete table',
+                      icon: const Icon(Icons.delete_forever_outlined, size: 18),
+                      onPressed: widget.enabled
+                          ? () => _deleteActiveTable(table)
+                          : null,
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8, right: 12),
+                      child: Icon(Icons.table_chart_outlined, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SingleChildScrollView(
+            key: ValueKey(
+              'smooth_markdown_editor_table_body_scroll_${segment.range.start}',
+            ),
+            scrollDirection: Axis.horizontal,
+            padding: editorTheme.tablePadding ?? _editorBlockPadding(context),
+            child: Table(
+              border: TableBorder.all(
+                color: editorTheme.tableBorderColor ??
+                    _editorBlockBorderColor(context),
+              ),
+              defaultColumnWidth: const IntrinsicColumnWidth(),
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              children: [
+                TableRow(
+                  decoration: BoxDecoration(
+                    color: table.headerRow
+                        ? editorTheme.tableHeaderColor ??
+                            theme.colorScheme.surfaceVariant.withOpacity(0.25)
+                        : null,
+                  ),
+                  children: [
+                    for (var column = 0; column < table.columnCount; column++)
+                      _buildFormattedTableCell(
+                        context,
+                        table,
+                        rowIndex: 0,
+                        columnIndex: column,
+                        header: true,
+                      ),
+                  ],
+                ),
+                for (var row = 0; row < table.rows.length; row++)
+                  TableRow(
+                    children: [
+                      for (var column = 0; column < table.columnCount; column++)
+                        _buildFormattedTableCell(
+                          context,
+                          table,
+                          rowIndex: row,
+                          columnIndex: column,
+                        ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormattedTableCell(
+    BuildContext context,
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    bool header = false,
+  }) {
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    final children = _tableCellChildren(
+      table,
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: header,
+    );
+    final active = _activeTableCell?.matches(
+          table.id,
+          rowIndex: rowIndex,
+          columnIndex: columnIndex,
+          header: header,
+        ) ??
+        false;
+    final position = _tableCellPosition(
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: header,
+    );
+    final selected = _activeTableSelection?.tableId == table.id &&
+        _activeTableSelection!.contains(position);
+    final keyPrefix = header ? 'header' : 'row_$rowIndex';
+    final semanticHeader =
+        (header && table.headerRow) || (table.headerColumn && columnIndex == 0);
+    final textStyle = semanticHeader
+        ? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)
+        : theme.textTheme.bodyMedium;
+    final baseCellColor = semanticHeader && !(header && table.headerRow)
+        ? editorTheme.tableHeaderColor ??
+            theme.colorScheme.surfaceVariant.withOpacity(0.18)
+        : null;
+    final cellColor = selected
+        ? editorTheme.tableSelectionColor ??
+            theme.colorScheme.primary.withOpacity(0.12)
+        : baseCellColor;
+    final textAlign = _tableCellTextAlign(table, columnIndex);
+    final contentAlignment = _tableCellContentAlignment(table, columnIndex);
+
+    if (active) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onSecondaryTapDown: widget.enabled
+            ? (details) => _showTableCellContextMenu(
+                  context,
+                  details,
+                  table,
+                  rowIndex: rowIndex,
+                  columnIndex: columnIndex,
+                  header: header,
+                )
+            : null,
+        child: ColoredBox(
+          color: cellColor ?? Colors.transparent,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 96),
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: TextField(
+                key: ValueKey(
+                  'smooth_markdown_editor_table_cell_active_${table.id}_${keyPrefix}_$columnIndex',
+                ),
+                controller: _tableCellController,
+                focusNode: _tableCellFocusNode,
+                enabled: widget.enabled,
+                autofocus: true,
+                minLines: 1,
+                maxLines: null,
+                textAlign: textAlign,
+                style: textStyle,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: editorTheme.tableActiveBorderColor ??
+                          theme.colorScheme.primary.withOpacity(0.45),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: editorTheme.tableActiveBorderColor ??
+                          theme.colorScheme.primary,
+                      width: 1.5,
+                    ),
+                  ),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final cell = InkWell(
+      key: ValueKey(
+        'smooth_markdown_editor_table_cell_${table.id}_${keyPrefix}_$columnIndex',
+      ),
+      onTap: widget.enabled
+          ? () => _handleTableCellTap(
+                table,
+                rowIndex: rowIndex,
+                columnIndex: columnIndex,
+                header: header,
+                children: children,
+              )
+          : null,
+      child: Container(
+        key: selected
+            ? ValueKey(
+                'smooth_markdown_editor_table_cell_selected_${table.id}_${keyPrefix}_$columnIndex',
+              )
+            : null,
+        constraints: const BoxConstraints(minWidth: 96),
+        alignment: contentAlignment,
+        color: cellColor,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: _renderFormattedInlineCell(
+          context,
+          children,
+          textStyle,
+          textAlign,
+        ),
+      ),
+    );
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapDown: widget.enabled
+          ? (details) => _showTableCellContextMenu(
+                context,
+                details,
+                table,
+                rowIndex: rowIndex,
+                columnIndex: columnIndex,
+                header: header,
+              )
+          : null,
+      child: _buildFormattedTableCellSelectionDragTarget(
+        table,
+        rowIndex: rowIndex,
+        columnIndex: columnIndex,
+        header: header,
+        child: cell,
+      ),
+    );
+  }
+
+  Widget _buildFormattedTableCellSelectionDragTarget(
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+    required Widget child,
+  }) {
+    if (!widget.enabled) return child;
+
+    return DragTarget<_FormattedRangeSelectionDragPayload>(
+      onWillAccept: (payload) =>
+          payload?.kind == _FormattedRangeSelectionDragKind.tableCell &&
+          payload?.tableId == table.id,
+      onMove: _handleFormattedRangeSelectionDragTargetMove,
+      onAccept: (_) => _selectTableCellRangeTo(
+        table,
+        rowIndex: rowIndex,
+        columnIndex: columnIndex,
+        header: header,
+      ),
+      builder: (context, candidateData, rejectedData) {
+        return LongPressDraggable<_FormattedRangeSelectionDragPayload>(
+          data: _FormattedRangeSelectionDragPayload(
+            kind: _FormattedRangeSelectionDragKind.tableCell,
+            tableId: table.id,
+          ),
+          hapticFeedbackOnStart: false,
+          maxSimultaneousDrags: 1,
+          feedback: const SizedBox(width: 1, height: 1),
+          childWhenDragging: child,
+          onDragStarted: () {
+            _beginTableCellRangeSelection(
+              table,
+              rowIndex: rowIndex,
+              columnIndex: columnIndex,
+              header: header,
+            );
+            _beginFormattedRangeDragAutoScroll();
+          },
+          onDragUpdate: _handleFormattedRangeSelectionDragUpdate,
+          onDragEnd: (_) => _stopFormattedRangeAutoScroll(),
+          onDragCompleted: _stopFormattedRangeAutoScroll,
+          onDraggableCanceled: (_, __) => _stopFormattedRangeAutoScroll(),
+          child: child,
+        );
+      },
+    );
+  }
+
+  Future<void> _showTableCellContextMenu(
+    BuildContext context,
+    TapDownDetails details,
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+  }) async {
+    final overlay = Overlay.of(context).context.findRenderObject();
+    if (overlay is! RenderBox) return;
+
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(details.globalPosition, details.globalPosition),
+      Offset.zero & overlay.size,
+    );
+    final action = await showMenu<_TableContextAction>(
+      context: context,
+      position: position,
+      items: [
+        if (columnIndex > 0)
+          const PopupMenuItem(
+            value: _TableContextAction.addColumnBefore,
+            child: Text('Add Column Before'),
+          ),
+        const PopupMenuItem(
+          value: _TableContextAction.addColumnAfter,
+          child: Text('Add Column After'),
+        ),
+        PopupMenuItem(
+          value: _TableContextAction.deleteColumn,
+          enabled: table.columnCount > 1,
+          child: const Text('Delete Column'),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: _TableContextAction.alignColumnDefault,
+          child: Text('Default Alignment'),
+        ),
+        const PopupMenuItem(
+          value: _TableContextAction.alignColumnLeft,
+          child: Text('Align Left'),
+        ),
+        const PopupMenuItem(
+          value: _TableContextAction.alignColumnCenter,
+          child: Text('Align Center'),
+        ),
+        const PopupMenuItem(
+          value: _TableContextAction.alignColumnRight,
+          child: Text('Align Right'),
+        ),
+        const PopupMenuDivider(),
+        if (!header)
+          const PopupMenuItem(
+            value: _TableContextAction.addRowAbove,
+            child: Text('Add Row Above'),
+          ),
+        const PopupMenuItem(
+          value: _TableContextAction.addRowBelow,
+          child: Text('Add Row Below'),
+        ),
+        PopupMenuItem(
+          value: _TableContextAction.deleteRow,
+          enabled: !header || table.rows.isNotEmpty,
+          child: const Text('Delete Row'),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: _TableContextAction.toggleHeaderRow,
+          child: Text('Toggle Header Row'),
+        ),
+        const PopupMenuItem(
+          value: _TableContextAction.toggleHeaderColumn,
+          child: Text('Toggle Header Column'),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: _TableContextAction.deleteTable,
+          child: Text('Delete Table'),
+        ),
+      ],
+    );
+    if (action == null) return;
+    _runTableContextAction(
+      table,
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: header,
+      action: action,
+    );
+  }
+
+  void _runTableContextAction(
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+    required _TableContextAction action,
+  }) {
+    final editor = _controller.documentEditor;
+    switch (action) {
+      case _TableContextAction.addColumnBefore:
+        editor.insertTableColumnBefore(table.id, columnIndex);
+        break;
+      case _TableContextAction.addColumnAfter:
+        editor.insertTableColumnAfter(table.id, columnIndex);
+        break;
+      case _TableContextAction.deleteColumn:
+        editor.deleteTableColumn(table.id, columnIndex);
+        setState(() {
+          _activeTableCell = null;
+          _activeTableSelection = null;
+        });
+        break;
+      case _TableContextAction.alignColumnDefault:
+        editor.setTableColumnAlignment(
+          blockId: table.id,
+          columnIndex: columnIndex,
+          alignment: null,
+        );
+        break;
+      case _TableContextAction.alignColumnLeft:
+        editor.setTableColumnAlignment(
+          blockId: table.id,
+          columnIndex: columnIndex,
+          alignment: MarkdownTableAlignment.left,
+        );
+        break;
+      case _TableContextAction.alignColumnCenter:
+        editor.setTableColumnAlignment(
+          blockId: table.id,
+          columnIndex: columnIndex,
+          alignment: MarkdownTableAlignment.center,
+        );
+        break;
+      case _TableContextAction.alignColumnRight:
+        editor.setTableColumnAlignment(
+          blockId: table.id,
+          columnIndex: columnIndex,
+          alignment: MarkdownTableAlignment.right,
+        );
+        break;
+      case _TableContextAction.addRowAbove:
+        if (!header) {
+          editor.insertTableRowBefore(table.id, rowIndex);
+        }
+        break;
+      case _TableContextAction.addRowBelow:
+        if (header) {
+          editor.insertTableRowBefore(table.id, 0);
+        } else {
+          editor.insertTableRowAfter(table.id, rowIndex);
+        }
+        break;
+      case _TableContextAction.deleteRow:
+        if (header) {
+          _deleteTableHeaderRow(table);
+        } else {
+          editor.deleteTableRow(table.id, rowIndex);
+        }
+        setState(() {
+          _activeTableCell = null;
+          _activeTableSelection = null;
+        });
+        break;
+      case _TableContextAction.toggleHeaderRow:
+        editor.toggleTableHeaderRow(table.id);
+        break;
+      case _TableContextAction.toggleHeaderColumn:
+        editor.toggleTableHeaderColumn(table.id);
+        break;
+      case _TableContextAction.deleteTable:
+        editor.deleteTable(table.id);
+        setState(() {
+          _activeTableCell = null;
+          _activeTableSelection = null;
+        });
+        break;
+    }
+  }
+
+  void _deleteTableHeaderRow(MarkdownTableBlock table) {
+    _controller.documentEditor.updateTable(table.id, (current) {
+      if (current.rows.isEmpty) return current;
+      return current.copyWith(
+        headers: current.rows.first,
+        rows: current.rows.skip(1).toList(growable: false),
+      );
+    });
+  }
+
+  List<MarkdownInlineNode> _tableCellChildren(
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+  }) {
+    if (columnIndex < 0 || columnIndex >= table.columnCount) {
+      return const [MarkdownText('')];
+    }
+    if (header) {
+      return columnIndex < table.headers.length
+          ? table.headers[columnIndex]
+          : const [MarkdownText('')];
+    }
+    if (rowIndex < 0 || rowIndex >= table.rows.length) {
+      return const [MarkdownText('')];
+    }
+    final row = table.rows[rowIndex];
+    return columnIndex < row.length
+        ? row[columnIndex]
+        : const [MarkdownText('')];
+  }
+
+  String _inlineMarkdown(List<MarkdownInlineNode> children) {
+    return children.map((child) => child.toMarkdown()).join();
+  }
+
+  String _inlinePlainText(List<MarkdownInlineNode> children) {
+    return children.map((child) => child.plainText).join();
+  }
+
+  MarkdownTableAlignment? _tableColumnAlignment(
+    MarkdownTableBlock table,
+    int columnIndex,
+  ) {
+    if (columnIndex < 0 || columnIndex >= table.alignments.length) return null;
+    return table.alignments[columnIndex];
+  }
+
+  TextAlign _tableCellTextAlign(
+    MarkdownTableBlock table,
+    int columnIndex,
+  ) {
+    return switch (_tableColumnAlignment(table, columnIndex)) {
+      MarkdownTableAlignment.left => TextAlign.left,
+      MarkdownTableAlignment.center => TextAlign.center,
+      MarkdownTableAlignment.right => TextAlign.right,
+      null => TextAlign.left,
+    };
+  }
+
+  AlignmentGeometry _tableCellContentAlignment(
+    MarkdownTableBlock table,
+    int columnIndex,
+  ) {
+    return switch (_tableColumnAlignment(table, columnIndex)) {
+      MarkdownTableAlignment.left || null => AlignmentDirectional.centerStart,
+      MarkdownTableAlignment.center => Alignment.center,
+      MarkdownTableAlignment.right => AlignmentDirectional.centerEnd,
+    };
+  }
+
+  Widget _renderFormattedInlineCell(
+    BuildContext context,
+    List<MarkdownInlineNode> children,
+    TextStyle? style,
+    TextAlign textAlign,
+  ) {
+    final baseStyle = style ?? DefaultTextStyle.of(context).style;
+    return RichText(
+      textAlign: textAlign,
+      text: TextSpan(
+        style: baseStyle,
+        children: _inlineCellSpans(context, children, baseStyle),
+      ),
+    );
+  }
+
+  List<InlineSpan> _inlineCellSpans(
+    BuildContext context,
+    List<MarkdownInlineNode> nodes,
+    TextStyle style,
+  ) {
+    return [
+      for (final node in nodes)
+        ..._inlineCellSpansForNode(context, node, style),
+    ];
+  }
+
+  List<InlineSpan> _inlineCellSpansForNode(
+    BuildContext context,
+    MarkdownInlineNode node,
+    TextStyle style,
+  ) {
+    switch (node) {
+      case MarkdownText():
+        return [TextSpan(text: node.text, style: style)];
+      case MarkdownStrong():
+        return _inlineCellSpans(
+          context,
+          node.children,
+          style.copyWith(fontWeight: FontWeight.w700),
+        );
+      case MarkdownEmphasis():
+        return _inlineCellSpans(
+          context,
+          node.children,
+          style.copyWith(fontStyle: FontStyle.italic),
+        );
+      case MarkdownStrikethrough():
+        return _inlineCellSpans(
+          context,
+          node.children,
+          style.copyWith(
+            decoration: _mergeTextDecoration(
+              style.decoration,
+              TextDecoration.lineThrough,
+            ),
+          ),
+        );
+      case MarkdownInlineCode():
+        return [
+          TextSpan(
+            text: node.code,
+            style: style.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6),
+            ),
+          ),
+        ];
+      case MarkdownHardBreak():
+        return [TextSpan(text: '\n', style: style)];
+      case MarkdownInlineMath():
+        return [
+          TextSpan(
+            text: node.latex,
+            style: style.copyWith(
+              fontFamily: 'monospace',
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+          ),
+        ];
+      case MarkdownLink():
+        return _inlineCellSpans(
+          context,
+          node.children,
+          style.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+            decoration: _mergeTextDecoration(
+              style.decoration,
+              TextDecoration.underline,
+            ),
+          ),
+        );
+      case MarkdownImage():
+        return [
+          TextSpan(
+            text: node.alt,
+            style: style.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ];
+      case MarkdownWikilink():
+        return [
+          TextSpan(
+            text: node.label,
+            style: style.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              decoration: _mergeTextDecoration(
+                style.decoration,
+                TextDecoration.underline,
+              ),
+            ),
+          ),
+        ];
+      default:
+        return [TextSpan(text: node.plainText, style: style)];
+    }
+  }
+
+  TextDecoration _mergeTextDecoration(
+    TextDecoration? current,
+    TextDecoration added,
+  ) {
+    return TextDecoration.combine([
+      if (current != null && current != TextDecoration.none) current,
+      added,
+    ]);
+  }
+
+  TextSelection _sourceSelectionForPlainTextSelection(
+    MarkdownBlock block,
+    String source,
+    TextSelection selection, {
+    required int sourceBaseOffset,
+  }) {
+    return _clampSourceSelection(
+      TextSelection(
+        baseOffset: sourceBaseOffset +
+            _sourceOffsetForPlainTextOffset(
+              block,
+              source,
+              selection.baseOffset,
+            ),
+        extentOffset: sourceBaseOffset +
+            _sourceOffsetForPlainTextOffset(
+              block,
+              source,
+              selection.extentOffset,
+            ),
+        affinity: selection.affinity,
+        isDirectional: selection.isDirectional,
+      ),
+    );
+  }
+
+  TextSelection _plainTextSelectionForSourceSelection(
+    MarkdownBlock block,
+    String source,
+    TextSelection selection, {
+    required int textLength,
+  }) {
+    return TextSelection(
+      baseOffset: _plainTextOffsetForSourceOffset(
+        block,
+        source,
+        selection.baseOffset,
+      ).clamp(0, textLength).toInt(),
+      extentOffset: _plainTextOffsetForSourceOffset(
+        block,
+        source,
+        selection.extentOffset,
+      ).clamp(0, textLength).toInt(),
+      affinity: selection.affinity,
+      isDirectional: selection.isDirectional,
+    );
+  }
+
+  int _sourceOffsetForPlainTextOffset(
+    MarkdownBlock block,
+    String source,
+    int plainTextOffset,
+  ) {
+    final children = _inlineChildrenForBlock(block);
+    final inlineStart = _plainTextSourceOffsetFor(block, source)
+        .clamp(0, source.length)
+        .toInt();
+    final clampedPlain =
+        plainTextOffset.clamp(0, block.plainText.length).toInt();
+    if (children == null) {
+      return (inlineStart + clampedPlain).clamp(0, source.length).toInt();
+    }
+
+    final inlineSourceLength = source.length - inlineStart;
+    final inlineSourceOffset =
+        _inlineSourceOffsetForPlainTextOffset(children, clampedPlain);
+    return (inlineStart + inlineSourceOffset)
+        .clamp(0, inlineStart + inlineSourceLength)
+        .toInt();
+  }
+
+  int _plainTextOffsetForSourceOffset(
+    MarkdownBlock block,
+    String source,
+    int sourceOffset,
+  ) {
+    final children = _inlineChildrenForBlock(block);
+    final inlineStart = _plainTextSourceOffsetFor(block, source)
+        .clamp(0, source.length)
+        .toInt();
+    final clampedSource = sourceOffset.clamp(0, source.length).toInt();
+    final inlineSourceOffset =
+        (clampedSource - inlineStart).clamp(0, source.length - inlineStart);
+    if (children == null) return inlineSourceOffset.toInt();
+    return _plainTextOffsetForInlineSourceOffset(
+      children,
+      inlineSourceOffset.toInt(),
+    );
+  }
+
+  List<MarkdownInlineNode>? _inlineChildrenForBlock(MarkdownBlock block) {
+    return switch (block) {
+      MarkdownParagraphBlock() => block.children,
+      MarkdownHeadingBlock() => block.children,
+      _ => null,
+    };
+  }
+
+  int _inlineSourceOffsetForPlainTextOffset(
+    List<MarkdownInlineNode> children,
+    int plainTextOffset,
+  ) {
+    final plainText = _inlinePlainText(children);
+    final clampedPlain = plainTextOffset.clamp(0, plainText.length).toInt();
+    var sourceCursor = 0;
+    var plainCursor = 0;
+
+    for (final child in children) {
+      final childPlainLength = child.plainText.length;
+      final childPlainEnd = plainCursor + childPlainLength;
+      if (childPlainLength > 0 &&
+          (clampedPlain == plainCursor || clampedPlain < childPlainEnd)) {
+        return sourceCursor +
+            _inlineNodeSourceOffsetForPlainTextOffset(
+              child,
+              clampedPlain - plainCursor,
+            );
+      }
+
+      sourceCursor += child.toMarkdown().length;
+      plainCursor = childPlainEnd;
+    }
+
+    return sourceCursor;
+  }
+
+  int _plainTextOffsetForInlineSourceOffset(
+    List<MarkdownInlineNode> children,
+    int sourceOffset,
+  ) {
+    final sourceLength = _inlineMarkdown(children).length;
+    final clampedSource = sourceOffset.clamp(0, sourceLength).toInt();
+    var sourceCursor = 0;
+    var plainCursor = 0;
+
+    for (final child in children) {
+      final childSourceLength = child.toMarkdown().length;
+      final childSourceEnd = sourceCursor + childSourceLength;
+      if (clampedSource <= childSourceEnd) {
+        return plainCursor +
+            _inlineNodePlainTextOffsetForSourceOffset(
+              child,
+              clampedSource - sourceCursor,
+            );
+      }
+
+      sourceCursor = childSourceEnd;
+      plainCursor += child.plainText.length;
+    }
+
+    return plainCursor;
+  }
+
+  int _inlineNodeSourceOffsetForPlainTextOffset(
+    MarkdownInlineNode node,
+    int plainTextOffset,
+  ) {
+    final clampedPlain =
+        plainTextOffset.clamp(0, node.plainText.length).toInt();
+    switch (node) {
+      case MarkdownText():
+        return _escapedSourceOffsetForPlainTextOffset(
+          node.toMarkdown(),
+          clampedPlain,
+        );
+      case MarkdownStrong():
+        return 2 +
+            _inlineSourceOffsetForPlainTextOffset(
+              node.children,
+              clampedPlain,
+            );
+      case MarkdownEmphasis():
+        return 1 +
+            _inlineSourceOffsetForPlainTextOffset(
+              node.children,
+              clampedPlain,
+            );
+      case MarkdownStrikethrough():
+        return 2 +
+            _inlineSourceOffsetForPlainTextOffset(
+              node.children,
+              clampedPlain,
+            );
+      case MarkdownLink():
+        return 1 +
+            _inlineSourceOffsetForPlainTextOffset(
+              node.children,
+              clampedPlain,
+            );
+      case MarkdownInlineCode():
+        return 1 + clampedPlain;
+      case MarkdownInlineMath():
+        return 1 + clampedPlain;
+      case MarkdownImage():
+        return 2 +
+            _escapedSourceOffsetForPlainTextOffset(
+              _escapeMarkdownInlineText(node.alt),
+              clampedPlain,
+            );
+      case MarkdownWikilink():
+        return 2 + clampedPlain;
+      case MarkdownHardBreak():
+        return clampedPlain == 0 ? 0 : node.toMarkdown().length;
+      default:
+        return clampedPlain.clamp(0, node.toMarkdown().length).toInt();
+    }
+  }
+
+  int _inlineNodePlainTextOffsetForSourceOffset(
+    MarkdownInlineNode node,
+    int sourceOffset,
+  ) {
+    final sourceLength = node.toMarkdown().length;
+    final clampedSource = sourceOffset.clamp(0, sourceLength).toInt();
+    switch (node) {
+      case MarkdownText():
+        return _plainTextOffsetForEscapedSourceOffset(
+          node.toMarkdown(),
+          clampedSource,
+        ).clamp(0, node.text.length).toInt();
+      case MarkdownStrong():
+        return _plainTextOffsetForDelimitedInlineSource(
+          node.children,
+          clampedSource,
+          openingLength: 2,
+          closingLength: 2,
+        );
+      case MarkdownEmphasis():
+        return _plainTextOffsetForDelimitedInlineSource(
+          node.children,
+          clampedSource,
+          openingLength: 1,
+          closingLength: 1,
+        );
+      case MarkdownStrikethrough():
+        return _plainTextOffsetForDelimitedInlineSource(
+          node.children,
+          clampedSource,
+          openingLength: 2,
+          closingLength: 2,
+        );
+      case MarkdownLink():
+        final labelSourceLength = _inlineMarkdown(node.children).length;
+        if (clampedSource <= 1) return 0;
+        if (clampedSource >= 1 + labelSourceLength) {
+          return node.plainText.length;
+        }
+        return _plainTextOffsetForInlineSourceOffset(
+          node.children,
+          clampedSource - 1,
+        );
+      case MarkdownInlineCode():
+        return (clampedSource - 1).clamp(0, node.plainText.length).toInt();
+      case MarkdownInlineMath():
+        return (clampedSource - 1).clamp(0, node.plainText.length).toInt();
+      case MarkdownImage():
+        final altSource = _escapeMarkdownInlineText(node.alt);
+        if (clampedSource <= 2) return 0;
+        if (clampedSource >= 2 + altSource.length) {
+          return node.plainText.length;
+        }
+        return _plainTextOffsetForEscapedSourceOffset(
+          altSource,
+          clampedSource - 2,
+        ).clamp(0, node.plainText.length).toInt();
+      case MarkdownWikilink():
+        return (clampedSource - 2).clamp(0, node.plainText.length).toInt();
+      case MarkdownHardBreak():
+        return clampedSource >= sourceLength ? 1 : 0;
+      default:
+        return clampedSource.clamp(0, node.plainText.length).toInt();
+    }
+  }
+
+  int _plainTextOffsetForDelimitedInlineSource(
+    List<MarkdownInlineNode> children,
+    int sourceOffset, {
+    required int openingLength,
+    required int closingLength,
+  }) {
+    final sourceLength =
+        openingLength + _inlineMarkdown(children).length + closingLength;
+    final clampedSource = sourceOffset.clamp(0, sourceLength).toInt();
+    final childrenPlainTextLength = _inlinePlainText(children).length;
+    if (clampedSource <= openingLength) return 0;
+    if (clampedSource >= sourceLength - closingLength) {
+      return childrenPlainTextLength;
+    }
+    return _plainTextOffsetForInlineSourceOffset(
+      children,
+      clampedSource - openingLength,
+    );
+  }
+
+  int _escapedSourceOffsetForPlainTextOffset(
+    String source,
+    int plainTextOffset,
+  ) {
+    var sourceOffset = 0;
+    var plainCursor = 0;
+    while (sourceOffset < source.length && plainCursor < plainTextOffset) {
+      if (source[sourceOffset] == '\\' && sourceOffset + 1 < source.length) {
+        sourceOffset += 2;
+      } else {
+        sourceOffset++;
+      }
+      plainCursor++;
+    }
+    return sourceOffset.clamp(0, source.length).toInt();
+  }
+
+  int _plainTextOffsetForEscapedSourceOffset(
+    String source,
+    int sourceOffset,
+  ) {
+    final clampedSource = sourceOffset.clamp(0, source.length).toInt();
+    var cursor = 0;
+    var plainOffset = 0;
+    while (cursor < clampedSource) {
+      if (source[cursor] == '\\' && cursor + 1 < source.length) {
+        if (cursor + 1 >= clampedSource) break;
+        cursor += 2;
+      } else {
+        cursor++;
+      }
+      plainOffset++;
+    }
+    return plainOffset;
+  }
+
+  String _escapeMarkdownInlineText(String text) {
+    return text
+        .replaceAll('\\', r'\\')
+        .replaceAll('[', r'\[')
+        .replaceAll(']', r'\]')
+        .replaceAll('`', r'\`')
+        .replaceAll('*', r'\*');
+  }
+
+  MarkdownBlock? _activeEditableBlock() {
+    final blockId = _activeFormattedBlockId;
+    if (blockId == null) return null;
+    return _controller.document.blockById(blockId);
+  }
+
+  MarkdownBlock? _activeTopLevelBlock() {
+    final cell = _activeTableCell;
+    if (cell != null) {
+      return _controller.document.blockById(cell.tableId);
+    }
+    final tableSelection = _activeTableSelection;
+    if (tableSelection != null) {
+      return _controller.document.blockById(tableSelection.tableId);
+    }
+
+    final activeBlock = _activeEditableBlock();
+    if (activeBlock != null) {
+      return _topLevelBlockContaining(activeBlock.id) ?? activeBlock;
+    }
+
+    final range = _activeFormattedRange;
+    if (range == null) return null;
+    for (final segment in _documentBlockSegments()) {
+      if (segment.range == range) return segment.block;
+    }
+    return null;
+  }
+
+  MarkdownListKind? _activeListKind() {
+    final block = _activeTopLevelBlock();
+    return block is MarkdownListBlock ? block.kind : null;
+  }
+
+  int? _activeHeadingLevel() {
+    final block = _activeEditableBlock();
+    return block is MarkdownHeadingBlock ? block.level : null;
+  }
+
+  bool _activeInlineSelectionContains(
+    bool Function(MarkdownInlineNode node) matches,
+  ) {
+    final active = _activeInlineSelectionData();
+    if (active == null) return false;
+    return _inlineSelectionContains(
+      active.children,
+      active.selection,
+      matches,
+    );
+  }
+
+  ({List<MarkdownInlineNode> children, TextSelection selection})?
+      _activeInlineSelectionData() {
+    if (_activeTableCell != null) {
+      final children = _tableCellController.inlineNodes;
+      if (children == null ||
+          _inlinePlainText(children) != _tableCellController.text) {
+        return null;
+      }
+      return (children: children, selection: _tableCellController.selection);
+    }
+
+    if (!_activeFormattedPlainText || _activeFormattedBlockId == null) {
+      return null;
+    }
+
+    final block = _formattedBlockController.block ?? _activeEditableBlock();
+    final children = switch (block) {
+      MarkdownParagraphBlock() => block.children,
+      MarkdownHeadingBlock() => block.children,
+      _ => null,
+    };
+    if (children == null ||
+        _inlinePlainText(children) != _formattedBlockController.text) {
+      return null;
+    }
+    return (children: children, selection: _formattedBlockController.selection);
+  }
+
+  bool _inlineSelectionContains(
+    List<MarkdownInlineNode> children,
+    TextSelection selection,
+    bool Function(MarkdownInlineNode node) matches,
+  ) {
+    if (!selection.isValid) return false;
+    final length = _inlinePlainText(children).length;
+    final start = selection.start.clamp(0, length).toInt();
+    final end = selection.end.clamp(start, length).toInt();
+    return _inlineSelectionContainsInRange(
+      children,
+      0,
+      start,
+      end,
+      selection.isCollapsed,
+      matches,
+    );
+  }
+
+  bool _inlineSelectionContainsInRange(
+    List<MarkdownInlineNode> children,
+    int baseOffset,
+    int selectionStart,
+    int selectionEnd,
+    bool collapsed,
+    bool Function(MarkdownInlineNode node) matches,
+  ) {
+    var cursor = baseOffset;
+    for (final node in children) {
+      final nodeStart = cursor;
+      final nodeEnd = nodeStart + node.plainText.length;
+      cursor = nodeEnd;
+
+      final overlaps = collapsed
+          ? selectionStart > nodeStart && selectionStart <= nodeEnd
+          : selectionStart < nodeEnd && selectionEnd > nodeStart;
+      if (!overlaps) continue;
+
+      if (matches(node)) return true;
+
+      final nested = _inlineNodeChildren(node);
+      if (nested != null &&
+          _inlineSelectionContainsInRange(
+            nested,
+            nodeStart,
+            selectionStart,
+            selectionEnd,
+            collapsed,
+            matches,
+          )) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  List<MarkdownInlineNode>? _inlineNodeChildren(MarkdownInlineNode node) {
+    return switch (node) {
+      MarkdownStrong() => node.children,
+      MarkdownEmphasis() => node.children,
+      MarkdownStrikethrough() => node.children,
+      MarkdownLink() => node.children,
+      _ => null,
+    };
+  }
+
+  bool _isStoredMarkCommand(MarkdownEditorCommand command) {
+    return command == MarkdownEditorCommand.bold ||
+        command == MarkdownEditorCommand.italic ||
+        command == MarkdownEditorCommand.strikethrough ||
+        command == MarkdownEditorCommand.inlineCode;
+  }
+
+  _StoredMarkTarget? _currentStoredMarkTarget() {
+    final cell = _activeTableCell;
+    if (cell != null) {
+      return _StoredMarkTarget.tableCell(
+        tableId: cell.tableId,
+        rowIndex: cell.rowIndex,
+        columnIndex: cell.columnIndex,
+        header: cell.header,
+      );
+    }
+
+    final blockId = _activeFormattedBlockId;
+    if (_activeFormattedPlainText && blockId != null) {
+      return _StoredMarkTarget.formattedBlock(blockId);
+    }
+    return null;
+  }
+
+  bool _storedMarkTargetMatchesCurrentSelection() {
+    final target = _storedMarkTarget;
+    if (target == null) return false;
+    if (target != _currentStoredMarkTarget()) return false;
+    final selection = _activeTableCell != null
+        ? _tableCellController.selection
+        : _formattedBlockController.selection;
+    return selection.isValid && selection.isCollapsed;
+  }
+
+  void _clearStoredMarks() {
+    _storedMarkTarget = null;
+    _storedMarks = const {};
+  }
+
+  void _clearStoredMarksForExpandedSelection() {
+    final target = _currentStoredMarkTarget();
+    if (_storedMarkTarget != target) return;
+    final selection = _activeTableCell != null
+        ? _tableCellController.selection
+        : _formattedBlockController.selection;
+    if (!selection.isValid || !selection.isCollapsed) {
+      _clearStoredMarks();
+    }
+  }
+
+  bool _toggleStoredMarkCommand(MarkdownEditorCommand command) {
+    if (!_isStoredMarkCommand(command)) return false;
+
+    final target = _currentStoredMarkTarget();
+    if (target == null) return false;
+    final selection = _activeTableCell != null
+        ? _tableCellController.selection
+        : _formattedBlockController.selection;
+    if (!selection.isValid || !selection.isCollapsed) return false;
+
+    final nextMarks = target == _storedMarkTarget
+        ? Set<MarkdownEditorCommand>.of(_storedMarks)
+        : _effectiveStoredMarksAtCurrentSelection();
+
+    if (command == MarkdownEditorCommand.inlineCode) {
+      if (nextMarks.contains(command)) {
+        nextMarks.clear();
+      } else {
+        nextMarks
+          ..clear()
+          ..add(command);
+      }
+    } else {
+      nextMarks.remove(MarkdownEditorCommand.inlineCode);
+      if (!nextMarks.add(command)) {
+        nextMarks.remove(command);
+      }
+    }
+
+    setState(() {
+      _storedMarkTarget = target;
+      _storedMarks = Set<MarkdownEditorCommand>.unmodifiable(nextMarks);
+    });
+    _requestActiveEditorFocus();
+    return true;
+  }
+
+  Set<MarkdownEditorCommand> _effectiveStoredMarksAtCurrentSelection() {
+    final marks = <MarkdownEditorCommand>{};
+    if (_activeInlineSelectionContains((node) => node is MarkdownStrong)) {
+      marks.add(MarkdownEditorCommand.bold);
+    }
+    if (_activeInlineSelectionContains((node) => node is MarkdownEmphasis)) {
+      marks.add(MarkdownEditorCommand.italic);
+    }
+    if (_activeInlineSelectionContains(
+      (node) => node is MarkdownStrikethrough,
+    )) {
+      marks.add(MarkdownEditorCommand.strikethrough);
+    }
+    if (_activeInlineSelectionContains((node) => node is MarkdownInlineCode)) {
+      return {MarkdownEditorCommand.inlineCode};
+    }
+    return marks;
+  }
+
+  List<MarkdownInlineNode> _storedMarkedTextNodes(String text) {
+    if (_storedMarks.contains(MarkdownEditorCommand.inlineCode)) {
+      return [MarkdownInlineCode(text)];
+    }
+
+    var nodes = <MarkdownInlineNode>[MarkdownText(text)];
+    if (_storedMarks.contains(MarkdownEditorCommand.bold)) {
+      nodes = [MarkdownStrong(nodes)];
+    }
+    if (_storedMarks.contains(MarkdownEditorCommand.italic)) {
+      nodes = [MarkdownEmphasis(nodes)];
+    }
+    if (_storedMarks.contains(MarkdownEditorCommand.strikethrough)) {
+      nodes = [MarkdownStrikethrough(nodes)];
+    }
+    return nodes;
+  }
+
+  String? _inlineSelectionMarkdown(
+    List<MarkdownInlineNode> children,
+    TextSelection selection,
+  ) {
+    if (selection.isCollapsed) return null;
+
+    final plainText = _inlinePlainText(children);
+    final start = selection.start.clamp(0, plainText.length).toInt();
+    final end = selection.end.clamp(start, plainText.length).toInt();
+    if (start == end) return null;
+
+    final selected =
+        _sliceInlineNodes(children, TextRange(start: start, end: end));
+    if (selected.isEmpty) return null;
+    return _inlineMarkdown(selected);
+  }
+
+  List<MarkdownInlineNode> _sliceInlineNodes(
+    List<MarkdownInlineNode> children,
+    TextRange range,
+  ) {
+    final result = <MarkdownInlineNode>[];
+    var cursor = 0;
+
+    for (final child in children) {
+      final childStart = cursor;
+      final childEnd = childStart + child.plainText.length;
+      cursor = childEnd;
+
+      if (childEnd <= range.start) continue;
+      if (childStart >= range.end) break;
+
+      final localStart =
+          (range.start - childStart).clamp(0, child.plainText.length).toInt();
+      final localEnd = (range.end - childStart)
+          .clamp(localStart, child.plainText.length)
+          .toInt();
+      final sliced = _sliceInlineNode(
+        child,
+        TextRange(start: localStart, end: localEnd),
+      );
+      if (sliced != null && sliced.plainText.isNotEmpty) {
+        result.add(sliced);
+      }
+    }
+
+    return result;
+  }
+
+  MarkdownInlineNode? _sliceInlineNode(
+    MarkdownInlineNode node,
+    TextRange range,
+  ) {
+    final length = node.plainText.length;
+    final start = range.start.clamp(0, length).toInt();
+    final end = range.end.clamp(start, length).toInt();
+    if (start == end) return null;
+    if (start == 0 && end == length) return node;
+
+    switch (node) {
+      case MarkdownText():
+        return MarkdownText(node.text.substring(start, end));
+      case MarkdownStrong():
+        final children = _sliceInlineNodes(
+          node.children,
+          TextRange(start: start, end: end),
+        );
+        return children.isEmpty ? null : MarkdownStrong(children);
+      case MarkdownEmphasis():
+        final children = _sliceInlineNodes(
+          node.children,
+          TextRange(start: start, end: end),
+        );
+        return children.isEmpty ? null : MarkdownEmphasis(children);
+      case MarkdownStrikethrough():
+        final children = _sliceInlineNodes(
+          node.children,
+          TextRange(start: start, end: end),
+        );
+        return children.isEmpty ? null : MarkdownStrikethrough(children);
+      case MarkdownLink():
+        final children = _sliceInlineNodes(
+          node.children,
+          TextRange(start: start, end: end),
+        );
+        return children.isEmpty
+            ? null
+            : MarkdownLink(
+                url: node.url,
+                title: node.title,
+                children: children,
+              );
+      case MarkdownInlineCode():
+        return MarkdownInlineCode(node.code.substring(start, end));
+      case MarkdownInlineMath():
+        return MarkdownInlineMath(node.latex.substring(start, end));
+      case MarkdownHardBreak() || MarkdownImage() || MarkdownWikilink():
+        return start == 0 && end == length ? node : null;
+      default:
+        final text = node.plainText;
+        return MarkdownText(text.substring(start, end));
+    }
+  }
+
+  MarkdownTableCellPosition _tableCellPosition({
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+  }) {
+    return MarkdownTableCellPosition(
+      rowIndex: header ? 0 : rowIndex + 1,
+      columnIndex: columnIndex,
+    );
+  }
+
+  void _handleTableCellTap(
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+    required List<MarkdownInlineNode> children,
+  }) {
+    if (HardwareKeyboard.instance.isShiftPressed &&
+        _selectTableCellRangeTo(
+          table,
+          rowIndex: rowIndex,
+          columnIndex: columnIndex,
+          header: header,
+        )) {
+      return;
+    }
+
+    _activateTableCell(
+      table.id,
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: header,
+      children: children,
+    );
+  }
+
+  bool _selectTableCellRangeTo(
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+  }) {
+    final existingSelection = _activeTableSelection;
+    final activeCell = _activeTableCell;
+    MarkdownTableCellPosition? anchor;
+    if (existingSelection?.tableId == table.id) {
+      anchor = existingSelection!.anchor;
+    } else if (activeCell != null && activeCell.tableId == table.id) {
+      anchor = _tableCellPosition(
+        rowIndex: activeCell.rowIndex,
+        columnIndex: activeCell.columnIndex,
+        header: activeCell.header,
+      );
+    }
+    if (anchor == null) return false;
+
+    final focus = _tableCellPosition(
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: header,
+    );
+    final selection = MarkdownTableCellSelection(
+      tableId: table.id,
+      anchor: anchor,
+      focus: focus,
+    );
+
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeTableSelection = selection;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _beginTableCellRangeSelection(
+    MarkdownTableBlock table, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+  }) {
+    final anchor = _tableCellPosition(
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: header,
+    );
+    final selection = MarkdownTableCellSelection(
+      tableId: table.id,
+      anchor: anchor,
+      focus: anchor,
+    );
+
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeTableSelection = selection;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  void _activateTableCell(
+    String tableId, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+    required List<MarkdownInlineNode> children,
+  }) {
+    final nextStoredTarget = _StoredMarkTarget.tableCell(
+      tableId: tableId,
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: header,
+    );
+    if (nextStoredTarget != _storedMarkTarget) {
+      _clearStoredMarks();
+    }
+
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = children
+      ..value = TextEditingValue(
+        text: _inlinePlainText(children),
+        selection: TextSelection.collapsed(
+          offset: _inlinePlainText(children).length,
+        ),
+      );
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = _TableCellSelection(
+        tableId: tableId,
+        rowIndex: rowIndex,
+        columnIndex: columnIndex,
+        header: header,
+      );
+      _activeTableSelection = null;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _tableCellFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _handleTableCellChanged() {
+    if (_syncingTableCell) return;
+    if (_hasActiveComposing(_tableCellController.value)) return;
+
+    final cell = _activeTableCell;
+    if (cell == null) return;
+
+    final table = _controller.document.blockById(cell.tableId);
+    if (table is! MarkdownTableBlock) return;
+    final currentChildren = _tableCellChildren(
+      table,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+    );
+    final currentText = _inlinePlainText(currentChildren);
+    final nextText = _tableCellController.text;
+
+    if (currentText == nextText) {
+      _clearStoredMarksForExpandedSelection();
+      return;
+    }
+
+    if (_applyTableCellLinkPaste(cell, currentText, nextText)) {
+      return;
+    }
+
+    if (_applyTableCellInlineMarkdownPaste(
+      cell,
+      currentChildren,
+      currentText,
+      nextText,
+    )) {
+      return;
+    }
+
+    if (_applyTableCellStoredMarkInsertion(
+      cell,
+      currentText,
+      nextText,
+    )) {
+      return;
+    }
+
+    if (!_controller.documentEditor.replaceTableCellText(
+      blockId: cell.tableId,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+      text: nextText,
+    )) {
+      return;
+    }
+
+    if (_applyTableCellInlineInputRule(cell, nextText)) {
+      return;
+    }
+
+    final nextTable = _controller.document.blockById(cell.tableId);
+    if (nextTable is! MarkdownTableBlock) return;
+    _tableCellController.inlineNodes = _tableCellChildren(
+      nextTable,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+    );
+  }
+
+  bool _applyTableCellStoredMarkInsertion(
+    _TableCellSelection cell,
+    String currentText,
+    String nextText,
+  ) {
+    if (!_storedMarkTargetMatchesCurrentSelection()) return false;
+
+    final diff = _plainTextDiff(currentText, nextText);
+    if (!diff.range.isCollapsed ||
+        diff.replacement.isEmpty ||
+        diff.replacement.contains('\n')) {
+      return false;
+    }
+
+    final applied =
+        _controller.documentEditor.replaceTableCellRangeWithInlineNodes(
+      blockId: cell.tableId,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+      range: diff.range,
+      replacement: _storedMarkedTextNodes(diff.replacement),
+    );
+    if (!applied) return false;
+
+    _syncActiveTableCell(
+      selectionOffset: diff.range.start + diff.replacement.length,
+    );
+    return true;
+  }
+
+  bool _applyTableCellInlineMarkdownPaste(
+    _TableCellSelection cell,
+    List<MarkdownInlineNode> currentChildren,
+    String currentText,
+    String nextText,
+  ) {
+    if (!_looksLikePastedMarkdown(nextText) ||
+        nextText.trimRight().contains('\n') ||
+        !_inlineChildrenHaveOnlyPlainText(currentChildren)) {
+      return false;
+    }
+
+    final parsed = MarkdownDocumentCodec(plugins: widget.plugins).parse(
+      nextText,
+    );
+    if (parsed.blocks.length != 1) return false;
+
+    final parsedBlock = parsed.blocks.single;
+    final children = switch (parsedBlock) {
+      MarkdownParagraphBlock() => parsedBlock.children,
+      MarkdownHeadingBlock() => parsedBlock.children,
+      _ => null,
+    };
+    final normalizedChildren =
+        children == null ? null : _normalizeInlinePasteNodes(children);
+    if (normalizedChildren == null || normalizedChildren.isEmpty) return false;
+    if (normalizedChildren.length == 1 &&
+        normalizedChildren.single is MarkdownText &&
+        normalizedChildren.single.plainText == nextText) {
+      return false;
+    }
+
+    final replaced =
+        _controller.documentEditor.replaceTableCellRangeWithInlineNodes(
+      blockId: cell.tableId,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+      range: TextRange(start: 0, end: currentText.length),
+      replacement: normalizedChildren,
+    );
+    if (!replaced) return false;
+
+    final table = _controller.document.blockById(cell.tableId);
+    if (table is! MarkdownTableBlock) return false;
+    final nextChildren = _tableCellChildren(
+      table,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+    );
+    final plainText = _inlinePlainText(nextChildren);
+
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = nextChildren
+      ..value = TextEditingValue(
+        text: plainText,
+        selection: TextSelection.collapsed(offset: plainText.length),
+      );
+    _syncingTableCell = false;
+    _tableCellFocusNode.requestFocus();
+    setState(() {});
+    return true;
+  }
+
+  bool _applyTableCellLinkPaste(
+    _TableCellSelection cell,
+    String currentText,
+    String nextText,
+  ) {
+    final diff = _plainTextDiff(currentText, nextText);
+    final url = _linkPasteUrl(diff.replacement);
+    if (url == null) return false;
+
+    final applied = diff.range.isCollapsed
+        ? _controller.documentEditor.replaceTableCellRangeWithInlineNodes(
+            blockId: cell.tableId,
+            rowIndex: cell.rowIndex,
+            columnIndex: cell.columnIndex,
+            header: cell.header,
+            range: diff.range,
+            replacement: _linkPasteInsertedNodes(diff.replacement, url),
+          )
+        : _controller.documentEditor.applyTableCellInlineCommand(
+            blockId: cell.tableId,
+            rowIndex: cell.rowIndex,
+            columnIndex: cell.columnIndex,
+            header: cell.header,
+            range: diff.range,
+            command: MarkdownEditorCommand.link,
+            argument: url,
+          );
+    if (!applied) return false;
+
+    final table = _controller.document.blockById(cell.tableId);
+    if (table is! MarkdownTableBlock) return false;
+    final nextChildren = _tableCellChildren(
+      table,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+    );
+    final plainText = _inlinePlainText(nextChildren);
+    final selectionOffset = (diff.range.isCollapsed
+            ? diff.range.start + diff.replacement.length
+            : diff.range.end)
+        .clamp(0, plainText.length)
+        .toInt();
+
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = nextChildren
+      ..value = TextEditingValue(
+        text: plainText,
+        selection: TextSelection.collapsed(offset: selectionOffset),
+      );
+    _syncingTableCell = false;
+    _tableCellFocusNode.requestFocus();
+    setState(() {});
+    return true;
+  }
+
+  bool _applyTableCellInlineInputRule(
+    _TableCellSelection cell,
+    String text,
+  ) {
+    final selection = _tableCellController.selection;
+    if (!selection.isValid || !selection.isCollapsed) {
+      return false;
+    }
+
+    final match = _inlineInputRuleMatch(text, selection.extentOffset);
+    if (match == null) return false;
+
+    final applied =
+        _controller.documentEditor.replaceTableCellRangeWithInlineNodes(
+      blockId: cell.tableId,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+      range: match.range,
+      replacement: match.replacement,
+    );
+    if (!applied) return false;
+
+    final table = _controller.document.blockById(cell.tableId);
+    if (table is! MarkdownTableBlock) return false;
+    final children = _tableCellChildren(
+      table,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+    );
+    final plainText = _inlinePlainText(children);
+    final selectionOffset = match.range.start + match.plainText.length;
+
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = children
+      ..value = TextEditingValue(
+        text: plainText,
+        selection: TextSelection.collapsed(
+          offset: selectionOffset.clamp(0, plainText.length),
+        ),
+      );
+    _syncingTableCell = false;
+    _tableCellFocusNode.requestFocus();
+    setState(() {});
+    return true;
+  }
+
+  KeyEventResult _handleTableCellKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    final moveUpward = _blockMoveShortcutUpward(event);
+    if (moveUpward != null) {
+      return _moveActiveTopLevelBlock(upward: moveUpward)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    final isModifierPressed = HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isAltPressed;
+    if (isModifierPressed) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      final moved = _moveActiveTableCell(
+        backward: HardwareKeyboard.instance.isShiftPressed,
+      );
+      return moved ? KeyEventResult.handled : KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      final moved = _moveActiveTableCellToNextRow();
+      return moved ? KeyEventResult.handled : KeyEventResult.ignored;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  bool _moveActiveTableCell({required bool backward}) {
+    final cell = _activeTableCell;
+    if (cell == null || !widget.enabled) return false;
+
+    final table = _controller.document.blockById(cell.tableId);
+    if (table is! MarkdownTableBlock || table.columnCount == 0) return false;
+
+    final nextCell = backward
+        ? _previousTableCell(table, cell)
+        : _nextTableCell(table, cell);
+    if (nextCell == null) return true;
+
+    var nextTable = table;
+    if (!backward &&
+        !nextCell.header &&
+        nextCell.rowIndex == table.rows.length) {
+      _controller.documentEditor.insertTableRowAfter(
+        table.id,
+        table.rows.length - 1,
+      );
+      final updated = _controller.document.blockById(table.id);
+      if (updated is! MarkdownTableBlock) return true;
+      nextTable = updated;
+    }
+
+    _activateTableCell(
+      nextCell.tableId,
+      rowIndex: nextCell.rowIndex,
+      columnIndex: nextCell.columnIndex,
+      header: nextCell.header,
+      children: _tableCellChildren(
+        nextTable,
+        rowIndex: nextCell.rowIndex,
+        columnIndex: nextCell.columnIndex,
+        header: nextCell.header,
+      ),
+    );
+    return true;
+  }
+
+  bool _moveActiveTableCellToNextRow() {
+    final cell = _activeTableCell;
+    if (cell == null || !widget.enabled) return false;
+
+    final table = _controller.document.blockById(cell.tableId);
+    if (table is! MarkdownTableBlock || table.columnCount == 0) return false;
+
+    final columnIndex =
+        cell.columnIndex.clamp(0, table.columnCount - 1).toInt();
+    final rowIndex = cell.header ? 0 : cell.rowIndex + 1;
+    var nextTable = table;
+
+    if (rowIndex >= table.rows.length) {
+      _controller.documentEditor.insertTableRowAfter(
+        table.id,
+        table.rows.length - 1,
+      );
+      final updated = _controller.document.blockById(table.id);
+      if (updated is! MarkdownTableBlock) return true;
+      nextTable = updated;
+    }
+
+    _activateTableCell(
+      cell.tableId,
+      rowIndex: rowIndex,
+      columnIndex: columnIndex,
+      header: false,
+      children: _tableCellChildren(
+        nextTable,
+        rowIndex: rowIndex,
+        columnIndex: columnIndex,
+        header: false,
+      ),
+    );
+    return true;
+  }
+
+  _TableCellSelection? _nextTableCell(
+    MarkdownTableBlock table,
+    _TableCellSelection cell,
+  ) {
+    if (cell.tableId != table.id || cell.columnIndex < 0) return null;
+
+    if (cell.header) {
+      if (cell.columnIndex + 1 < table.columnCount) {
+        return cell.copyWith(columnIndex: cell.columnIndex + 1);
+      }
+      return cell.copyWith(rowIndex: 0, columnIndex: 0, header: false);
+    }
+
+    if (cell.rowIndex < 0) return null;
+    if (cell.columnIndex + 1 < table.columnCount) {
+      return cell.copyWith(columnIndex: cell.columnIndex + 1);
+    }
+    if (cell.rowIndex + 1 < table.rows.length) {
+      return cell.copyWith(rowIndex: cell.rowIndex + 1, columnIndex: 0);
+    }
+
+    return cell.copyWith(rowIndex: table.rows.length, columnIndex: 0);
+  }
+
+  _TableCellSelection? _previousTableCell(
+    MarkdownTableBlock table,
+    _TableCellSelection cell,
+  ) {
+    if (cell.tableId != table.id || cell.columnIndex < 0) return null;
+
+    if (!cell.header) {
+      if (cell.columnIndex > 0) {
+        return cell.copyWith(columnIndex: cell.columnIndex - 1);
+      }
+      if (cell.rowIndex > 0) {
+        return cell.copyWith(
+          rowIndex: cell.rowIndex - 1,
+          columnIndex: table.columnCount - 1,
+        );
+      }
+      return cell.copyWith(
+        rowIndex: 0,
+        columnIndex: table.columnCount - 1,
+        header: true,
+      );
+    }
+
+    if (cell.columnIndex > 0) {
+      return cell.copyWith(columnIndex: cell.columnIndex - 1);
+    }
+    return null;
+  }
+
+  void _insertTableRowAfterActive(MarkdownTableBlock table) {
+    final active = _activeTableCell;
+    final rowIndex = active?.tableId == table.id && !active!.header
+        ? active.rowIndex
+        : table.rows.length - 1;
+    _controller.documentEditor.insertTableRowAfter(table.id, rowIndex);
+  }
+
+  void _insertTableRowBeforeActive(MarkdownTableBlock table) {
+    final active = _activeTableCell;
+    final rowIndex =
+        active?.tableId == table.id && !active!.header ? active.rowIndex : 0;
+    _controller.documentEditor.insertTableRowBefore(table.id, rowIndex);
+  }
+
+  void _insertTableColumnAfterActive(MarkdownTableBlock table) {
+    final active = _activeTableCell;
+    final columnIndex = active?.tableId == table.id
+        ? active!.columnIndex
+        : table.columnCount - 1;
+    _controller.documentEditor.insertTableColumnAfter(table.id, columnIndex);
+  }
+
+  void _insertTableColumnBeforeActive(MarkdownTableBlock table) {
+    final active = _activeTableCell;
+    final columnIndex = active?.tableId == table.id ? active!.columnIndex : 0;
+    _controller.documentEditor.insertTableColumnBefore(table.id, columnIndex);
+  }
+
+  bool _canDeleteActiveTableRow(MarkdownTableBlock table) {
+    final active = _activeTableCell;
+    return active != null &&
+        active.tableId == table.id &&
+        !active.header &&
+        table.rows.isNotEmpty;
+  }
+
+  bool _canDeleteActiveTableColumn(MarkdownTableBlock table) {
+    final active = _activeTableCell;
+    return active != null &&
+        active.tableId == table.id &&
+        table.columnCount > 1;
+  }
+
+  void _deleteActiveTableRow(MarkdownTableBlock table) {
+    final active = _activeTableCell;
+    if (active == null || active.tableId != table.id || active.header) return;
+    _controller.documentEditor.deleteTableRow(table.id, active.rowIndex);
+    setState(() {
+      _activeTableCell = null;
+      _activeTableSelection = null;
+    });
+  }
+
+  void _deleteActiveTableColumn(MarkdownTableBlock table) {
+    final active = _activeTableCell;
+    if (active == null || active.tableId != table.id) return;
+    _controller.documentEditor.deleteTableColumn(table.id, active.columnIndex);
+    setState(() {
+      _activeTableCell = null;
+      _activeTableSelection = null;
+    });
+  }
+
+  void _toggleTableHeaderRow(MarkdownTableBlock table) {
+    _controller.documentEditor.toggleTableHeaderRow(table.id);
+  }
+
+  void _toggleTableHeaderColumn(MarkdownTableBlock table) {
+    _controller.documentEditor.toggleTableHeaderColumn(table.id);
+  }
+
+  void _deleteActiveTable(MarkdownTableBlock table) {
+    _controller.documentEditor.deleteTable(table.id);
+    setState(() {
+      _activeTableCell = null;
+      _activeTableSelection = null;
+    });
+  }
+
+  Widget _buildFormattedFrontmatterSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    MarkdownFrontmatterBlock block,
+  ) {
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    final textStyle = _sourceTextStyle(context) ??
+        theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace');
+
+    return DecoratedBox(
+      key: ValueKey(
+        'smooth_markdown_editor_frontmatter_block_${segment.range.start}',
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
+            child: SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  const Icon(Icons.data_object, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Frontmatter',
+                    style: editorTheme.blockHeaderTextStyle,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: _editorBlockPadding(context),
+            child: _FrontmatterEditor(
+              key: ValueKey(
+                'smooth_markdown_editor_frontmatter_editor_${block.id}',
+              ),
+              fieldKey: ValueKey(
+                'smooth_markdown_editor_frontmatter_source_${segment.range.start}',
+              ),
+              content: block.content,
+              enabled: widget.enabled,
+              textStyle: textStyle,
+              onChanged: (content) {
+                _controller.documentEditor.updateFrontmatter(
+                  block.id,
+                  content,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormattedCodeBlockSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    _FencedCodeBlock codeBlock,
+  ) {
+    final selectedLanguage = _supportedCodeLanguages.any(
+      (language) => language.value == codeBlock.language,
+    )
+        ? codeBlock.language
+        : '';
+    final isMermaid = codeBlock.language == 'mermaid';
+    final showMermaidSource = isMermaid &&
+        (_mermaidSourceBlocks.contains(segment.range.start) ||
+            codeBlock.code.trim().isEmpty);
+    final copied = _copiedCodeBlockStart == segment.range.start;
+
+    return DecoratedBox(
+      key: ValueKey('smooth_markdown_editor_code_block_${segment.range.start}'),
+      decoration: BoxDecoration(
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
+            child: SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'Edit code',
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    onPressed: widget.enabled
+                        ? () => _activateFormattedSegment(segment)
+                        : null,
+                  ),
+                  IconButton(
+                    tooltip: copied ? 'Copied' : 'Copy code',
+                    icon: Icon(
+                      copied ? Icons.check : Icons.copy,
+                      size: 18,
+                    ),
+                    onPressed: codeBlock.code.trim().isEmpty
+                        ? null
+                        : () => _copyCodeBlock(segment, codeBlock),
+                  ),
+                  if (isMermaid)
+                    IconButton(
+                      key: ValueKey(
+                        'smooth_markdown_editor_mermaid_toggle_${segment.range.start}',
+                      ),
+                      tooltip: showMermaidSource
+                          ? 'Preview Mermaid'
+                          : 'Edit Mermaid source',
+                      icon: Icon(
+                        showMermaidSource
+                            ? Icons.visibility_outlined
+                            : Icons.edit_outlined,
+                        size: 18,
+                      ),
+                      onPressed: () => _toggleMermaidSource(segment),
+                    ),
+                  const Spacer(),
+                  DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      key: ValueKey(
+                        'smooth_markdown_editor_code_language_${segment.range.start}',
+                      ),
+                      value: selectedLanguage,
+                      items: [
+                        for (final language in _supportedCodeLanguages)
+                          DropdownMenuItem(
+                            value: language.value,
+                            child: Text(language.label),
+                          ),
+                      ],
+                      onChanged: widget.enabled
+                          ? (language) => _updateCodeBlockLanguage(
+                                segment,
+                                codeBlock,
+                                language ?? '',
+                              )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: _editorBlockPadding(context),
+            child: showMermaidSource
+                ? _buildMermaidSourceView(context, segment, codeBlock)
+                : _renderMarkdown(context, segment.source),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMermaidSourceView(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    _FencedCodeBlock codeBlock,
+  ) {
+    final theme = Theme.of(context);
+    final textStyle = _sourceTextStyle(context) ??
+        theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace');
+
+    return InkWell(
+      key: ValueKey(
+          'smooth_markdown_editor_mermaid_source_${segment.range.start}'),
+      borderRadius: BorderRadius.circular(6),
+      onTap: widget.enabled ? () => _activateFormattedSegment(segment) : null,
+      child: DecoratedBox(
+        decoration: widget.styleSheet?.codeBlockDecoration ??
+            BoxDecoration(
+              color: _editorBlockHeaderColor(context),
+              borderRadius: BorderRadius.circular(6),
+            ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: widget.styleSheet?.codeBlockPadding ??
+              _editorBlockPadding(context),
+          child: Text(
+            codeBlock.code.isEmpty ? ' ' : codeBlock.code,
+            style: textStyle,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormattedBlockMathSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    String latex,
+  ) {
+    final editorTheme = _effectiveEditorTheme(context);
+    final blockKey =
+        ValueKey('smooth_markdown_editor_block_math_${segment.range.start}');
+    final borderRadius = _editorBlockBorderRadius(context);
+    final openEditor =
+        widget.enabled ? () => _showBlockMathEditor(segment, latex) : null;
+
+    return Focus(
+      key: blockKey,
+      canRequestFocus: widget.enabled,
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent || openEditor == null) {
+          return KeyEventResult.ignored;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.space) {
+          openEditor();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Semantics(
+        button: widget.enabled,
+        label: 'Block Math',
+        child: InkWell(
+          key: ValueKey(
+            'smooth_markdown_editor_block_math_action_${segment.range.start}',
+          ),
+          borderRadius: borderRadius,
+          onTap: openEditor,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border.all(color: _editorBlockBorderColor(context)),
+              borderRadius: borderRadius,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Material(
+                  color: _editorBlockHeaderColor(context),
+                  borderRadius: _editorBlockHeaderRadius(context),
+                  child: SizedBox(
+                    height: 40,
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 12),
+                        const Icon(Icons.functions, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Block Math',
+                          style: editorTheme.blockHeaderTextStyle,
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Edit math',
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          onPressed: openEditor,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: _editorBlockPadding(context),
+                  child: _renderBlockMath(context, latex),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget? _buildCustomBlockSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+  ) {
+    final block = segment.block;
+    if (block == null) return null;
+
+    final contextData = _customBlockContext(segment, block);
+    final custom = widget.customBlockBuilder?.call(context, contextData);
+    if (custom != null) return custom;
+    if (block is! MarkdownRawBlock) return null;
+
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    return DecoratedBox(
+      key: ValueKey(
+        'smooth_markdown_editor_custom_block_${segment.range.start}',
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
+            child: SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  const Icon(Icons.extension_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Custom Block',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: editorTheme.blockHeaderTextStyle ??
+                          theme.textTheme.titleSmall,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Edit custom block',
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    onPressed: widget.enabled
+                        ? () => _activateFormattedSegment(segment)
+                        : null,
+                  ),
+                  IconButton(
+                    tooltip: 'Delete custom block',
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    onPressed: widget.enabled ? contextData.delete : null,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: _editorBlockPadding(context),
+            child: Text(
+              block.markdown,
+              style: _sourceTextStyle(context) ??
+                  theme.textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget? _buildCustomBlockEditorSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+  ) {
+    final block = segment.block;
+    if (block == null) return null;
+
+    final contextData = _customBlockEditorContext(segment, block);
+    return widget.customBlockEditorBuilder?.call(context, contextData);
+  }
+
+  MarkdownEditorCustomBlockContext _customBlockContext(
+    _MarkdownBlockSegment segment,
+    MarkdownBlock block,
+  ) {
+    return MarkdownEditorCustomBlockContext(
+      blockId: block.id,
+      blockType: block.type,
+      markdown: segment.source,
+      plainText: block.plainText,
+      enabled: widget.enabled,
+      edit: () => _activateFormattedSegment(segment),
+      replaceMarkdown: (markdown) => _replaceCustomBlockMarkdown(
+        segment,
+        markdown,
+      ),
+      delete: () => _deleteCustomBlock(segment),
+    );
+  }
+
+  MarkdownEditorCustomBlockEditorContext _customBlockEditorContext(
+    _MarkdownBlockSegment segment,
+    MarkdownBlock block,
+  ) {
+    return MarkdownEditorCustomBlockEditorContext(
+      blockId: block.id,
+      blockType: block.type,
+      markdown: segment.source,
+      plainText: block.plainText,
+      enabled: widget.enabled,
+      replaceMarkdown: (markdown) => _replaceCustomBlockMarkdown(
+        segment,
+        markdown,
+      ),
+      finishEditing: () {
+        setState(_clearActiveFormattedBlock);
+        _formattedPaneFocusNode.requestFocus();
+      },
+      delete: () => _deleteCustomBlock(segment),
+    );
+  }
+
+  void _replaceCustomBlockMarkdown(
+    _MarkdownBlockSegment segment,
+    String markdown,
+  ) {
+    if (!widget.enabled) return;
+
+    final block = segment.block;
+    if (block != null) {
+      final replaced = _controller.replaceBlockWithMarkdown(block.id, markdown);
+      if (replaced != null) {
+        setState(_clearActiveFormattedBlock);
+        _formattedPaneFocusNode.requestFocus();
+        return;
+      }
+    }
+
+    _controller.replaceRange(
+      segment.range,
+      markdown,
+      selection: TextSelection.collapsed(offset: segment.range.start),
+    );
+    setState(_clearActiveFormattedBlock);
+    _formattedPaneFocusNode.requestFocus();
+  }
+
+  void _deleteCustomBlock(_MarkdownBlockSegment segment) {
+    if (!widget.enabled) return;
+
+    final block = segment.block;
+    if (block != null) {
+      _controller.documentEditor.removeBlock(block.id);
+    } else {
+      _controller.replaceRange(segment.range, '');
+    }
+    setState(_clearActiveFormattedBlock);
+    _formattedPaneFocusNode.requestFocus();
+  }
+
+  Widget _buildFormattedImageSegment(
+    BuildContext context,
+    _MarkdownBlockSegment segment,
+    MarkdownImageBlock block,
+  ) {
+    final editorTheme = _effectiveEditorTheme(context);
+    return DecoratedBox(
+      key:
+          ValueKey('smooth_markdown_editor_image_block_${segment.range.start}'),
+      decoration: BoxDecoration(
+        border: Border.all(color: _editorBlockBorderColor(context)),
+        borderRadius: _editorBlockBorderRadius(context),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: _editorBlockHeaderColor(context),
+            borderRadius: _editorBlockHeaderRadius(context),
+            child: SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  const Icon(Icons.image_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      block.alt.isEmpty ? block.url : block.alt,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: editorTheme.blockHeaderTextStyle,
+                    ),
+                  ),
+                  IconButton(
+                    key: ValueKey(
+                      'smooth_markdown_editor_image_edit_${segment.range.start}',
+                    ),
+                    tooltip: 'Edit image',
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    onPressed: widget.enabled
+                        ? () => unawaited(_showImageBlockEditor(block))
+                        : null,
+                  ),
+                  IconButton(
+                    key: ValueKey(
+                      'smooth_markdown_editor_image_delete_${segment.range.start}',
+                    ),
+                    tooltip: 'Delete image',
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    onPressed: widget.enabled
+                        ? () {
+                            _controller.documentEditor.removeBlock(block.id);
+                            setState(_clearActiveFormattedBlock);
+                          }
+                        : null,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: _editorBlockPadding(context),
+            child: _renderMarkdown(context, block.toMarkdown()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourcePane(BuildContext context) {
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+
+    return DecoratedBox(
+      decoration: widget.sourceDecoration ??
+          editorTheme.sourceDecoration ??
+          BoxDecoration(color: theme.colorScheme.surface),
+      child: TextField(
+        key: _sourceKey,
+        controller: _controller.textController,
+        focusNode: _focusNode,
+        enabled: widget.enabled,
+        autofocus: widget.autofocus,
+        scrollController: _sourceScrollController,
+        expands: true,
+        maxLines: null,
+        minLines: null,
+        textAlignVertical: TextAlignVertical.top,
+        style: _sourceTextStyle(context),
+        keyboardType: TextInputType.multiline,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          hintText: widget.placeholder,
+          contentPadding: editorTheme.sourcePadding ?? const EdgeInsets.all(16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewPane(BuildContext context) {
+    final theme = Theme.of(context);
+    final editorTheme = _effectiveEditorTheme(context);
+    return DecoratedBox(
+      decoration: widget.previewDecoration ??
+          editorTheme.previewDecoration ??
+          BoxDecoration(color: theme.colorScheme.surface),
+      child: SingleChildScrollView(
+        padding: editorTheme.previewPadding ?? const EdgeInsets.all(16),
+        child: _renderMarkdown(context, _controller.text),
+      ),
+    );
+  }
+
+  TextStyle? _sourceTextStyle(BuildContext context) {
+    final editorTheme = _effectiveEditorTheme(context);
+    return widget.textStyle ??
+        editorTheme.sourceTextStyle ??
+        Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontFamily: 'monospace',
+              height: 1.5,
+            );
+  }
+
+  TextStyle? _formattedEditingTextStyle(
+    BuildContext context,
+    MarkdownBlock? block,
+  ) {
+    final theme = Theme.of(context);
+    if (block is MarkdownCodeBlock || block is MarkdownMermaidBlock) {
+      return _sourceTextStyle(context);
+    }
+    if (block is MarkdownHeadingBlock) {
+      final style = switch (block.level) {
+        1 => theme.textTheme.headlineMedium,
+        2 => theme.textTheme.headlineSmall,
+        3 => theme.textTheme.titleLarge,
+        4 => theme.textTheme.titleMedium,
+        _ => theme.textTheme.titleSmall,
+      };
+      return style?.copyWith(fontWeight: FontWeight.w700, height: 1.25);
+    }
+    return widget.textStyle ??
+        theme.textTheme.bodyMedium?.copyWith(height: 1.5);
+  }
+
+  Widget _renderMarkdown(BuildContext context, String data) {
+    return SmoothMarkdown(
+      data: data,
+      styleSheet: _effectiveStyleSheet(context),
+      config: widget.config,
+      onTapLink: widget.onTapLink == null ? null : _handleEditorLinkTap,
+      onTapImage: widget.onTapImage,
+      imageBuilder: widget.imageBuilder,
+      codeBuilder: widget.codeBuilder,
+      useEnhancedComponents: widget.useEnhancedComponents,
+      enableCache: widget.enableCache,
+      useRepaintBoundary: true,
+      plugins: _previewPlugins(),
+      builderRegistry: _previewBuilderRegistry(),
+    );
+  }
+
+  void _handleEditorLinkTap(String url) {
+    final keyboard = HardwareKeyboard.instance;
+    if (!keyboard.isMetaPressed && !keyboard.isControlPressed) return;
+
+    final normalizedUrl = _normalizeAllowedLinkUrl(url);
+    if (normalizedUrl == null || normalizedUrl.isEmpty) return;
+
+    widget.onTapLink?.call(normalizedUrl);
+  }
+
+  void _handleFormattedSegmentTap(_MarkdownBlockSegment segment) {
+    if (HardwareKeyboard.instance.isShiftPressed &&
+        _selectFormattedDocumentRangeTo(segment)) {
+      return;
+    }
+
+    _activateFormattedSegment(segment);
+  }
+
+  void _handleFormattedListItemTap(
+    MarkdownListBlock list,
+    int itemIndex,
+    _MarkdownBlockSegment segment,
+  ) {
+    if (HardwareKeyboard.instance.isShiftPressed &&
+        _selectFormattedListItemRangeTo(list, itemIndex)) {
+      return;
+    }
+
+    _activateFormattedSegment(segment);
+  }
+
+  bool _selectFormattedListItemRangeTo(
+    MarkdownListBlock focusList,
+    int focusIndex,
+  ) {
+    if (focusIndex < 0 || focusIndex >= focusList.items.length) return false;
+
+    final existingSelection = _activeListItemSelection;
+    final existingAnchorLocation = existingSelection == null
+        ? null
+        : _listItemLocationForItemId(
+            existingSelection.listId,
+            existingSelection.anchorItemId,
+          );
+    final activeLocation = existingAnchorLocation ?? _activeListItemLocation();
+    if (activeLocation == null || activeLocation.list.id != focusList.id) {
+      return false;
+    }
+
+    final anchorItemId =
+        existingAnchorLocation?.item.id ?? activeLocation.item.id;
+    final selection = MarkdownListItemSelection(
+      listId: focusList.id,
+      anchorItemId: anchorItemId,
+      focusItemId: focusList.items[focusIndex].id,
+    );
+    if (selection.normalizedFor(focusList.items) == null) return false;
+
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = null
+      ..value = const TextEditingValue();
+    _syncingFormattedBlock = false;
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeListItemSelection = selection;
+    });
+    final sourceSelection = _sourceSelectionForListItemSelection(selection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _beginFormattedListItemRangeSelection(
+    MarkdownListBlock list,
+    int itemIndex,
+  ) {
+    if (itemIndex < 0 || itemIndex >= list.items.length) return false;
+
+    final item = list.items[itemIndex];
+    final selection = MarkdownListItemSelection(
+      listId: list.id,
+      anchorItemId: item.id,
+      focusItemId: item.id,
+    );
+
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = null
+      ..value = const TextEditingValue();
+    _syncingFormattedBlock = false;
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeListItemSelection = selection;
+    });
+    final sourceSelection = _sourceSelectionForListItemSelection(selection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _selectFormattedDocumentRangeTo(_MarkdownBlockSegment focusSegment) {
+    if (!_isSelectableDocumentTextSegment(focusSegment)) return false;
+
+    final focusBlock = focusSegment.block!;
+    final focusLocation = _documentTextSegmentLocation(focusSegment);
+    if (focusLocation == null) return false;
+
+    final existingSelection = _activeDocumentSelection;
+    final existingAnchor = existingSelection?.anchor;
+    final existingAnchorLocation = existingAnchor == null
+        ? null
+        : _documentTextBlockLocation(existingAnchor.blockId);
+    final activeLocation = existingAnchorLocation ??
+        (existingAnchor == null ? _activeDocumentTextBlockLocation() : null);
+    if (activeLocation == null) return false;
+    if (activeLocation.parentId != focusLocation.parentId) return false;
+
+    final anchorBlock = activeLocation.block;
+    final anchorIndex = activeLocation.index;
+    final focusIndex = focusLocation.index;
+    final existingAnchorMatchesParent =
+        existingAnchor != null && existingAnchorLocation != null;
+    final anchor = existingAnchorMatchesParent
+        ? existingAnchor
+        : MarkdownDocumentPosition(
+            blockId: anchorBlock.id,
+            offset:
+                focusIndex >= anchorIndex ? 0 : anchorBlock.plainText.length,
+          );
+    final focus = MarkdownDocumentPosition(
+      blockId: focusBlock.id,
+      offset: focusIndex >= anchorIndex ? focusBlock.plainText.length : 0,
+    );
+    final selection = MarkdownDocumentSelection(anchor: anchor, focus: focus);
+    if (_documentSelectionBlockIds(selection).isEmpty) return false;
+
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = null
+      ..value = const TextEditingValue();
+    _syncingFormattedBlock = false;
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeDocumentSelection = selection;
+    });
+    final sourceSelection = _sourceSelectionForDocumentSelection(selection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _beginFormattedDocumentRangeSelection(
+    _MarkdownBlockSegment anchorSegment,
+  ) {
+    if (!_isSelectableDocumentTextSegment(anchorSegment)) return false;
+
+    final block = anchorSegment.block!;
+    final selection = MarkdownDocumentSelection(
+      anchor: MarkdownDocumentPosition(blockId: block.id, offset: 0),
+      focus: MarkdownDocumentPosition(
+        blockId: block.id,
+        offset: block.plainText.length,
+      ),
+    );
+
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = null
+      ..value = const TextEditingValue();
+    _syncingFormattedBlock = false;
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = null
+      ..value = const TextEditingValue();
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeDocumentSelection = selection;
+    });
+    final sourceSelection = _sourceSelectionForDocumentSelection(selection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _isSelectableDocumentTextSegment(_MarkdownBlockSegment segment) {
+    final block = segment.block;
+    return block != null && _isSelectableDocumentTextBlock(block);
+  }
+
+  bool _isSelectableDocumentTextBlock(MarkdownBlock block) {
+    return block is MarkdownParagraphBlock || block is MarkdownHeadingBlock;
+  }
+
+  _DocumentTextBlockLocation? _documentTextSegmentLocation(
+    _MarkdownBlockSegment segment,
+  ) {
+    final block = segment.block;
+    if (block == null || !_isSelectableDocumentTextBlock(block)) return null;
+    return _documentTextBlockLocation(block.id);
+  }
+
+  _DocumentTextBlockLocation? _documentTextBlockLocation(String blockId) {
+    return _documentTextBlockLocationInBlocks(
+      parentId: null,
+      blocks: _controller.document.blocks,
+      blockId: blockId,
+    );
+  }
+
+  _DocumentTextBlockLocation? _documentTextBlockLocationInBlocks({
+    required String? parentId,
+    required List<MarkdownBlock> blocks,
+    required String blockId,
+  }) {
+    for (var index = 0; index < blocks.length; index++) {
+      final block = blocks[index];
+      if (block.id == blockId && _isSelectableDocumentTextBlock(block)) {
+        return _DocumentTextBlockLocation(
+          parentId: parentId,
+          siblings: blocks,
+          index: index,
+          block: block,
+        );
+      }
+
+      final nested = switch (block) {
+        MarkdownBlockquoteBlock() => _documentTextBlockLocationInBlocks(
+            parentId: block.id,
+            blocks: block.blocks,
+            blockId: blockId,
+          ),
+        MarkdownListBlock() => _documentTextBlockLocationInList(
+            list: block,
+            blockId: blockId,
+          ),
+        _ => null,
+      };
+      if (nested != null) return nested;
+    }
+    return null;
+  }
+
+  _DocumentTextBlockLocation? _documentTextBlockLocationInList({
+    required MarkdownListBlock list,
+    required String blockId,
+  }) {
+    for (final item in list.items) {
+      final nested = _documentTextBlockLocationInBlocks(
+        parentId: item.id,
+        blocks: item.blocks,
+        blockId: blockId,
+      );
+      if (nested != null) return nested;
+    }
+    return null;
+  }
+
+  _DocumentTextBlockLocation? _activeDocumentTextBlockLocation() {
+    final blockId = _activeFormattedBlockId;
+    if (!_activeFormattedPlainText || blockId == null) return null;
+    return _documentTextBlockLocation(blockId);
+  }
+
+  List<_MarkdownBlockSegment> _documentSelectionSegments(
+    MarkdownDocumentSelection selection,
+  ) {
+    final anchorLocation = _documentTextBlockLocation(selection.anchor.blockId);
+    final focusLocation = _documentTextBlockLocation(selection.focus.blockId);
+    if (anchorLocation == null ||
+        focusLocation == null ||
+        anchorLocation.parentId != focusLocation.parentId) {
+      return const [];
+    }
+
+    final startIndex = anchorLocation.index < focusLocation.index
+        ? anchorLocation.index
+        : focusLocation.index;
+    final endIndex = anchorLocation.index < focusLocation.index
+        ? focusLocation.index
+        : anchorLocation.index;
+    for (var index = startIndex; index <= endIndex; index++) {
+      if (!_isSelectableDocumentTextBlock(anchorLocation.siblings[index])) {
+        return const [];
+      }
+    }
+
+    final segments = _documentBlockSegments();
+    _MarkdownBlockSegment? segmentFor(String blockId) {
+      for (final segment in segments) {
+        final nested = _nestedSegmentForBlockId(segment, blockId);
+        if (nested != null) return nested;
+      }
+      return null;
+    }
+
+    final selected = <_MarkdownBlockSegment>[];
+    for (var index = startIndex; index <= endIndex; index++) {
+      final segment = segmentFor(anchorLocation.siblings[index].id);
+      if (segment == null) return const [];
+      selected.add(segment);
+    }
+    return selected;
+  }
+
+  bool _activeDocumentSelectionIncludes(_MarkdownBlockSegment segment) {
+    final selection = _activeDocumentSelection;
+    final block = segment.block;
+    if (selection == null || block == null) return false;
+    if (!_isSelectableDocumentTextSegment(segment)) return false;
+    return _documentSelectionBlockIds(selection).contains(block.id);
+  }
+
+  List<String> _documentSelectionBlockIds(
+    MarkdownDocumentSelection selection,
+  ) {
+    return [
+      for (final segment in _documentSelectionSegments(selection))
+        if (segment.block != null) segment.block!.id,
+    ];
+  }
+
+  TextSelection? _sourceSelectionForDocumentSelection(
+    MarkdownDocumentSelection selection,
+  ) {
+    final selected = _documentSelectionSegments(selection);
+    if (selected.isEmpty) return null;
+
+    final anchorLocation = _documentTextBlockLocation(selection.anchor.blockId);
+    final focusLocation = _documentTextBlockLocation(selection.focus.blockId);
+    if (anchorLocation == null || focusLocation == null) return null;
+
+    final forward = anchorLocation.index <= focusLocation.index;
+    final first = selected.first;
+    final last = selected.last;
+    return TextSelection(
+      baseOffset: forward
+          ? first.range.start + first.blockSourceOffset
+          : last.range.start + last.blockSourceOffset + last.source.length,
+      extentOffset: forward
+          ? last.range.start + last.blockSourceOffset + last.source.length
+          : first.range.start + first.blockSourceOffset,
+    );
+  }
+
+  bool _activeListItemSelectionIncludes(
+    MarkdownListBlock list,
+    MarkdownListItem item,
+  ) {
+    final selection = _activeListItemSelection;
+    if (selection == null || selection.listId != list.id) return false;
+    return selection.containsItem(item.id, list.items);
+  }
+
+  _ListItemLocation? _activeListItemLocation() {
+    final blockId = _activeFormattedBlockId;
+    if (!_activeFormattedPlainText || blockId == null) return null;
+    return _listItemLocationForBlockId(blockId);
+  }
+
+  _ListItemLocation? _listItemLocationForBlockId(String blockId) {
+    return _listItemLocationForBlockIdInBlocks(
+      _controller.document.blocks,
+      blockId,
+    );
+  }
+
+  _ListItemLocation? _listItemLocationForBlockIdInBlocks(
+    List<MarkdownBlock> blocks,
+    String blockId,
+  ) {
+    for (final block in blocks) {
+      if (block is MarkdownListBlock) {
+        for (var itemIndex = 0; itemIndex < block.items.length; itemIndex++) {
+          final item = block.items[itemIndex];
+          for (final child in item.blocks) {
+            final nested = _listItemLocationForBlockIdInBlocks(
+              [child],
+              blockId,
+            );
+            if (nested != null) return nested;
+          }
+
+          final primaryBlock = _firstEditableListItemBlock(item);
+          if (primaryBlock?.id == blockId) {
+            return _ListItemLocation(
+              list: block,
+              item: item,
+              itemIndex: itemIndex,
+              primaryBlock: primaryBlock,
+            );
+          }
+        }
+      } else if (block is MarkdownBlockquoteBlock) {
+        final nested = _listItemLocationForBlockIdInBlocks(
+          block.blocks,
+          blockId,
+        );
+        if (nested != null) return nested;
+      }
+    }
+    return null;
+  }
+
+  _ListItemLocation? _listItemLocationForItemId(
+    String listId,
+    String itemId,
+  ) {
+    return _listItemLocationForItemIdInBlocks(
+      _controller.document.blocks,
+      listId,
+      itemId,
+    );
+  }
+
+  _ListItemLocation? _listItemLocationForItemIdInBlocks(
+    List<MarkdownBlock> blocks,
+    String listId,
+    String itemId,
+  ) {
+    for (final block in blocks) {
+      if (block is MarkdownListBlock) {
+        if (block.id == listId) {
+          for (var index = 0; index < block.items.length; index++) {
+            final item = block.items[index];
+            if (item.id == itemId) {
+              return _ListItemLocation(
+                list: block,
+                item: item,
+                itemIndex: index,
+                primaryBlock: _firstEditableListItemBlock(item),
+              );
+            }
+          }
+        }
+
+        for (final item in block.items) {
+          final nested = _listItemLocationForItemIdInBlocks(
+            item.blocks,
+            listId,
+            itemId,
+          );
+          if (nested != null) return nested;
+        }
+      } else if (block is MarkdownBlockquoteBlock) {
+        final nested = _listItemLocationForItemIdInBlocks(
+          block.blocks,
+          listId,
+          itemId,
+        );
+        if (nested != null) return nested;
+      }
+    }
+    return null;
+  }
+
+  TextSelection? _sourceSelectionForListItemSelection(
+    MarkdownListItemSelection selection,
+  ) {
+    final list = _controller.document.blockById(selection.listId);
+    if (list is! MarkdownListBlock) return null;
+    final normalized = selection.normalizedFor(list.items);
+    if (normalized == null) return null;
+
+    final startIndex = list.items.indexWhere(
+      (item) => item.id == normalized.anchorItemId,
+    );
+    final endIndex = list.items.indexWhere(
+      (item) => item.id == normalized.focusItemId,
+    );
+    if (startIndex == -1 || endIndex == -1) return null;
+
+    _MarkdownBlockSegment? listSegment;
+    for (final segment in _documentBlockSegments()) {
+      listSegment = _nestedSegmentForBlockId(segment, list.id);
+      if (listSegment != null) break;
+    }
+    if (listSegment == null) return null;
+
+    final start = listSegment.range.start +
+        listSegment.blockSourceOffset +
+        _listItemSourceOffset(list, startIndex);
+    final end = listSegment.range.start +
+        listSegment.blockSourceOffset +
+        _listItemSourceOffset(list, endIndex) +
+        _serializedListItemLines(list, endIndex).join('\n').length;
+    final forward = selection.anchorItemId == normalized.anchorItemId;
+    return TextSelection(
+      baseOffset: forward ? start : end,
+      extentOffset: forward ? end : start,
+    );
+  }
+
+  int _listItemSourceOffset(MarkdownListBlock list, int itemIndex) {
+    var offset = 0;
+    for (var index = 0; index < itemIndex; index++) {
+      offset += _serializedListItemLines(list, index).join('\n').length + 1;
+    }
+    return offset;
+  }
+
+  _MarkdownBlockSegment? _nestedSegmentForBlockId(
+    _MarkdownBlockSegment segment,
+    String blockId,
+  ) {
+    if (segment.block?.id == blockId) return segment;
+    final block = segment.block;
+    if (block is MarkdownListBlock) {
+      for (var itemIndex = 0; itemIndex < block.items.length; itemIndex++) {
+        final item = block.items[itemIndex];
+        for (var childIndex = 0;
+            childIndex < item.blocks.length;
+            childIndex++) {
+          final child = item.blocks[childIndex];
+          final childSegment = _MarkdownBlockSegment(
+            range: segment.range,
+            source: child.toMarkdown(),
+            block: child,
+            containerBlockId: segment.containerBlockId ?? block.id,
+            blockSourceOffset: segment.blockSourceOffset +
+                _listItemChildBlockSourceOffset(block, itemIndex, childIndex),
+          );
+          final nested = _nestedSegmentForBlockId(childSegment, blockId);
+          if (nested != null) return nested;
+        }
+      }
+    } else if (block is MarkdownBlockquoteBlock) {
+      for (var index = 0; index < block.blocks.length; index++) {
+        final child = block.blocks[index];
+        final childSegment = _MarkdownBlockSegment(
+          range: segment.range,
+          source: child.toMarkdown(),
+          block: child,
+          containerBlockId: segment.containerBlockId ?? block.id,
+          blockSourceOffset: segment.blockSourceOffset +
+              _blockquoteChildSourceOffset(block, index),
+        );
+        final nested = _nestedSegmentForBlockId(childSegment, blockId);
+        if (nested != null) return nested;
+      }
+    }
+    return null;
+  }
+
+  void _clearActiveDocumentSelectionIfInvalid() {
+    final selection = _activeDocumentSelection;
+    if (selection != null && _documentSelectionBlockIds(selection).isEmpty) {
+      _activeDocumentSelection = null;
+    }
+
+    final listSelection = _activeListItemSelection;
+    final list = listSelection == null
+        ? null
+        : _controller.document.blockById(listSelection.listId);
+    if (listSelection != null &&
+        (list is! MarkdownListBlock ||
+            listSelection.normalizedFor(list.items) == null)) {
+      _activeListItemSelection = null;
+    }
+  }
+
+  Widget _renderBlockMath(BuildContext context, String latex) {
+    final styleSheet = _effectiveStyleSheet(context);
+    return const BlockMathBuilder().build(
+      BlockMathNode(latex),
+      styleSheet,
+      MarkdownRenderContext(
+        styleSheet: styleSheet,
+        selectable: false,
+      ),
+    );
+  }
+
+  void _activateFormattedSegment(
+    _MarkdownBlockSegment segment, {
+    TextSelection? selection,
+  }) {
+    final plainTextEditing = _usesPlainTextEditing(segment.block);
+    final editingText =
+        plainTextEditing ? segment.block!.plainText : segment.source;
+    final localSelection = _localSelectionForSegment(
+      segment,
+      selection,
+      editingText.length,
+      plainTextEditing: plainTextEditing,
+    );
+    final nextStoredTarget = plainTextEditing && segment.block != null
+        ? _StoredMarkTarget.formattedBlock(segment.block!.id)
+        : null;
+    if (nextStoredTarget == null || nextStoredTarget != _storedMarkTarget) {
+      _clearStoredMarks();
+    }
+    _syncingFormattedBlock = true;
+    _formattedBlockController.block = plainTextEditing ? segment.block : null;
+    _formattedBlockController.value = TextEditingValue(
+      text: editingText,
+      selection: localSelection,
+    );
+    _syncingFormattedBlock = false;
+
+    setState(() {
+      _activeDocumentSelection = null;
+      _activeTableCell = null;
+      _activeTableSelection = null;
+      _activeListItemSelection = null;
+      _activeFormattedRange = segment.range;
+      _activeFormattedBlockId = segment.block?.id;
+      _activeFormattedContainerBlockId = plainTextEditing
+          ? segment.containerBlockId ?? segment.block!.id
+          : null;
+      _activeFormattedBlockSourceOffset =
+          plainTextEditing ? segment.blockSourceOffset : 0;
+      _activeFormattedPlainText = plainTextEditing;
+    });
+    _controller.textController.selection = plainTextEditing
+        ? _sourceSelectionForPlainTextSelection(
+            segment.block!,
+            segment.source,
+            localSelection,
+            sourceBaseOffset: segment.range.start + segment.blockSourceOffset,
+          )
+        : TextSelection(
+            baseOffset: segment.range.start + localSelection.baseOffset,
+            extentOffset: segment.range.start + localSelection.extentOffset,
+          );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedBlockFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _handleFormattedBlockChanged() {
+    if (_syncingFormattedBlock) return;
+    if (_hasActiveComposing(_formattedBlockController.value)) return;
+
+    final range = _activeFormattedRange;
+    if (range == null) return;
+
+    if (_activeFormattedPlainText && _activeFormattedBlockId != null) {
+      _handlePlainTextFormattedBlockChanged(range);
+      return;
+    }
+
+    final text = _controller.text;
+    if (range.start < 0 || range.start > text.length) return;
+    final end = range.end.clamp(range.start, text.length);
+    final replacement = _formattedBlockController.text;
+    final nextRange = TextRange(
+      start: range.start,
+      end: range.start + replacement.length,
+    );
+
+    final localSelection = _formattedBlockController.selection;
+    final globalSelection = localSelection.isValid
+        ? TextSelection(
+            baseOffset: range.start + localSelection.baseOffset,
+            extentOffset: range.start + localSelection.extentOffset,
+          )
+        : TextSelection.collapsed(offset: nextRange.end);
+
+    _activeFormattedRange = nextRange;
+
+    if (text.substring(range.start, end) == replacement) {
+      _controller.textController.selection = globalSelection;
+      return;
+    }
+
+    _controller.replaceRange(
+      TextRange(start: range.start, end: end),
+      replacement,
+      selection: globalSelection,
+    );
+  }
+
+  void _handlePlainTextFormattedBlockChanged(TextRange range) {
+    final block = _controller.document.blockById(_activeFormattedBlockId!);
+    final replacement = _formattedBlockController.text;
+    if (block is MarkdownCodeBlock) {
+      _handleCodeFormattedBlockChanged(range, block, replacement);
+      return;
+    }
+    if (block is MarkdownMermaidBlock) {
+      _handleCodeFormattedBlockChanged(range, block, replacement);
+      return;
+    }
+    if (_applyFormattedBlockImageInputRule(block, replacement)) {
+      return;
+    }
+    if (_applyFormattedMarkdownPaste(range, block, replacement)) return;
+    if (_applyFormattedInputRule(range, block, replacement)) return;
+
+    if (block != null && block.plainText == replacement) {
+      _clearStoredMarksForExpandedSelection();
+      final sourceOffset = _activeFormattedBlockSourceOffset +
+          _plainTextSourceOffsetFor(block, block.toMarkdown());
+      final localSelection = _formattedBlockController.selection;
+      final globalSelection = localSelection.isValid
+          ? TextSelection(
+              baseOffset:
+                  range.start + sourceOffset + localSelection.baseOffset,
+              extentOffset:
+                  range.start + sourceOffset + localSelection.extentOffset,
+            )
+          : TextSelection.collapsed(
+              offset: range.start + sourceOffset + block.plainText.length,
+            );
+      _controller.textController.selection = globalSelection;
+      return;
+    }
+
+    if (_preserveFormattedWikilinkTrigger(range, block, replacement)) {
+      return;
+    }
+
+    if (_applyFormattedLinkPaste(range, block, replacement)) {
+      return;
+    }
+
+    if (_applyFormattedStoredMarkInsertion(range, block, replacement)) {
+      return;
+    }
+
+    if (block == null ||
+        !_controller.documentEditor.replaceTextBlockText(
+          block.id,
+          replacement,
+        )) {
+      return;
+    }
+
+    final nextBlock = _controller.document.blockById(block.id);
+    if (nextBlock == null) return;
+
+    if (_applyFormattedInlineInputRule(range, nextBlock, replacement)) {
+      return;
+    }
+
+    final nextSource = nextBlock.toMarkdown();
+    final sourceOffset = _activeFormattedBlockSourceOffset +
+        _plainTextSourceOffsetFor(nextBlock, nextSource);
+    final localSelection = _formattedBlockController.selection;
+    final globalSelection = localSelection.isValid
+        ? TextSelection(
+            baseOffset: range.start + sourceOffset + localSelection.baseOffset,
+            extentOffset:
+                range.start + sourceOffset + localSelection.extentOffset,
+          )
+        : TextSelection.collapsed(
+            offset: range.start + sourceOffset + nextBlock.plainText.length,
+          );
+
+    _formattedBlockController.block = nextBlock;
+    _activeFormattedRange = _rangeForActiveContainer(range.start, nextBlock);
+    _controller.textController.selection = globalSelection;
+  }
+
+  void _handleCodeFormattedBlockChanged(
+    TextRange range,
+    MarkdownBlock block,
+    String replacement,
+  ) {
+    if (block.plainText == replacement) {
+      final localSelection = _formattedBlockController.selection;
+      _controller.textController.selection =
+          _sourceSelectionForActiveFormattedPlainText(
+        range,
+        block,
+        localSelection,
+      );
+      return;
+    }
+
+    if (!_controller.documentEditor
+        .updateCodeBlockCode(block.id, replacement)) {
+      return;
+    }
+
+    final nextBlock = _controller.document.blockById(block.id);
+    if (nextBlock == null) return;
+
+    _formattedBlockController.block = nextBlock;
+    _activeFormattedRange = _rangeForActiveContainer(range.start, nextBlock);
+    final localSelection = _formattedBlockController.selection;
+    _controller.textController.selection =
+        _sourceSelectionForActiveFormattedPlainText(
+      range,
+      nextBlock,
+      localSelection,
+    );
+  }
+
+  TextSelection _sourceSelectionForActiveFormattedPlainText(
+    TextRange range,
+    MarkdownBlock block,
+    TextSelection localSelection,
+  ) {
+    final source = block.toMarkdown();
+    final sourceOffset = _activeFormattedBlockSourceOffset +
+        _plainTextSourceOffsetFor(
+          block,
+          source,
+        );
+    if (!localSelection.isValid) {
+      return TextSelection.collapsed(
+        offset: range.start + sourceOffset + block.plainText.length,
+      );
+    }
+
+    return TextSelection(
+      baseOffset: range.start + sourceOffset + localSelection.baseOffset,
+      extentOffset: range.start + sourceOffset + localSelection.extentOffset,
+    );
+  }
+
+  bool _applyFormattedStoredMarkInsertion(
+    TextRange range,
+    MarkdownBlock? block,
+    String replacement,
+  ) {
+    if (!_usesPlainTextEditing(block) ||
+        !_storedMarkTargetMatchesCurrentSelection()) {
+      return false;
+    }
+
+    final diff = _plainTextDiff(block!.plainText, replacement);
+    if (!diff.range.isCollapsed ||
+        diff.replacement.isEmpty ||
+        diff.replacement.contains('\n')) {
+      return false;
+    }
+
+    final applied = _controller.documentEditor.replaceTextRangeWithInlineNodes(
+      block.id,
+      diff.range,
+      _storedMarkedTextNodes(diff.replacement),
+    );
+    if (!applied) return false;
+
+    final selectionOffset = diff.range.start + diff.replacement.length;
+    _syncActiveFormattedBlock(
+      block.id,
+      selectionOffset: selectionOffset,
+    );
+    return true;
+  }
+
+  bool _preserveFormattedWikilinkTrigger(
+    TextRange range,
+    MarkdownBlock? block,
+    String replacement,
+  ) {
+    if (!widget.enableWikilinks || !_usesPlainTextEditing(block)) {
+      return false;
+    }
+
+    final localSelection = _formattedBlockController.selection;
+    if (!localSelection.isValid || !localSelection.isCollapsed) {
+      return false;
+    }
+
+    final cursor =
+        localSelection.extentOffset.clamp(0, replacement.length).toInt();
+    final open = replacement.lastIndexOf('[[', cursor);
+    final close = replacement.lastIndexOf(']]', cursor);
+    if (open == -1 || open <= close) return false;
+
+    final query = replacement.substring(open + 2, cursor);
+    if (query.contains('\n')) return false;
+
+    final markdown = block!.toMarkdown();
+    final sourceOffset = _activeFormattedBlockSourceOffset +
+        _plainTextSourceOffsetFor(block, markdown);
+    final sourceRange = TextRange(
+      start: range.start + sourceOffset,
+      end: range.start + sourceOffset + block.plainText.length,
+    );
+    final globalSelection = TextSelection(
+      baseOffset: range.start + sourceOffset + localSelection.baseOffset,
+      extentOffset: range.start + sourceOffset + localSelection.extentOffset,
+    );
+
+    _controller.replaceRange(
+      sourceRange,
+      replacement,
+      selection: globalSelection,
+    );
+    _activeFormattedRange = TextRange(
+      start: range.start,
+      end: range.start + sourceOffset + replacement.length,
+    );
+    final nextBlock = _controller.document.blockById(block.id);
+    if (nextBlock != null) {
+      _formattedBlockController.block = nextBlock;
+    }
+    return true;
+  }
+
+  bool _applyFormattedInlineInputRule(
+    TextRange range,
+    MarkdownBlock block,
+    String text,
+  ) {
+    if (!_usesPlainTextEditing(block)) return false;
+
+    final localSelection = _formattedBlockController.selection;
+    if (!localSelection.isValid || !localSelection.isCollapsed) {
+      return false;
+    }
+
+    final match = _inlineInputRuleMatch(
+      text,
+      localSelection.extentOffset,
+    );
+    if (match == null) return false;
+
+    final imageBlock = match.imageBlock;
+    if (imageBlock != null) {
+      final inserted =
+          _controller.documentEditor.replaceTextRangeWithImageBlock(
+        block.id,
+        match.range,
+        url: imageBlock.url,
+        alt: imageBlock.alt,
+        title: imageBlock.title,
+      );
+      if (inserted == null) return false;
+      _syncActiveFormattedBlock(
+        inserted.activeBlockId,
+        selectionOffset: inserted.selectionOffset,
+      );
+      return true;
+    }
+
+    final applied = _controller.documentEditor.replaceTextRangeWithInlineNodes(
+      block.id,
+      match.range,
+      match.replacement,
+    );
+    if (!applied) return false;
+
+    final nextBlock = _controller.document.blockById(block.id);
+    if (nextBlock == null) return false;
+
+    final nextSelectionOffset = match.range.start + match.plainText.length;
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = nextBlock
+      ..value = TextEditingValue(
+        text: nextBlock.plainText,
+        selection: TextSelection.collapsed(
+          offset: nextSelectionOffset.clamp(0, nextBlock.plainText.length),
+        ),
+      );
+    _syncingFormattedBlock = false;
+
+    final nextSource = nextBlock.toMarkdown();
+    final sourceOffset = _activeFormattedBlockSourceOffset +
+        _plainTextSourceOffsetFor(nextBlock, nextSource);
+    _activeFormattedRange = _rangeForActiveContainer(range.start, nextBlock);
+    _controller.textController.selection = _clampSourceSelection(
+      TextSelection.collapsed(
+        offset: range.start +
+            sourceOffset +
+            match.range.start +
+            match.markdown.length,
+      ),
+    );
+    _formattedBlockFocusNode.requestFocus();
+    return true;
+  }
+
+  bool _applyFormattedBlockImageInputRule(
+    MarkdownBlock? block,
+    String text,
+  ) {
+    if (!_usesPlainTextEditing(block)) return false;
+
+    final localSelection = _formattedBlockController.selection;
+    if (!localSelection.isValid || !localSelection.isCollapsed) {
+      return false;
+    }
+
+    final image = _blockImageInputRuleMatch(text);
+    if (image == null) return false;
+
+    final inserted = _controller.documentEditor.replaceBlockWithImageInputRule(
+      block!.id,
+      url: image.url,
+      alt: image.alt,
+      title: image.title,
+    );
+    if (inserted == null) return false;
+
+    _syncActiveFormattedBlock(
+      inserted.activeBlockId,
+      selectionOffset: inserted.selectionOffset,
+    );
+    return true;
+  }
+
+  bool _applyFormattedLinkPaste(
+    TextRange range,
+    MarkdownBlock? block,
+    String replacement,
+  ) {
+    if (!_usesPlainTextEditing(block)) return false;
+
+    final diff = _plainTextDiff(block!.plainText, replacement);
+    final url = _linkPasteUrl(diff.replacement);
+    if (url == null) return false;
+
+    if (diff.range.isCollapsed) {
+      final applied =
+          _controller.documentEditor.replaceTextRangeWithInlineNodes(
+        block.id,
+        diff.range,
+        _linkPasteInsertedNodes(diff.replacement, url),
+      );
+      if (!applied) return false;
+    } else {
+      _controller.documentEditor.applyInlineCommand(
+        block.id,
+        diff.range,
+        MarkdownEditorCommand.link,
+        argument: url,
+      );
+    }
+
+    final nextBlock = _controller.document.blockById(block.id);
+    if (nextBlock == null) return false;
+
+    final selectionOffset = (diff.range.isCollapsed
+            ? diff.range.start + diff.replacement.length
+            : diff.range.end)
+        .clamp(0, nextBlock.plainText.length)
+        .toInt();
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = nextBlock
+      ..value = TextEditingValue(
+        text: nextBlock.plainText,
+        selection: TextSelection.collapsed(offset: selectionOffset),
+      );
+    _syncingFormattedBlock = false;
+
+    final nextSource = nextBlock.toMarkdown();
+    final sourceOffset = _activeFormattedBlockSourceOffset +
+        _plainTextSourceOffsetFor(nextBlock, nextSource);
+    _activeFormattedRange = _rangeForActiveContainer(range.start, nextBlock);
+    _controller.textController.selection = _clampSourceSelection(
+      TextSelection.collapsed(
+        offset: range.start + sourceOffset + nextSource.length,
+      ),
+    );
+    _formattedBlockFocusNode.requestFocus();
+    return true;
+  }
+
+  bool _applyFormattedMarkdownPaste(
+    TextRange range,
+    MarkdownBlock? block,
+    String replacement,
+  ) {
+    if (block == null) {
+      return false;
+    }
+
+    final diff = _plainTextDiff(block.plainText, replacement);
+    final pastedMarkdown = diff.replacement;
+    if (!_looksLikePastedMarkdown(pastedMarkdown)) {
+      return false;
+    }
+
+    final trimmedLeft = pastedMarkdown.trimLeft();
+    if (trimmedLeft.length != pastedMarkdown.length &&
+        _blockImageInputRuleMatch(trimmedLeft) != null) {
+      return false;
+    }
+
+    final isSingleLine = !pastedMarkdown.trimRight().contains('\n');
+    if (isSingleLine && _looksLikeFormattedInputRuleTrigger(pastedMarkdown)) {
+      return false;
+    }
+
+    if (isSingleLine && !_looksLikePastedBlockMarkdown(pastedMarkdown)) {
+      return _applyFormattedInlineMarkdownPaste(
+        range,
+        block,
+        replacement,
+        diff,
+      );
+    }
+
+    final previousContainer = _topLevelBlockContaining(block.id);
+    final replacingTopLevel = previousContainer?.id == block.id;
+    final parsed = MarkdownDocumentCodec(plugins: widget.plugins).parse(
+      pastedMarkdown,
+    );
+    final inserted = _controller.documentEditor.replaceTextRangeWithBlocks(
+      block.id,
+      diff.range,
+      parsed.blocks,
+    );
+    if (inserted == null) return false;
+
+    final nextContainer = previousContainer == null
+        ? null
+        : _controller.document.blockById(previousContainer.id);
+
+    final selectionOffset = replacingTopLevel
+        ? range.start + inserted.selectionOffset
+        : range.start +
+            (nextContainer?.toMarkdown().length ?? inserted.selectionOffset);
+    setState(_clearActiveFormattedBlock);
+    _controller.textController.selection = _clampSourceSelection(
+      TextSelection.collapsed(offset: selectionOffset),
+    );
+    return true;
+  }
+
+  bool _applyFormattedInlineMarkdownPaste(
+    TextRange range,
+    MarkdownBlock block,
+    String replacement,
+    _PlainTextDiff diff,
+  ) {
+    if (!_usesPlainTextEditing(block)) return false;
+    if (!_textBlockHasOnlyPlainText(block)) return false;
+
+    final parsed = MarkdownDocumentCodec(plugins: widget.plugins).parse(
+      diff.replacement,
+    );
+    if (parsed.blocks.length != 1) return false;
+
+    final parsedBlock = parsed.blocks.single;
+    final children = switch (parsedBlock) {
+      MarkdownParagraphBlock() => parsedBlock.children,
+      MarkdownHeadingBlock() => parsedBlock.children,
+      _ => null,
+    };
+    final normalizedChildren =
+        children == null ? null : _normalizeInlinePasteNodes(children);
+    if (normalizedChildren == null || normalizedChildren.isEmpty) return false;
+    if (normalizedChildren.length == 1 &&
+        normalizedChildren.single is MarkdownText &&
+        normalizedChildren.single.plainText == diff.replacement) {
+      return false;
+    }
+
+    final replaced = _controller.documentEditor.replaceTextRangeWithInlineNodes(
+      block.id,
+      diff.range,
+      normalizedChildren,
+    );
+    if (!replaced) return false;
+
+    final nextBlock = _controller.document.blockById(block.id);
+    if (nextBlock == null) return false;
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = nextBlock
+      ..value = TextEditingValue(
+        text: nextBlock.plainText,
+        selection: TextSelection.collapsed(
+          offset:
+              diff.range.start + _inlinePlainText(normalizedChildren).length,
+        ),
+      );
+    _syncingFormattedBlock = false;
+    _activeFormattedRange = _rangeForActiveContainer(range.start, nextBlock);
+    _controller.textController.selection = _clampSourceSelection(
+      TextSelection.collapsed(
+        offset: _activeFormattedRange!.start + nextBlock.toMarkdown().length,
+      ),
+    );
+    _formattedBlockFocusNode.requestFocus();
+    return true;
+  }
+
+  bool _textBlockHasOnlyPlainText(MarkdownBlock block) {
+    final children = switch (block) {
+      MarkdownParagraphBlock() => block.children,
+      MarkdownHeadingBlock() => block.children,
+      _ => const <MarkdownInlineNode>[],
+    };
+    return _inlineChildrenHaveOnlyPlainText(children);
+  }
+
+  bool _inlineChildrenHaveOnlyPlainText(List<MarkdownInlineNode> children) {
+    return children.every((child) => child is MarkdownText);
+  }
+
+  List<MarkdownInlineNode> _normalizeInlinePasteNodes(
+    List<MarkdownInlineNode> children,
+  ) {
+    return [
+      for (final child in children) _normalizeInlinePasteNode(child),
+    ];
+  }
+
+  MarkdownInlineNode _normalizeInlinePasteNode(MarkdownInlineNode child) {
+    return switch (child) {
+      MarkdownLink() => _normalizeInlinePasteLink(child),
+      MarkdownStrong() => MarkdownStrong(
+          _normalizeInlinePasteNodes(child.children),
+        ),
+      MarkdownEmphasis() => MarkdownEmphasis(
+          _normalizeInlinePasteNodes(child.children),
+        ),
+      MarkdownStrikethrough() => MarkdownStrikethrough(
+          _normalizeInlinePasteNodes(child.children),
+        ),
+      _ => child,
+    };
+  }
+
+  MarkdownInlineNode _normalizeInlinePasteLink(MarkdownLink link) {
+    final url = _normalizeAllowedLinkUrl(link.url);
+    if (url == null || url.isEmpty) return MarkdownText(link.toMarkdown());
+    return MarkdownLink(
+      url: url,
+      title: link.title,
+      children: _normalizeInlinePasteNodes(link.children),
+    );
+  }
+
+  bool _looksLikePastedMarkdown(String text) {
+    final markdownPatterns = RegExp(
+      r'^#{1,6}\s|^\s*[-*+]\s|^\s*\d+\.\s|^\s*>\s|```|^\s*\[.*\]\(.*\)|^\s*!\[|\*\*.*\*\*|__.*__|~~.*~~|^\s*[-*_]{3,}\s*$|^\|.+\||\$\$[\s\S]+?\$\$',
+      multiLine: true,
+    );
+    return markdownPatterns.hasMatch(text);
+  }
+
+  bool _looksLikePastedBlockMarkdown(String text) {
+    final blockPatterns = RegExp(
+      r'^#{1,6}\s|^\s*[-*+]\s|^\s*\d+\.\s|^\s*>\s|```|^\s*!\[|^\s*[-*_]{3,}\s*$|^\|.+\||\$\$[\s\S]+?\$\$',
+      multiLine: true,
+    );
+    return blockPatterns.hasMatch(text);
+  }
+
+  bool _looksLikeFormattedInputRuleTrigger(String text) {
+    return RegExp(
+      r'^\s*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|>\s+|`{3,}[^`\n]*\s+|~{3,}[^~\n]*\s+|---|—-|___\s|\*\*\*\s)$',
+    ).hasMatch(text);
+  }
+
+  _PlainTextDiff _plainTextDiff(String previous, String next) {
+    var prefix = 0;
+    final minLength =
+        previous.length < next.length ? previous.length : next.length;
+    while (prefix < minLength && previous[prefix] == next[prefix]) {
+      prefix++;
+    }
+
+    var previousSuffix = previous.length;
+    var nextSuffix = next.length;
+    while (previousSuffix > prefix &&
+        nextSuffix > prefix &&
+        previous[previousSuffix - 1] == next[nextSuffix - 1]) {
+      previousSuffix--;
+      nextSuffix--;
+    }
+
+    return _PlainTextDiff(
+      range: TextRange(start: prefix, end: previousSuffix),
+      replacement: next.substring(prefix, nextSuffix),
+    );
+  }
+
+  String? _linkPasteUrl(String replacement) {
+    final value = replacement.trim();
+    if (value.isEmpty || value.contains(RegExp(r'\s'))) return null;
+    if (!_autoLinkTokenRegExp.hasMatch(value)) return null;
+
+    final url = _normalizeAutoLinkUrl(value);
+    return url.isEmpty ? null : url;
+  }
+
+  List<MarkdownInlineNode> _linkPasteInsertedNodes(
+    String replacement,
+    String url,
+  ) {
+    final leadingLength = replacement.length - replacement.trimLeft().length;
+    final withoutLeading = replacement.substring(leadingLength);
+    final trailingLength =
+        withoutLeading.length - withoutLeading.trimRight().length;
+    final label =
+        withoutLeading.substring(0, withoutLeading.length - trailingLength);
+    final trailingStart = withoutLeading.length - trailingLength;
+
+    return [
+      if (leadingLength > 0)
+        MarkdownText(replacement.substring(0, leadingLength)),
+      MarkdownLink(
+        url: url,
+        children: [MarkdownText(label)],
+      ),
+      if (trailingLength > 0)
+        MarkdownText(withoutLeading.substring(trailingStart)),
+    ];
+  }
+
+  _ImageInputRuleMatch? _blockImageInputRuleMatch(String text) {
+    final parsed = MarkdownDocumentCodec(plugins: widget.plugins).parse(
+      text.trim(),
+    );
+    if (parsed.blocks.length != 1) return null;
+
+    final block = parsed.blocks.single;
+    if (block is! MarkdownImageBlock || block.url.isEmpty) return null;
+    return _ImageInputRuleMatch(
+      url: block.url,
+      alt: block.alt,
+      title: block.title,
+    );
+  }
+
+  _InlineInputRuleMatch? _inlineInputRuleMatch(
+    String text,
+    int cursor,
+  ) {
+    if (cursor < 0 || cursor > text.length) return null;
+
+    final prefix = text.substring(0, cursor);
+    final imageMatch = RegExp(
+      r'''(?:^|\s)(!\[(.+|:?)\]\((\S+)(?:(?:\s+)["'](\S+)["'])?\))$''',
+    ).firstMatch(prefix);
+    if (imageMatch != null) {
+      final markdown = imageMatch.group(1)!;
+      final alt = imageMatch.group(2) ?? '';
+      final url = imageMatch.group(3)!.trim();
+      final title = imageMatch.group(4);
+      if (url.isNotEmpty) {
+        final image = _ImageInputRuleMatch(
+          url: url,
+          alt: alt,
+          title: title,
+        );
+        return _InlineInputRuleMatch(
+          range: TextRange(
+            start: prefix.length - markdown.length,
+            end: prefix.length,
+          ),
+          replacement: [
+            MarkdownImage(url: image.url, alt: image.alt, title: image.title),
+          ],
+          plainText: alt,
+          markdown: markdown,
+          imageBlock: image,
+        );
+      }
+    }
+
+    final linkMatch =
+        RegExp(r'\[([^\]\n]+)\]\(([^)\n]+)\)$').firstMatch(prefix);
+    if (linkMatch != null) {
+      final label = linkMatch.group(1)!;
+      final url = _normalizeAllowedLinkUrl(linkMatch.group(2)!);
+      if (label.isNotEmpty && url != null && url.isNotEmpty) {
+        return _InlineInputRuleMatch(
+          range: TextRange(start: linkMatch.start, end: linkMatch.end),
+          replacement: [
+            MarkdownLink(
+              url: url,
+              children: [MarkdownText(label)],
+            ),
+          ],
+          plainText: label,
+          markdown: prefix.substring(linkMatch.start, linkMatch.end),
+        );
+      }
+    }
+
+    final autoLinkMatch = _autoLinkInputRuleMatch(prefix);
+    if (autoLinkMatch != null) return autoLinkMatch;
+
+    final wikilinkMatch = widget.enableWikilinks
+        ? RegExp(r'\[\[([^\]\n]+?)\]\]$').firstMatch(prefix)
+        : null;
+    if (wikilinkMatch != null) {
+      final target = wikilinkMatch.group(1)!;
+      if (target.isNotEmpty) {
+        final node = MarkdownWikilink(target: target);
+        return _InlineInputRuleMatch(
+          range: TextRange(start: wikilinkMatch.start, end: wikilinkMatch.end),
+          replacement: [node],
+          plainText: node.plainText,
+          markdown: prefix.substring(wikilinkMatch.start, wikilinkMatch.end),
+        );
+      }
+    }
+
+    final codeMatch = RegExp(r'`([^`\n]+)`$').firstMatch(prefix);
+    if (codeMatch != null && _validInlineRuleBoundary(prefix, codeMatch)) {
+      final code = codeMatch.group(1)!;
+      return _InlineInputRuleMatch(
+        range: TextRange(start: codeMatch.start, end: codeMatch.end),
+        replacement: [MarkdownInlineCode(code)],
+        plainText: code,
+        markdown: prefix.substring(codeMatch.start, codeMatch.end),
+      );
+    }
+
+    final mathMatch = RegExp(r'\$([^$\n]+)\$$').firstMatch(prefix);
+    if (mathMatch != null &&
+        _validInlineRuleBoundary(prefix, mathMatch) &&
+        !_isDollarDelimitedByDollar(prefix, mathMatch)) {
+      final latex = mathMatch.group(1)!;
+      return _InlineInputRuleMatch(
+        range: TextRange(start: mathMatch.start, end: mathMatch.end),
+        replacement: [MarkdownInlineMath(latex)],
+        plainText: latex,
+        markdown: prefix.substring(mathMatch.start, mathMatch.end),
+      );
+    }
+
+    final strikeMatch = RegExp(r'~~([^~\n]+)~~$').firstMatch(prefix);
+    if (strikeMatch != null && _validInlineRuleBoundary(prefix, strikeMatch)) {
+      final text = strikeMatch.group(1)!;
+      return _InlineInputRuleMatch(
+        range: TextRange(start: strikeMatch.start, end: strikeMatch.end),
+        replacement: [
+          MarkdownStrikethrough([MarkdownText(text)]),
+        ],
+        plainText: text,
+        markdown: prefix.substring(strikeMatch.start, strikeMatch.end),
+      );
+    }
+
+    final strongMatch =
+        RegExp(r'(?:\*\*([^*\n]+)\*\*|__([^_\n]+)__)$').firstMatch(prefix);
+    if (strongMatch != null && _validInlineRuleBoundary(prefix, strongMatch)) {
+      final text = strongMatch.group(1) ?? strongMatch.group(2)!;
+      return _InlineInputRuleMatch(
+        range: TextRange(start: strongMatch.start, end: strongMatch.end),
+        replacement: [
+          MarkdownStrong([MarkdownText(text)]),
+        ],
+        plainText: text,
+        markdown: prefix.substring(strongMatch.start, strongMatch.end),
+      );
+    }
+
+    final emphasisMatch =
+        RegExp(r'(?:\*([^*\n]+)\*|_([^_\n]+)_)$').firstMatch(prefix);
+    if (emphasisMatch != null &&
+        _validInlineRuleBoundary(prefix, emphasisMatch)) {
+      final text = emphasisMatch.group(1) ?? emphasisMatch.group(2)!;
+      return _InlineInputRuleMatch(
+        range: TextRange(start: emphasisMatch.start, end: emphasisMatch.end),
+        replacement: [
+          MarkdownEmphasis([MarkdownText(text)]),
+        ],
+        plainText: text,
+        markdown: prefix.substring(emphasisMatch.start, emphasisMatch.end),
+      );
+    }
+
+    return null;
+  }
+
+  _InlineInputRuleMatch? _autoLinkInputRuleMatch(String prefix) {
+    final match =
+        RegExp('($_autoLinkTokenPattern)([)\\]])?(\\s)\$').firstMatch(prefix);
+    if (match == null || !_validInlineRuleBoundary(prefix, match)) {
+      return null;
+    }
+
+    var label = match.group(1)!;
+    final closingWrapper = match.group(2) ?? '';
+    if (closingWrapper.isNotEmpty &&
+        !_hasMatchingAutoLinkOpeningWrapper(prefix, match, closingWrapper)) {
+      return null;
+    }
+    final trailingSpace = match.group(3)!;
+    var trailingPunctuation = '';
+    while (label.isNotEmpty && '.,;:!?'.contains(label[label.length - 1])) {
+      trailingPunctuation = label[label.length - 1] + trailingPunctuation;
+      label = label.substring(0, label.length - 1);
+    }
+    if (label.isEmpty) return null;
+
+    final url = _normalizeAutoLinkUrl(label);
+    if (url.isEmpty) return null;
+
+    final replacement = <MarkdownInlineNode>[
+      MarkdownLink(
+        url: url,
+        children: [MarkdownText(label)],
+      ),
+      if (trailingPunctuation.isNotEmpty) MarkdownText(trailingPunctuation),
+      if (closingWrapper.isNotEmpty) MarkdownText(closingWrapper),
+      MarkdownText(trailingSpace),
+    ];
+
+    return _InlineInputRuleMatch(
+      range: TextRange(start: match.start, end: match.end),
+      replacement: replacement,
+      plainText: '$label$trailingPunctuation$closingWrapper$trailingSpace',
+      markdown: replacement.map((node) => node.toMarkdown()).join(),
+    );
+  }
+
+  bool _hasMatchingAutoLinkOpeningWrapper(
+    String prefix,
+    RegExpMatch match,
+    String closingWrapper,
+  ) {
+    if (match.start == 0) return false;
+    final expectedOpening = closingWrapper == ')' ? '(' : '[';
+    return prefix[match.start - 1] == expectedOpening;
+  }
+
+  bool _validInlineRuleBoundary(String prefix, RegExpMatch match) {
+    if (match.start == 0) return true;
+    final previous = prefix[match.start - 1];
+    return previous.trim().isEmpty || "([{>\"'".contains(previous);
+  }
+
+  bool _isDollarDelimitedByDollar(String prefix, RegExpMatch match) {
+    final beforeOpening = match.start > 0 ? prefix[match.start - 1] : '';
+    final beforeClosing = match.end > 1 ? prefix[match.end - 2] : '';
+    return beforeOpening == r'$' || beforeClosing == r'$';
+  }
+
+  bool _applyFormattedInputRule(
+    TextRange range,
+    MarkdownBlock? block,
+    String replacement,
+  ) {
+    if (block is! MarkdownParagraphBlock) return false;
+
+    final localSelection = _formattedBlockController.selection;
+    if (!localSelection.isValid || !localSelection.isCollapsed) {
+      return false;
+    }
+
+    final result = _controller.documentEditor.applyInputRules(
+      blockId: block.id,
+      text: replacement,
+      selectionOffset: localSelection.extentOffset,
+    );
+    if (result == null) return false;
+
+    final activeBlock = _controller.document.blockById(result.activeBlockId);
+    final container = _topLevelBlockContaining(result.activeBlockId);
+    final usePlainText = _usesPlainTextEditing(activeBlock);
+
+    _syncingFormattedBlock = true;
+    if (usePlainText) {
+      final selectionOffset = result.selectionOffset
+          .clamp(0, activeBlock!.plainText.length)
+          .toInt();
+      _formattedBlockController.block = activeBlock;
+      _formattedBlockController.value = TextEditingValue(
+        text: activeBlock.plainText,
+        selection: TextSelection.collapsed(offset: selectionOffset),
+      );
+    } else {
+      _formattedBlockController.block = null;
+      _formattedBlockController.value = const TextEditingValue();
+    }
+    _syncingFormattedBlock = false;
+
+    if (usePlainText && activeBlock != null && container != null) {
+      final blockSourceOffset = _blockSourceOffsetInContainer(
+        container,
+        activeBlock.id,
+      );
+      final sourceOffset = blockSourceOffset +
+          _plainTextSourceOffsetFor(activeBlock, activeBlock.toMarkdown());
+      final sourceSelection = TextSelection.collapsed(
+        offset: range.start + sourceOffset + result.selectionOffset,
+      );
+
+      setState(() {
+        _activeFormattedRange = TextRange(
+          start: range.start,
+          end: range.start + container.toMarkdown().length,
+        );
+        _activeFormattedBlockId = activeBlock.id;
+        _activeFormattedContainerBlockId = container.id;
+        _activeFormattedBlockSourceOffset = blockSourceOffset;
+        _activeFormattedPlainText = true;
+      });
+      _controller.textController.selection =
+          _clampSourceSelection(sourceSelection);
+      return true;
+    }
+
+    setState(_clearActiveFormattedBlock);
+    _controller.textController.selection = _clampSourceSelection(
+      TextSelection.collapsed(offset: range.start),
+    );
+    return true;
+  }
+
+  TextRange _rangeForActiveContainer(int rangeStart, MarkdownBlock fallback) {
+    final containerId = _activeFormattedContainerBlockId;
+    final container = containerId == null
+        ? null
+        : _controller.document.blockById(containerId);
+    final source = (container ?? fallback).toMarkdown();
+    return TextRange(start: rangeStart, end: rangeStart + source.length);
+  }
+
+  MarkdownBlock? _topLevelBlockContaining(String blockId) {
+    for (final block in _controller.document.blocks) {
+      if (block.findBlock(blockId) != null) return block;
+    }
+    return null;
+  }
+
+  int _blockSourceOffsetInContainer(
+    MarkdownBlock container,
+    String blockId,
+  ) {
+    if (container.id == blockId) return 0;
+
+    if (container is MarkdownListBlock) {
+      return _blockSourceOffsetInList(container, blockId) ?? 0;
+    }
+
+    if (container is MarkdownBlockquoteBlock) {
+      for (var index = 0; index < container.blocks.length; index++) {
+        final block = container.blocks[index];
+        final childOffset = _blockquoteChildSourceOffset(container, index);
+        if (block.id == blockId) {
+          return childOffset;
+        }
+        if (block.findBlock(blockId) != null) {
+          return childOffset + _blockSourceOffsetInContainer(block, blockId);
+        }
+      }
+    }
+
+    return 0;
+  }
+
+  int? _blockSourceOffsetInList(
+    MarkdownListBlock list,
+    String blockId,
+  ) {
+    for (var itemIndex = 0; itemIndex < list.items.length; itemIndex++) {
+      final item = list.items[itemIndex];
+      for (var childIndex = 0; childIndex < item.blocks.length; childIndex++) {
+        final child = item.blocks[childIndex];
+        final childOffset = _listItemChildBlockSourceOffset(
+          list,
+          itemIndex,
+          childIndex,
+        );
+        if (child.id == blockId) {
+          return childOffset;
+        }
+        if (child.findBlock(blockId) != null) {
+          return childOffset + _blockSourceOffsetInContainer(child, blockId);
+        }
+      }
+    }
+    return null;
+  }
+
+  TextSelection _clampSourceSelection(TextSelection selection) {
+    final textLength = _controller.text.length;
+    if (!selection.isValid) {
+      return TextSelection.collapsed(offset: textLength);
+    }
+    return TextSelection(
+      baseOffset: selection.baseOffset.clamp(0, textLength),
+      extentOffset: selection.extentOffset.clamp(0, textLength),
+    );
+  }
+
+  bool _usesPlainTextEditing(MarkdownBlock? block) {
+    return block is MarkdownParagraphBlock ||
+        block is MarkdownHeadingBlock ||
+        block is MarkdownCodeBlock ||
+        block is MarkdownMermaidBlock;
+  }
+
+  TextSelection _localSelectionForSegment(
+    _MarkdownBlockSegment segment,
+    TextSelection? selection,
+    int textLength, {
+    required bool plainTextEditing,
+  }) {
+    if (selection == null) {
+      return TextSelection.collapsed(offset: textLength);
+    }
+
+    if (!plainTextEditing) return selection;
+
+    return _plainTextSelectionForSourceSelection(
+      segment.block!,
+      segment.source,
+      selection,
+      textLength: textLength,
+    );
+  }
+
+  int _plainTextSourceOffsetFor(MarkdownBlock block, String source) {
+    if (block is MarkdownHeadingBlock) {
+      final match = RegExp(r'^(?: {0,3})#{1,6}[ \t]+').firstMatch(source);
+      if (match != null) return match.end;
+      if (block.plainText.isEmpty) return source.length;
+    }
+    if (block is MarkdownCodeBlock || block is MarkdownMermaidBlock) {
+      final firstLineEnd = source.indexOf('\n');
+      return firstLineEnd == -1 ? source.length : firstLineEnd + 1;
+    }
+    return 0;
+  }
+
+  _FencedCodeBlock? _parseFencedCodeSegment(String source) {
+    final lines = source.split('\n');
+    if (lines.isEmpty) return null;
+
+    final opening = lines.first.trimLeft();
+    if (!opening.startsWith('```') && !opening.startsWith('~~~')) {
+      return null;
+    }
+
+    final fence = opening.substring(0, 3);
+    final info = opening.substring(3).trim();
+    final language = info.isEmpty ? '' : info.split(RegExp(r'\s+')).first;
+    final hasClosingFence =
+        lines.length > 1 && lines.last.trimLeft().startsWith(fence);
+    final codeLines =
+        hasClosingFence ? lines.sublist(1, lines.length - 1) : lines.sublist(1);
+
+    return _FencedCodeBlock(
+      fence: fence,
+      language: language,
+      info: info.isEmpty ? null : info,
+      code: codeLines.join('\n'),
+    );
+  }
+
+  String? _parseBlockMathSegment(String source) {
+    final lines = source.split('\n');
+    if (lines.length < 3) return null;
+    if (lines.first.trim() != r'$$' || lines.last.trim() != r'$$') {
+      return null;
+    }
+    return lines.sublist(1, lines.length - 1).join('\n');
+  }
+
+  String _normalizeBlockMathSource(String source) {
+    var normalized = source.trim();
+    if (normalized.startsWith(r'$$') &&
+        normalized.endsWith(r'$$') &&
+        normalized.length >= 4) {
+      normalized = normalized.substring(2, normalized.length - 2).trim();
+    }
+    return normalized;
+  }
+
+  void _updateCodeBlockLanguage(
+    _MarkdownBlockSegment segment,
+    _FencedCodeBlock codeBlock,
+    String language,
+  ) {
+    final block = segment.block;
+    if (block is MarkdownCodeBlock) {
+      _controller.documentEditor.updateCodeBlockLanguage(block.id, language);
+      setState(() {
+        _clearActiveFormattedBlock();
+        if (language != 'mermaid') {
+          _mermaidSourceBlocks.remove(segment.range.start);
+        }
+      });
+      return;
+    }
+    if (block is MarkdownMermaidBlock) {
+      _controller.documentEditor.updateCodeBlockLanguage(block.id, language);
+      setState(() {
+        _clearActiveFormattedBlock();
+        if (language != 'mermaid') {
+          _mermaidSourceBlocks.remove(segment.range.start);
+        }
+      });
+      return;
+    }
+
+    final source = segment.source;
+    final firstLineEnd = source.indexOf('\n');
+    final openingEnd = firstLineEnd == -1 ? source.length : firstLineEnd;
+    final openingLine =
+        language.isEmpty ? codeBlock.fence : '${codeBlock.fence}$language';
+    final updatedSource = source.replaceRange(0, openingEnd, openingLine);
+
+    _controller.replaceRange(
+      segment.range,
+      updatedSource,
+      selection: TextSelection.collapsed(
+        offset: segment.range.start + updatedSource.length,
+      ),
+    );
+    setState(() {
+      _clearActiveFormattedBlock();
+      if (language != 'mermaid') {
+        _mermaidSourceBlocks.remove(segment.range.start);
+      }
+    });
+  }
+
+  void _toggleMermaidSource(_MarkdownBlockSegment segment) {
+    setState(() {
+      if (!_mermaidSourceBlocks.add(segment.range.start)) {
+        _mermaidSourceBlocks.remove(segment.range.start);
+      }
+    });
+  }
+
+  KeyEventResult _handleFormattedPaneKeyEvent(
+    FocusNode node,
+    KeyEvent event,
+  ) {
+    if (event is KeyDownEvent && _shouldDeleteActiveListItemSelection(event)) {
+      return _deleteActiveListItemSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    if (event is KeyDownEvent && _shouldDeleteActiveTableSelection(event)) {
+      return _clearActiveTableSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    if (event is KeyDownEvent && _shouldDeleteActiveDocumentSelection(event)) {
+      return _deleteActiveDocumentSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    return _handleKeyEvent(node, event);
+  }
+
+  Future<void> _showBlockMathEditor(
+    _MarkdownBlockSegment segment,
+    String latex,
+  ) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => _BlockMathEditorDialog(initialLatex: latex),
+    );
+
+    if (result == null || !mounted) return;
+
+    final trimmed = result.trim();
+    if (trimmed.isEmpty) return;
+
+    final block = segment.block;
+    if (block is MarkdownBlockMathBlock) {
+      _controller.documentEditor.updateBlockMath(block.id, trimmed);
+      setState(_clearActiveFormattedBlock);
+      return;
+    }
+
+    final replacement = '${r'$$'}\n$trimmed\n${r'$$'}';
+    _controller.replaceRange(
+      segment.range,
+      replacement,
+      selection: TextSelection.collapsed(
+        offset: segment.range.start + replacement.length,
+      ),
+    );
+    setState(_clearActiveFormattedBlock);
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    final suggestionResult = _handleSuggestionKeyEvent(event);
+    if (suggestionResult == KeyEventResult.handled) {
+      return suggestionResult;
+    }
+
+    if (_shouldDeleteActiveDocumentSelection(event)) {
+      return _deleteActiveDocumentSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (_shouldDeleteActiveListItemSelection(event)) {
+      return _deleteActiveListItemSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (_shouldDeleteActiveTableSelection(event)) {
+      return _clearActiveTableSelection()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    final shortcutResult = widget.onShortcut?.call(event, _controller);
+    if (shortcutResult == KeyEventResult.handled) {
+      return KeyEventResult.handled;
+    }
+
+    if (!widget.enableKeyboardShortcuts) {
+      return KeyEventResult.ignored;
+    }
+
+    final isModifierPressed = HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isControlPressed;
+    if (!isModifierPressed) {
+      return KeyEventResult.ignored;
+    }
+
+    final key = event.logicalKey;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+    final alt = HardwareKeyboard.instance.isAltPressed;
+
+    final moveUpward = _blockMoveShortcutUpward(event);
+    if (moveUpward != null) {
+      return _moveActiveTopLevelBlock(upward: moveUpward)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    if (!alt && key == LogicalKeyboardKey.keyZ) {
+      if (shift) {
+        _redo();
+      } else {
+        _undo();
+      }
+      return KeyEventResult.handled;
+    }
+    if (!shift && !alt && key == LogicalKeyboardKey.keyY) {
+      _redo();
+      return KeyEventResult.handled;
+    }
+
+    if (alt && !shift) {
+      final headingCommand = _headingCommandForShortcutKey(key);
+      if (headingCommand != null) {
+        return _applyCommandFromShortcut(headingCommand);
+      }
+      if (key == LogicalKeyboardKey.keyC) {
+        return _applyCommandFromShortcut(MarkdownEditorCommand.codeBlock);
+      }
+    }
+
+    if (shift && !alt) {
+      if (key == LogicalKeyboardKey.keyB) {
+        return _applyCommandFromShortcut(MarkdownEditorCommand.blockquote);
+      }
+      if (key == LogicalKeyboardKey.keyS || key == LogicalKeyboardKey.keyX) {
+        return _applyCommandFromShortcut(MarkdownEditorCommand.strikethrough);
+      }
+      if (_isShortcutDigitKey(key, 7)) {
+        return _applyCommandFromShortcut(MarkdownEditorCommand.orderedList);
+      }
+      if (_isShortcutDigitKey(key, 8)) {
+        return _applyCommandFromShortcut(MarkdownEditorCommand.unorderedList);
+      }
+      if (key == LogicalKeyboardKey.keyP) {
+        unawaited(_exportPdf());
+        return KeyEventResult.handled;
+      }
+    }
+
+    if (!shift && !alt && key == LogicalKeyboardKey.keyB) {
+      return _applyCommandFromShortcut(MarkdownEditorCommand.bold);
+    }
+    if (!shift && !alt && key == LogicalKeyboardKey.keyI) {
+      return _applyCommandFromShortcut(MarkdownEditorCommand.italic);
+    }
+    if (!shift && !alt && key == LogicalKeyboardKey.keyE) {
+      return _applyCommandFromShortcut(MarkdownEditorCommand.inlineCode);
+    }
+    if (!shift && !alt && key == LogicalKeyboardKey.keyK) {
+      return _applyCommandFromShortcut(MarkdownEditorCommand.link);
+    }
+    if (!shift && !alt && key == LogicalKeyboardKey.keyC) {
+      if (_copyActiveFormattedSelectionAsMarkdown()) {
+        return KeyEventResult.handled;
+      }
+    }
+    if (!shift && !alt && key == LogicalKeyboardKey.keyF) {
+      _openSearch();
+      return KeyEventResult.handled;
+    }
+    if (shift && !alt && key == LogicalKeyboardKey.keyC) {
+      _copyMenuController.open();
+      return KeyEventResult.handled;
+    }
+    if (shift && !alt && key == LogicalKeyboardKey.enter) {
+      _toggleFocusMode();
+      return KeyEventResult.handled;
+    }
+    if (shift && !alt && key == LogicalKeyboardKey.keyM) {
+      _toggleSourceMode();
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _applyCommandFromShortcut(MarkdownEditorCommand command) {
+    if (!_isCommandEnabled(command)) return KeyEventResult.ignored;
+    _applyCommand(command);
+    return KeyEventResult.handled;
+  }
+
+  bool _copyActiveFormattedSelectionAsMarkdown() {
+    final markdown = _activeFormattedSelectionMarkdown();
+    if (markdown == null) return false;
+
+    unawaited(Clipboard.setData(ClipboardData(text: markdown)));
+    return true;
+  }
+
+  String? _activeFormattedSelectionMarkdown() {
+    final tableSelection = _activeTableSelection;
+    if (_mode == MarkdownEditorMode.formatted && tableSelection != null) {
+      return _controller.copyTableSelectionAsTsv(tableSelection);
+    }
+
+    final listItemSelection = _activeListItemSelection;
+    if (_mode == MarkdownEditorMode.formatted && listItemSelection != null) {
+      return _controller.copyListItemSelectionAsMarkdown(listItemSelection);
+    }
+
+    final documentSelection = _activeDocumentSelection;
+    if (_mode == MarkdownEditorMode.formatted && documentSelection != null) {
+      return _controller.copyDocumentSelectionAsMarkdown(documentSelection);
+    }
+
+    if (_tableCellFocusNode.hasFocus) {
+      final children = _tableCellController.inlineNodes;
+      if (children == null ||
+          _inlinePlainText(children) != _tableCellController.text) {
+        return null;
+      }
+      return _inlineSelectionMarkdown(
+        children,
+        _tableCellController.selection,
+      );
+    }
+
+    if (!_formattedBlockFocusNode.hasFocus) return null;
+
+    final block = _formattedBlockController.block;
+    final children = switch (block) {
+      MarkdownParagraphBlock() => block.children,
+      MarkdownHeadingBlock() => block.children,
+      _ => null,
+    };
+    if (children == null ||
+        _inlinePlainText(children) != _formattedBlockController.text) {
+      return null;
+    }
+
+    return _inlineSelectionMarkdown(
+      children,
+      _formattedBlockController.selection,
+    );
+  }
+
+  KeyEventResult _handleSearchKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape) {
+      if (_searchOpen) {
+        setState(() => _searchOpen = false);
+      }
+      _focusNode.requestFocus();
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        _selectPreviousSearchMatch();
+      } else {
+        _selectNextSearchMatch();
+      }
+      _restoreSearchFocusAfterMatchNavigation();
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  void _restoreSearchFocusAfterMatchNavigation() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_searchOpen) return;
+      _searchFocusNode.requestFocus();
+      _searchController.selection = TextSelection.collapsed(
+        offset: _searchController.text.length,
+      );
+    });
+  }
+
+  KeyEventResult _handleSuggestionKeyEvent(KeyDownEvent event) {
+    if (!_shouldShowSlashCommands && !_shouldShowWikilinkSuggestions) {
+      return KeyEventResult.ignored;
+    }
+
+    final isModifierPressed = HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isAltPressed;
+    if (isModifierPressed) {
+      return KeyEventResult.ignored;
+    }
+
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape) {
+      setState(() {
+        _slashMatch = null;
+        _wikilinkMatch = null;
+        _slashSelectedIndex = 0;
+        _wikilinkSelectedIndex = 0;
+      });
+      _requestActiveEditorFocus();
+      return KeyEventResult.handled;
+    }
+
+    if (_shouldShowSlashCommands) {
+      final commands = _visibleSlashCommands();
+      if (commands.isEmpty) return KeyEventResult.ignored;
+      if (key == LogicalKeyboardKey.arrowDown) {
+        setState(() {
+          _slashSelectedIndex = (_slashSelectedIndex + 1) % commands.length;
+        });
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        setState(() {
+          _slashSelectedIndex =
+              (_slashSelectedIndex - 1 + commands.length) % commands.length;
+        });
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.numpadEnter) {
+        final index = _slashSelectedIndex.clamp(0, commands.length - 1).toInt();
+        _runSlashCommand(commands[index]);
+        return KeyEventResult.handled;
+      }
+    }
+
+    if (_shouldShowWikilinkSuggestions) {
+      final suggestions = _visibleWikilinkSuggestions();
+      if (suggestions.isEmpty) {
+        if (key == LogicalKeyboardKey.arrowDown ||
+            key == LogicalKeyboardKey.arrowUp ||
+            key == LogicalKeyboardKey.enter ||
+            key == LogicalKeyboardKey.numpadEnter) {
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        setState(() {
+          _wikilinkSelectedIndex =
+              (_wikilinkSelectedIndex + 1) % suggestions.length;
+        });
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        setState(() {
+          _wikilinkSelectedIndex =
+              (_wikilinkSelectedIndex - 1 + suggestions.length) %
+                  suggestions.length;
+        });
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.numpadEnter) {
+        final index =
+            _wikilinkSelectedIndex.clamp(0, suggestions.length - 1).toInt();
+        _insertWikilinkSuggestion(suggestions[index]);
+        return KeyEventResult.handled;
+      }
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  MarkdownEditorCommand? _headingCommandForShortcutKey(LogicalKeyboardKey key) {
+    if (_isShortcutDigitKey(key, 1)) return MarkdownEditorCommand.heading1;
+    if (_isShortcutDigitKey(key, 2)) return MarkdownEditorCommand.heading2;
+    if (_isShortcutDigitKey(key, 3)) return MarkdownEditorCommand.heading3;
+    if (_isShortcutDigitKey(key, 4)) return MarkdownEditorCommand.heading4;
+    if (_isShortcutDigitKey(key, 5)) return MarkdownEditorCommand.heading5;
+    if (_isShortcutDigitKey(key, 6)) return MarkdownEditorCommand.heading6;
+    return null;
+  }
+
+  bool _isShortcutDigitKey(LogicalKeyboardKey key, int digit) {
+    return switch (digit) {
+      1 =>
+        key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1,
+      2 =>
+        key == LogicalKeyboardKey.digit2 || key == LogicalKeyboardKey.numpad2,
+      3 =>
+        key == LogicalKeyboardKey.digit3 || key == LogicalKeyboardKey.numpad3,
+      4 =>
+        key == LogicalKeyboardKey.digit4 || key == LogicalKeyboardKey.numpad4,
+      5 =>
+        key == LogicalKeyboardKey.digit5 || key == LogicalKeyboardKey.numpad5,
+      6 =>
+        key == LogicalKeyboardKey.digit6 || key == LogicalKeyboardKey.numpad6,
+      7 =>
+        key == LogicalKeyboardKey.digit7 || key == LogicalKeyboardKey.numpad7,
+      8 =>
+        key == LogicalKeyboardKey.digit8 || key == LogicalKeyboardKey.numpad8,
+      _ => false,
+    };
+  }
+
+  bool? _blockMoveShortcutUpward(KeyEvent event) {
+    final keyboard = HardwareKeyboard.instance;
+    final hasShortcutModifier =
+        keyboard.isMetaPressed || keyboard.isControlPressed;
+    if (!hasShortcutModifier ||
+        !keyboard.isAltPressed ||
+        keyboard.isShiftPressed) {
+      return null;
+    }
+
+    return switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowUp => true,
+      LogicalKeyboardKey.arrowDown => false,
+      _ => null,
+    };
+  }
+
+  KeyEventResult _handleFormattedBlockKeyEvent(
+    FocusNode node,
+    KeyEvent event,
+  ) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    final suggestionResult = _handleSuggestionKeyEvent(event);
+    if (suggestionResult == KeyEventResult.handled) {
+      return suggestionResult;
+    }
+
+    final isModifierPressed = HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isAltPressed;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+    final moveUpward = _blockMoveShortcutUpward(event);
+    if (moveUpward != null) {
+      return _moveActiveTopLevelBlock(upward: moveUpward)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    if (isModifierPressed) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      if (_changeActiveCodeIndent(outdent: shift)) {
+        return KeyEventResult.handled;
+      }
+      return _changeActiveListItemIndent(outdent: shift)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    if (shift ||
+        (event.logicalKey != LogicalKeyboardKey.enter &&
+            event.logicalKey != LogicalKeyboardKey.backspace)) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.enter) {
+      return _splitActiveFormattedBlock()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+
+    return _deleteBackwardFromActiveFormattedBlock()
+        ? KeyEventResult.handled
+        : KeyEventResult.ignored;
+  }
+
+  bool _changeActiveCodeIndent({required bool outdent}) {
+    final blockId = _activeFormattedBlockId;
+    if (blockId == null) return false;
+    final block = _controller.document.blockById(blockId);
+    if (block is! MarkdownCodeBlock && block is! MarkdownMermaidBlock) {
+      return false;
+    }
+
+    final value = _formattedBlockController.value;
+    final selection = value.selection;
+    final text = value.text;
+    if (!selection.isValid) return false;
+
+    final start = selection.start.clamp(0, text.length);
+    final end = selection.end.clamp(start, text.length);
+    final lineStart = start == 0 ? 0 : text.lastIndexOf('\n', start - 1) + 1;
+    final effectiveEnd =
+        end > start && end <= text.length && text[end - 1] == '\n'
+            ? end - 1
+            : end;
+    final lineEndIndex = text.indexOf('\n', effectiveEnd);
+    final lineEnd = lineEndIndex == -1 ? text.length : lineEndIndex;
+
+    if (selection.isCollapsed) {
+      if (outdent) {
+        final removed = _leadingIndentToRemove(text, lineStart);
+        if (removed == 0 || start < lineStart + removed) return true;
+        _formattedBlockController.value = value.copyWith(
+          text: text.replaceRange(lineStart, lineStart + removed, ''),
+          selection: TextSelection.collapsed(offset: start - removed),
+          composing: TextRange.empty,
+        );
+        return true;
+      }
+
+      _formattedBlockController.value = value.copyWith(
+        text: text.replaceRange(start, start, '  '),
+        selection: TextSelection.collapsed(offset: start + 2),
+        composing: TextRange.empty,
+      );
+      return true;
+    }
+
+    final selectedBlock = text.substring(lineStart, lineEnd);
+    final lines = selectedBlock.split('\n');
+    if (!outdent) {
+      final replacement = lines.map((line) => '  $line').join('\n');
+      _formattedBlockController.value = value.copyWith(
+        text: text.replaceRange(lineStart, lineEnd, replacement),
+        selection: TextSelection(
+          baseOffset: selection.baseOffset + 2,
+          extentOffset: selection.extentOffset + (lines.length * 2),
+        ),
+        composing: TextRange.empty,
+      );
+      return true;
+    }
+
+    var removedBeforeBase = 0;
+    var removedBeforeExtent = 0;
+    var cursor = lineStart;
+    final replacementLines = <String>[];
+    for (final line in lines) {
+      final removed = _leadingIndentToRemove(line, 0);
+      replacementLines.add(line.substring(removed));
+      final lineEndOffset = cursor + line.length;
+      if (cursor < selection.baseOffset) removedBeforeBase += removed;
+      if (lineEndOffset < selection.extentOffset) {
+        removedBeforeExtent += removed;
+      }
+      cursor = lineEndOffset + 1;
+    }
+
+    final replacement = replacementLines.join('\n');
+    _formattedBlockController.value = value.copyWith(
+      text: text.replaceRange(lineStart, lineEnd, replacement),
+      selection: TextSelection(
+        baseOffset: (selection.baseOffset - removedBeforeBase)
+            .clamp(lineStart, text.length),
+        extentOffset: (selection.extentOffset - removedBeforeExtent)
+            .clamp(lineStart, text.length),
+      ),
+      composing: TextRange.empty,
+    );
+    return true;
+  }
+
+  int _leadingIndentToRemove(String text, int lineStart) {
+    if (lineStart >= text.length) return 0;
+    if (text.codeUnitAt(lineStart) == 0x09) return 1;
+    if (text.codeUnitAt(lineStart) != 0x20) return 0;
+    final next = lineStart + 1;
+    if (next < text.length && text.codeUnitAt(next) == 0x20) return 2;
+    return 1;
+  }
+
+  void _setMode(MarkdownEditorMode mode, {bool notify = true}) {
+    if (_mode == mode) return;
+    final previousMode = _mode;
+    final transition = _modeTransitionAnchor(previousMode, mode);
+    setState(() {
+      _mode = mode;
+      if (mode != MarkdownEditorMode.formatted) {
+        _clearActiveFormattedBlock();
+      }
+      if (mode != MarkdownEditorMode.source) {
+        _lastNonSourceMode = mode;
+      }
+    });
+    if (notify) {
+      widget.onModeChanged?.call(mode);
+    }
+    _restoreModeTransition(mode, transition);
+  }
+
+  void _toggleSourceMode() {
+    if (_mode == MarkdownEditorMode.source) {
+      _setMode(_lastNonSourceMode);
+    } else {
+      _setMode(MarkdownEditorMode.source);
+    }
+  }
+
+  _ModeTransitionAnchor? _modeTransitionAnchor(
+    MarkdownEditorMode from,
+    MarkdownEditorMode to,
+  ) {
+    if (to != MarkdownEditorMode.source && to != MarkdownEditorMode.formatted) {
+      return null;
+    }
+
+    final currentSelection = _clampSourceSelection(_controller.selection);
+    final cursor = currentSelection.extentOffset;
+    final topBlockIndex = switch (from) {
+      MarkdownEditorMode.formatted => _formattedTopBlockIndex() ??
+          (_activeFormattedRange == null
+              ? 0
+              : _blockIndexForSourceOffset(_activeFormattedRange!.start)),
+      MarkdownEditorMode.source ||
+      MarkdownEditorMode.split =>
+        _sourceTopBlockIndex() ?? _blockIndexForSourceOffset(cursor),
+      MarkdownEditorMode.preview => _blockIndexForSourceOffset(cursor),
+    };
+    final sourceSelection = _sourceSelectionForModeTransition(
+      from: from,
+      to: to,
+      currentSelection: currentSelection,
+      topBlockIndex: topBlockIndex,
+    );
+
+    return _ModeTransitionAnchor(
+      topBlockIndex: topBlockIndex,
+      sourceSelection: sourceSelection,
+    );
+  }
+
+  TextSelection _sourceSelectionForModeTransition({
+    required MarkdownEditorMode from,
+    required MarkdownEditorMode to,
+    required TextSelection currentSelection,
+    required int topBlockIndex,
+  }) {
+    if (from == MarkdownEditorMode.formatted &&
+        to == MarkdownEditorMode.source &&
+        _activeFormattedPlainText &&
+        _activeFormattedRange != null) {
+      final block = _formattedBlockController.block ?? _activeEditableBlock();
+      final localSelection = _formattedBlockController.selection;
+      if (block != null && localSelection.isValid) {
+        return _sourceSelectionForPlainTextSelection(
+          block,
+          block.toMarkdown(),
+          localSelection,
+          sourceBaseOffset:
+              _activeFormattedRange!.start + _activeFormattedBlockSourceOffset,
+        );
+      }
+    }
+
+    if (from != MarkdownEditorMode.formatted ||
+        to != MarkdownEditorMode.source ||
+        _activeFormattedRange != null) {
+      return currentSelection;
+    }
+
+    final segments = _documentBlockSegments();
+    if (segments.isEmpty) return currentSelection;
+    final clampedIndex = topBlockIndex.clamp(0, segments.length - 1).toInt();
+    return TextSelection.collapsed(offset: segments[clampedIndex].range.start);
+  }
+
+  void _restoreModeTransition(
+    MarkdownEditorMode mode,
+    _ModeTransitionAnchor? anchor,
+  ) {
+    if (anchor == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _mode != mode) return;
+
+      if (mode == MarkdownEditorMode.source) {
+        _controller.textController.selection = anchor.sourceSelection;
+        _focusNode.requestFocus();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _mode == MarkdownEditorMode.source) {
+            _scrollSourceBlockToTop(anchor.topBlockIndex);
+          }
+        });
+        return;
+      }
+
+      if (mode == MarkdownEditorMode.formatted) {
+        final target =
+            _formattedActivationTargetForSelection(anchor.sourceSelection);
+        if (target != null) {
+          _activateFormattedSegment(
+            target.segment,
+            selection: target.segmentSelection,
+          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _mode == MarkdownEditorMode.formatted) {
+              _scrollFormattedBlockToTop(anchor.topBlockIndex);
+            }
+          });
+        } else {
+          _scrollFormattedBlockToTop(anchor.topBlockIndex);
+        }
+      }
+    });
+  }
+
+  int _blockIndexForSourceOffset(int sourceOffset) {
+    final segments = _documentBlockSegments();
+    if (segments.isEmpty) return 0;
+
+    final offset = sourceOffset.clamp(0, _controller.text.length).toInt();
+    for (var index = 0; index < segments.length; index++) {
+      final segment = segments[index];
+      final nextSegment =
+          index + 1 < segments.length ? segments[index + 1] : null;
+      if (segment.range.isCollapsed &&
+          nextSegment != null &&
+          nextSegment.range.start == offset &&
+          nextSegment.range.end > offset) {
+        continue;
+      }
+      if (offset >= segment.range.start && offset <= segment.range.end) {
+        return index;
+      }
+      if (offset < segment.range.start) {
+        return index == 0 ? 0 : index - 1;
+      }
+    }
+    return segments.length - 1;
+  }
+
+  int? _sourceTopBlockIndex() {
+    if (!_sourceScrollController.hasClients) return null;
+    final offset = _sourceOffsetForScrollOffset(_sourceScrollController.offset);
+    return _blockIndexForSourceOffset(offset);
+  }
+
+  int? _formattedTopBlockIndex() {
+    final viewportContext = _formattedViewportKey.currentContext;
+    if (viewportContext == null) return null;
+
+    final viewportBox = viewportContext.findRenderObject();
+    if (viewportBox is! RenderBox || !viewportBox.hasSize) return null;
+
+    final viewportTop = viewportBox.localToGlobal(Offset.zero).dy;
+    final segments = _documentBlockSegments();
+    for (var index = 0; index < segments.length; index++) {
+      final segmentContext =
+          _formattedSegmentGlobalKey(segments[index]).currentContext;
+      if (segmentContext == null) continue;
+
+      final segmentBox = segmentContext.findRenderObject();
+      if (segmentBox is! RenderBox || !segmentBox.hasSize) continue;
+
+      final segmentTop = segmentBox.localToGlobal(Offset.zero).dy;
+      final segmentBottom = segmentTop + segmentBox.size.height;
+      if (segmentBottom >= viewportTop + 1) return index;
+    }
+
+    return null;
+  }
+
+  int _sourceOffsetForScrollOffset(double scrollOffset) {
+    final lineHeight = _estimatedSourceLineHeight();
+    final topLine = lineHeight <= 0 ? 0 : (scrollOffset / lineHeight).floor();
+    final lines = _controller.text.split('\n');
+    var offset = 0;
+    for (var line = 0; line < topLine && line < lines.length; line++) {
+      offset += lines[line].length + 1;
+    }
+    return offset.clamp(0, _controller.text.length).toInt();
+  }
+
+  double _sourceScrollOffsetForBlockIndex(int blockIndex) {
+    final segments = _documentBlockSegments();
+    if (segments.isEmpty) return 0;
+    final clampedIndex = blockIndex.clamp(0, segments.length - 1).toInt();
+    final sourceOffset = segments[clampedIndex].range.start;
+    final linesBefore = _controller.text
+            .substring(
+                0, sourceOffset.clamp(0, _controller.text.length).toInt())
+            .split('\n')
+            .length -
+        1;
+    return linesBefore * _estimatedSourceLineHeight();
+  }
+
+  double _estimatedSourceLineHeight() {
+    final style =
+        _sourceTextStyle(context) ?? DefaultTextStyle.of(context).style;
+    final fontSize = style.fontSize ?? 14;
+    final height = style.height ?? 1.2;
+    return fontSize * height;
+  }
+
+  void _scrollSourceBlockToTop(int blockIndex) {
+    if (!_sourceScrollController.hasClients) return;
+    final target = _sourceScrollOffsetForBlockIndex(blockIndex).clamp(
+      _sourceScrollController.position.minScrollExtent,
+      _sourceScrollController.position.maxScrollExtent,
+    );
+    _sourceScrollController.jumpTo(target.toDouble());
+  }
+
+  void _scrollFormattedBlockToTop(
+    int blockIndex, {
+    bool retryAfterJump = true,
+  }) {
+    final segments = _documentBlockSegments();
+    if (segments.isEmpty) return;
+    final clampedIndex = blockIndex.clamp(0, segments.length - 1).toInt();
+    final context =
+        _formattedSegmentGlobalKey(segments[clampedIndex]).currentContext;
+    if (context == null) {
+      _jumpFormattedScrollNearBlock(clampedIndex, segments.length);
+      if (retryAfterJump) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _mode == MarkdownEditorMode.formatted) {
+            _scrollFormattedBlockToTop(
+              clampedIndex,
+              retryAfterJump: false,
+            );
+          }
+        });
+      }
+      return;
+    }
+
+    Scrollable.ensureVisible(
+      context,
+      alignment: 0,
+      duration: Duration.zero,
+    );
+  }
+
+  void _jumpFormattedScrollNearBlock(int blockIndex, int blockCount) {
+    if (!_formattedScrollController.hasClients || blockCount <= 1) return;
+
+    final position = _formattedScrollController.position;
+    final target = lerpDouble(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+      blockIndex / (blockCount - 1),
+    );
+    if (target == null) return;
+
+    _formattedScrollController.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
+  }
+
+  void _jumpFormattedScrollNearSourceOffset(int sourceOffset) {
+    if (!_formattedScrollController.hasClients || _controller.text.isEmpty) {
+      return;
+    }
+
+    final position = _formattedScrollController.position;
+    final textLength = _controller.text.length;
+    final fraction = sourceOffset.clamp(0, textLength).toDouble() / textLength;
+    final target = lerpDouble(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+      fraction,
+    );
+    if (target == null) return;
+
+    _formattedScrollController.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
+  }
+
+  void _handleFormattedRangeSelectionDragUpdate(DragUpdateDetails details) {
+    _updateFormattedRangeAutoScrollPosition(details.globalPosition);
+  }
+
+  void _handleFormattedRangeSelectionPointerMove(PointerMoveEvent event) {
+    if (!_formattedRangeDragActive) return;
+    _updateFormattedRangeAutoScrollPosition(event.position);
+  }
+
+  void _handleFormattedRangeSelectionDragTargetMove(
+    DragTargetDetails<_FormattedRangeSelectionDragPayload> details,
+  ) {
+    _updateFormattedRangeAutoScrollPosition(details.offset);
+  }
+
+  void _beginFormattedRangeDragAutoScroll() {
+    _formattedRangeDragActive = true;
+  }
+
+  void _updateFormattedRangeAutoScrollPosition(Offset globalPosition) {
+    _formattedRangeDragGlobalPosition = globalPosition;
+    _startFormattedRangeAutoScroll();
+  }
+
+  void _startFormattedRangeAutoScroll() {
+    _formattedRangeAutoScrollTimer ??=
+        Timer.periodic(const Duration(milliseconds: 16), (_) {
+      _tickFormattedRangeAutoScroll();
+    });
+    _tickFormattedRangeAutoScroll();
+  }
+
+  void _stopFormattedRangeAutoScroll() {
+    _formattedRangeAutoScrollTimer?.cancel();
+    _formattedRangeAutoScrollTimer = null;
+    _formattedRangeDragGlobalPosition = null;
+    _formattedRangeDragActive = false;
+  }
+
+  void _tickFormattedRangeAutoScroll() {
+    if (!_formattedScrollController.hasClients) return;
+    final pointer = _formattedRangeDragGlobalPosition;
+    if (pointer == null) return;
+
+    final viewportContext = _formattedViewportKey.currentContext;
+    if (viewportContext == null) return;
+
+    final viewportBox = viewportContext.findRenderObject();
+    if (viewportBox is! RenderBox || !viewportBox.hasSize) return;
+
+    final topLeft = viewportBox.localToGlobal(Offset.zero);
+    final viewportTop = topLeft.dy;
+    final viewportBottom = viewportTop + viewportBox.size.height;
+    const edgeInset = 56.0;
+    const maxScrollStep = 18.0;
+
+    double? target;
+    if (pointer.dy < viewportTop + edgeInset) {
+      final distance = (viewportTop + edgeInset - pointer.dy).clamp(
+        0.0,
+        edgeInset,
+      );
+      target = _formattedScrollController.offset -
+          (maxScrollStep * distance / edgeInset);
+    } else if (pointer.dy > viewportBottom - edgeInset) {
+      final distance = (pointer.dy - (viewportBottom - edgeInset)).clamp(
+        0.0,
+        edgeInset,
+      );
+      target = _formattedScrollController.offset +
+          (maxScrollStep * distance / edgeInset);
+    }
+    if (target == null) return;
+
+    final clampedTarget = target.clamp(
+      _formattedScrollController.position.minScrollExtent,
+      _formattedScrollController.position.maxScrollExtent,
+    );
+    if (clampedTarget == _formattedScrollController.offset) return;
+    _formattedScrollController.jumpTo(clampedTarget.toDouble());
+  }
+
+  GlobalKey _formattedSegmentGlobalKey(_MarkdownBlockSegment segment) {
+    final id =
+        '${segment.range.start}:${segment.range.end}:${segment.block?.id ?? ''}';
+    return _formattedSegmentKeys.putIfAbsent(id, GlobalKey.new);
+  }
+
+  _FormattedActivationTarget? _formattedActivationTargetForSelection(
+    TextSelection sourceSelection,
+  ) {
+    final segments = _documentBlockSegments();
+    if (segments.isEmpty) return null;
+
+    final textLength = _controller.text.length;
+    final extent = sourceSelection.extentOffset.clamp(0, textLength).toInt();
+    final blockIndex = _blockIndexForSourceOffset(extent);
+    final topSegment = segments[blockIndex];
+    final nestedSegment =
+        _nestedActivationSegmentAtSourceOffset(topSegment, extent);
+    final targetSegment = nestedSegment ?? topSegment;
+    final selectionBase =
+        sourceSelection.baseOffset.clamp(0, textLength).toInt();
+    final selectionExtent =
+        sourceSelection.extentOffset.clamp(0, textLength).toInt();
+    final localBase = (selectionBase -
+            targetSegment.range.start -
+            targetSegment.blockSourceOffset)
+        .clamp(0, targetSegment.source.length)
+        .toInt();
+    final localExtent = (selectionExtent -
+            targetSegment.range.start -
+            targetSegment.blockSourceOffset)
+        .clamp(0, targetSegment.source.length)
+        .toInt();
+
+    return _FormattedActivationTarget(
+      segment: targetSegment,
+      segmentSelection: TextSelection(
+        baseOffset: localBase,
+        extentOffset: localExtent,
+      ),
+    );
+  }
+
+  _MarkdownBlockSegment? _nestedActivationSegmentAtSourceOffset(
+    _MarkdownBlockSegment segment,
+    int sourceOffset,
+  ) {
+    final block = segment.block;
+    if (block is MarkdownListBlock) {
+      return _nestedListSegmentAtSourceOffset(segment, block, sourceOffset);
+    }
+    if (block is MarkdownBlockquoteBlock) {
+      return _nestedBlockquoteSegmentAtSourceOffset(
+        segment,
+        block,
+        sourceOffset,
+      );
+    }
+    return null;
+  }
+
+  _MarkdownBlockSegment? _nestedListSegmentAtSourceOffset(
+    _MarkdownBlockSegment segment,
+    MarkdownListBlock list,
+    int sourceOffset,
+  ) {
+    for (var itemIndex = 0; itemIndex < list.items.length; itemIndex++) {
+      final item = list.items[itemIndex];
+      for (var childIndex = 0; childIndex < item.blocks.length; childIndex++) {
+        final child = item.blocks[childIndex];
+        final blockSourceOffset = segment.blockSourceOffset +
+            _listItemChildBlockSourceOffset(list, itemIndex, childIndex);
+        final childStart = segment.range.start + blockSourceOffset;
+        final childEnd = childStart + child.toMarkdown().length;
+        if (sourceOffset < childStart || sourceOffset > childEnd) continue;
+
+        final childSegment = _MarkdownBlockSegment(
+          range: segment.range,
+          source: child.toMarkdown(),
+          block: child,
+          containerBlockId: segment.containerBlockId ?? list.id,
+          blockSourceOffset: blockSourceOffset,
+        );
+        return _nestedActivationSegmentAtSourceOffset(
+              childSegment,
+              sourceOffset,
+            ) ??
+            childSegment;
+      }
+    }
+    return null;
+  }
+
+  _MarkdownBlockSegment? _nestedBlockquoteSegmentAtSourceOffset(
+    _MarkdownBlockSegment segment,
+    MarkdownBlockquoteBlock blockquote,
+    int sourceOffset,
+  ) {
+    for (var index = 0; index < blockquote.blocks.length; index++) {
+      final child = blockquote.blocks[index];
+      final blockSourceOffset = segment.blockSourceOffset +
+          _blockquoteChildSourceOffset(blockquote, index);
+      final childStart = segment.range.start + blockSourceOffset;
+      final childEnd = childStart + child.toMarkdown().length;
+      if (sourceOffset < childStart || sourceOffset > childEnd) continue;
+
+      final childSegment = _MarkdownBlockSegment(
+        range: segment.range,
+        source: child.toMarkdown(),
+        block: child,
+        containerBlockId: segment.containerBlockId ?? blockquote.id,
+        blockSourceOffset: blockSourceOffset,
+      );
+      return _nestedActivationSegmentAtSourceOffset(
+            childSegment,
+            sourceOffset,
+          ) ??
+          childSegment;
+    }
+    return null;
+  }
+
+  void _clearActiveFormattedBlock() {
+    _activeFormattedRange = null;
+    _activeFormattedBlockId = null;
+    _activeFormattedContainerBlockId = null;
+    _activeFormattedBlockSourceOffset = 0;
+    _activeFormattedPlainText = false;
+    _activeDocumentSelection = null;
+    _activeTableSelection = null;
+    _activeListItemSelection = null;
+    _clearStoredMarks();
+  }
+
+  void _toggleFocusMode() {
+    setState(() => _focusMode = !_focusMode);
+    widget.onFocusModeChanged?.call(_focusMode);
+  }
+
+  bool _splitActiveFormattedBlock() {
+    if (!widget.enabled ||
+        _mode != MarkdownEditorMode.formatted ||
+        !_activeFormattedPlainText ||
+        _activeFormattedBlockId == null) {
+      return false;
+    }
+
+    final selection = _formattedBlockController.selection;
+    if (!selection.isValid || !selection.isCollapsed) {
+      return false;
+    }
+
+    final result = _controller.documentEditor.splitBlockAt(
+      blockId: _activeFormattedBlockId!,
+      selectionOffset: selection.extentOffset,
+    );
+    if (result == null) return false;
+
+    _syncActiveFormattedBlock(
+      result.activeBlockId,
+      selectionOffset: result.selectionOffset,
+    );
+    return true;
+  }
+
+  bool _deleteBackwardFromActiveFormattedBlock() {
+    if (!widget.enabled ||
+        _mode != MarkdownEditorMode.formatted ||
+        !_activeFormattedPlainText ||
+        _activeFormattedBlockId == null) {
+      return false;
+    }
+
+    final selection = _formattedBlockController.selection;
+    if (!selection.isValid ||
+        !selection.isCollapsed ||
+        selection.extentOffset != 0) {
+      return false;
+    }
+
+    final result = _controller.documentEditor.deleteBackwardAt(
+      blockId: _activeFormattedBlockId!,
+      selectionOffset: selection.extentOffset,
+    );
+    if (result == null) return false;
+
+    _syncActiveFormattedBlock(
+      result.activeBlockId,
+      selectionOffset: result.selectionOffset,
+    );
+    return true;
+  }
+
+  bool _changeActiveListItemIndent({required bool outdent}) {
+    if (!widget.enabled ||
+        _mode != MarkdownEditorMode.formatted ||
+        !_activeFormattedPlainText ||
+        _activeFormattedBlockId == null) {
+      return false;
+    }
+
+    final selection = _formattedBlockController.selection;
+    if (!selection.isValid || !selection.isCollapsed) {
+      return _activeFormattedBlockIsInList();
+    }
+
+    final result = outdent
+        ? _controller.documentEditor.outdentListItemContainingBlock(
+            blockId: _activeFormattedBlockId!,
+            selectionOffset: selection.extentOffset,
+          )
+        : _controller.documentEditor.indentListItemContainingBlock(
+            blockId: _activeFormattedBlockId!,
+            selectionOffset: selection.extentOffset,
+          );
+    if (result == null) return _activeFormattedBlockIsInList();
+
+    _syncActiveFormattedBlock(
+      result.activeBlockId,
+      selectionOffset: result.selectionOffset,
+    );
+    return true;
+  }
+
+  bool _activeFormattedBlockIsInList() {
+    final blockId = _activeFormattedBlockId;
+    if (blockId == null) return false;
+    return _topLevelBlockContaining(blockId) is MarkdownListBlock;
+  }
+
+  String? _activeBlockIdForTopLevelMove() {
+    if (_activeDocumentSelection != null) return null;
+
+    final activeTableCell = _activeTableCell;
+    if (activeTableCell != null) return activeTableCell.tableId;
+    if (_activeFormattedPlainText && _activeFormattedBlockId != null) {
+      return _activeFormattedBlockId;
+    }
+    return _activeTopLevelBlock()?.id;
+  }
+
+  bool _canMoveActiveTopLevelBlock({required bool upward}) {
+    final blockId = _activeBlockIdForTopLevelMove();
+    return blockId != null && _controller.canMoveBlock(blockId, upward: upward);
+  }
+
+  bool _canDragFormattedSegment(_MarkdownBlockSegment segment) {
+    if (!widget.enabled ||
+        _mode != MarkdownEditorMode.formatted ||
+        _activeDocumentSelection != null ||
+        _activeTableSelection != null ||
+        _activeListItemSelection != null) {
+      return false;
+    }
+
+    final blockId = segment.block?.id;
+    return blockId != null &&
+        (_controller.canMoveBlock(blockId, upward: true) ||
+            _controller.canMoveBlock(blockId, upward: false));
+  }
+
+  bool _canDropFormattedBlockAt(
+    _FormattedBlockDragPayload payload,
+    int targetIndex,
+  ) {
+    return widget.enabled &&
+        _mode == MarkdownEditorMode.formatted &&
+        _controller.canMoveBlockToIndex(
+          payload.blockId,
+          targetIndex: targetIndex,
+        );
+  }
+
+  bool _moveFormattedBlockToIndex(
+    _FormattedBlockDragPayload payload,
+    int targetIndex,
+  ) {
+    if (!_canDropFormattedBlockAt(payload, targetIndex)) return false;
+
+    final activeTableCell = _activeTableCell;
+    final activeTableSelectionOffset = _selectionExtentOrTextEnd(
+      _tableCellController,
+    );
+    final activeTextBlockId =
+        _activeFormattedPlainText ? _activeFormattedBlockId : null;
+    final activeTextTopLevelId = activeTextBlockId == null
+        ? null
+        : _topLevelBlockContaining(activeTextBlockId)?.id;
+    final activeTextSelectionOffset = _selectionExtentOrTextEnd(
+      _formattedBlockController,
+    );
+    final movedActiveBlock = activeTextTopLevelId == payload.blockId;
+    final movedActiveTable = activeTableCell?.tableId == payload.blockId;
+
+    final result = _controller.moveBlockToIndex(
+      payload.blockId,
+      targetIndex: targetIndex,
+      selectionOffset: movedActiveBlock
+          ? activeTextSelectionOffset
+          : movedActiveTable
+              ? activeTableSelectionOffset
+              : 0,
+    );
+    if (result == null) return false;
+
+    _draggingFormattedBlockId = null;
+    if (activeTableCell != null &&
+        _controller.document.blockById(activeTableCell.tableId)
+            is MarkdownTableBlock) {
+      _syncActiveTableCell(selectionOffset: activeTableSelectionOffset);
+      return true;
+    }
+
+    if (activeTextBlockId != null &&
+        _controller.document.blockById(activeTextBlockId) != null) {
+      _syncActiveFormattedBlock(
+        activeTextBlockId,
+        selectionOffset: activeTextSelectionOffset,
+      );
+      return true;
+    }
+
+    setState(() {
+      _draggingFormattedBlockId = null;
+      _clearActiveFormattedBlock();
+    });
+    return true;
+  }
+
+  int _selectionExtentOrTextEnd(TextEditingController controller) {
+    final selection = controller.selection;
+    if (!selection.isValid) return controller.text.length;
+    return selection.extentOffset.clamp(0, controller.text.length).toInt();
+  }
+
+  bool _moveActiveTopLevelBlock({required bool upward}) {
+    if (!widget.enabled || _mode != MarkdownEditorMode.formatted) {
+      return false;
+    }
+
+    final activeTableCell = _activeTableCell;
+    if (activeTableCell != null) {
+      final selection = _tableCellController.selection;
+      final selectionOffset = selection.isValid
+          ? selection.extentOffset
+          : _tableCellController.text.length;
+      final result = _controller.moveBlock(
+        activeTableCell.tableId,
+        upward: upward,
+        selectionOffset: selectionOffset,
+      );
+      if (result == null) return false;
+
+      _syncActiveTableCell(selectionOffset: result.selectionOffset);
+      return true;
+    }
+
+    final blockId = _activeFormattedBlockId;
+    if (_activeFormattedPlainText && blockId != null) {
+      final selection = _formattedBlockController.selection;
+      final selectionOffset = selection.isValid
+          ? selection.extentOffset
+          : _formattedBlockController.text.length;
+      final result = _controller.moveBlock(
+        blockId,
+        upward: upward,
+        selectionOffset: selectionOffset,
+      );
+      if (result == null) return false;
+
+      _syncActiveFormattedBlock(
+        result.activeBlockId,
+        selectionOffset: result.selectionOffset,
+      );
+      return true;
+    }
+
+    final topLevelBlockId = _activeTopLevelBlock()?.id;
+    if (topLevelBlockId == null) return false;
+    final result = _controller.moveBlock(
+      topLevelBlockId,
+      upward: upward,
+      selectionOffset: 0,
+    );
+    if (result == null) return false;
+    setState(_clearActiveFormattedBlock);
+    return true;
+  }
+
+  bool _shouldDeleteActiveDocumentSelection(KeyEvent event) {
+    if (_mode != MarkdownEditorMode.formatted ||
+        _activeDocumentSelection == null ||
+        event is! KeyDownEvent) {
+      return false;
+    }
+
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isMetaPressed ||
+        keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isShiftPressed) {
+      return false;
+    }
+
+    return event.logicalKey == LogicalKeyboardKey.backspace ||
+        event.logicalKey == LogicalKeyboardKey.delete;
+  }
+
+  bool _shouldDeleteActiveListItemSelection(KeyEvent event) {
+    if (_mode != MarkdownEditorMode.formatted ||
+        _activeListItemSelection == null ||
+        event is! KeyDownEvent) {
+      return false;
+    }
+
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isMetaPressed ||
+        keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isShiftPressed) {
+      return false;
+    }
+
+    return event.logicalKey == LogicalKeyboardKey.backspace ||
+        event.logicalKey == LogicalKeyboardKey.delete;
+  }
+
+  bool _shouldDeleteActiveTableSelection(KeyEvent event) {
+    if (_mode != MarkdownEditorMode.formatted ||
+        _activeTableSelection == null ||
+        event is! KeyDownEvent) {
+      return false;
+    }
+
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isMetaPressed ||
+        keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isShiftPressed) {
+      return false;
+    }
+
+    return event.logicalKey == LogicalKeyboardKey.backspace ||
+        event.logicalKey == LogicalKeyboardKey.delete;
+  }
+
+  bool _clearActiveTableSelection() {
+    if (!widget.enabled || _mode != MarkdownEditorMode.formatted) return false;
+
+    final selection = _activeTableSelection;
+    if (selection == null) return false;
+
+    final cleared = _controller.clearTableSelection(selection);
+    if (!cleared) {
+      setState(() => _activeTableSelection = null);
+      return false;
+    }
+
+    final table = _controller.document.blockById(selection.tableId);
+    setState(() {
+      _activeTableSelection = table is MarkdownTableBlock ? selection : null;
+      _activeTableCell = null;
+      _activeDocumentSelection = null;
+      _activeListItemSelection = null;
+      _clearStoredMarks();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _deleteActiveListItemSelection() {
+    if (!widget.enabled || _mode != MarkdownEditorMode.formatted) return false;
+
+    final selection = _activeListItemSelection;
+    if (selection == null) return false;
+
+    final result = _controller.deleteListItemSelection(selection);
+    if (result == null) {
+      setState(_clearActiveFormattedBlock);
+      return false;
+    }
+
+    _syncActiveFormattedBlock(
+      result.activeBlockId,
+      selectionOffset: result.selectionOffset,
+    );
+    return true;
+  }
+
+  bool _deleteActiveDocumentSelection() {
+    if (!widget.enabled || _mode != MarkdownEditorMode.formatted) return false;
+
+    final selection = _activeDocumentSelection;
+    if (selection == null) return false;
+
+    final result = _controller.deleteDocumentSelection(selection);
+    if (result == null) {
+      setState(_clearActiveFormattedBlock);
+      return false;
+    }
+
+    _syncActiveFormattedBlock(
+      result.activeBlockId,
+      selectionOffset: result.selectionOffset,
+    );
+    return true;
+  }
+
+  void _undo() {
+    _applyHistoryChange(_controller.undo);
+  }
+
+  void _redo() {
+    _applyHistoryChange(_controller.redo);
+  }
+
+  void _applyHistoryChange(bool Function() change) {
+    if (!widget.enabled) return;
+
+    final activeTableCell = _activeTableCell;
+    final activeTableSelection = _activeTableSelection;
+    final activeDocumentSelection = _activeDocumentSelection;
+    final tableSelection = _tableCellController.selection;
+    final sourceHadFocus = _focusNode.hasFocus;
+
+    if (!change()) return;
+    _clearStoredMarks();
+
+    if (_mode == MarkdownEditorMode.formatted) {
+      if (activeTableCell != null &&
+          _restoreTableCellAfterHistory(activeTableCell, tableSelection)) {
+        return;
+      }
+
+      if (activeTableSelection != null &&
+          _controller.document.blockById(activeTableSelection.tableId)
+              is MarkdownTableBlock) {
+        setState(() {
+          _clearActiveFormattedBlock();
+          _activeTableCell = null;
+          _activeTableSelection = activeTableSelection;
+        });
+        _formattedPaneFocusNode.requestFocus();
+        return;
+      }
+
+      if (activeDocumentSelection != null &&
+          _documentSelectionBlockIds(activeDocumentSelection).isNotEmpty) {
+        setState(() {
+          _clearActiveFormattedBlock();
+          _activeTableCell = null;
+          _activeDocumentSelection = activeDocumentSelection;
+        });
+        final sourceSelection =
+            _sourceSelectionForDocumentSelection(activeDocumentSelection);
+        if (sourceSelection != null) {
+          _controller.textController.selection = sourceSelection;
+        }
+        _formattedPaneFocusNode.requestFocus();
+        return;
+      }
+
+      final target = _formattedActivationTargetForSelection(
+        _controller.selection,
+      );
+      if (target != null) {
+        if (_activeTableCell != null) {
+          setState(() {
+            _activeTableCell = null;
+            _activeTableSelection = null;
+          });
+        }
+        _activateFormattedSegment(
+          target.segment,
+          selection: target.segmentSelection,
+        );
+        return;
+      }
+
+      setState(() {
+        _clearActiveFormattedBlock();
+        _activeTableCell = null;
+        _activeTableSelection = null;
+      });
+      return;
+    }
+
+    if (_mode == MarkdownEditorMode.source || sourceHadFocus) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  bool _restoreTableCellAfterHistory(
+    _TableCellSelection cell,
+    TextSelection selection,
+  ) {
+    final table = _controller.document.blockById(cell.tableId);
+    if (table is! MarkdownTableBlock || !_tableCellExists(table, cell)) {
+      setState(() {
+        _activeTableCell = null;
+        _activeTableSelection = null;
+      });
+      return false;
+    }
+
+    final children = _tableCellChildren(
+      table,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+    );
+    final plainText = _inlinePlainText(children);
+    final offset = selection.isValid
+        ? selection.extentOffset.clamp(0, plainText.length).toInt()
+        : plainText.length;
+
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = children
+      ..value = TextEditingValue(
+        text: plainText,
+        selection: TextSelection.collapsed(offset: offset),
+      );
+    _syncingTableCell = false;
+
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = cell;
+      _activeTableSelection = null;
+    });
+    _tableCellFocusNode.requestFocus();
+    return true;
+  }
+
+  bool _tableCellExists(MarkdownTableBlock table, _TableCellSelection cell) {
+    if (cell.columnIndex < 0 || cell.columnIndex >= table.columnCount) {
+      return false;
+    }
+    if (cell.header) return true;
+    return cell.rowIndex >= 0 && cell.rowIndex < table.rows.length;
+  }
+
+  void _syncActiveFormattedBlock(
+    String blockId, {
+    required int selectionOffset,
+    TextSelection? sourceSelection,
+  }) {
+    final activeBlock = _controller.document.blockById(blockId);
+    final segments = _documentBlockSegments();
+    _MarkdownBlockSegment? segment;
+    for (final candidate in segments) {
+      if (candidate.block?.findBlock(blockId) != null) {
+        segment = candidate;
+        break;
+      }
+    }
+
+    final activeSegment = segment;
+    if (!_usesPlainTextEditing(activeBlock) || activeSegment == null) {
+      _syncingFormattedBlock = true;
+      _formattedBlockController
+        ..block = null
+        ..value = const TextEditingValue();
+      _syncingFormattedBlock = false;
+      setState(_clearActiveFormattedBlock);
+      return;
+    }
+
+    final clampedSelection =
+        selectionOffset.clamp(0, activeBlock!.plainText.length).toInt();
+    final localSelection = TextSelection.collapsed(offset: clampedSelection);
+    final container = activeSegment.block;
+    final blockSourceOffset = container == null
+        ? 0
+        : _blockSourceOffsetInContainer(container, activeBlock.id);
+
+    _syncingFormattedBlock = true;
+    _formattedBlockController
+      ..block = activeBlock
+      ..value = TextEditingValue(
+        text: activeBlock.plainText,
+        selection: localSelection,
+      );
+    _syncingFormattedBlock = false;
+
+    setState(() {
+      _activeDocumentSelection = null;
+      _activeTableCell = null;
+      _activeTableSelection = null;
+      _activeListItemSelection = null;
+      _activeFormattedRange = activeSegment.range;
+      _activeFormattedBlockId = activeBlock.id;
+      _activeFormattedContainerBlockId = container?.id ?? activeBlock.id;
+      _activeFormattedBlockSourceOffset = blockSourceOffset;
+      _activeFormattedPlainText = true;
+    });
+    _controller.textController.selection = sourceSelection == null
+        ? _sourceSelectionForPlainTextSelection(
+            activeBlock,
+            activeBlock.toMarkdown(),
+            localSelection,
+            sourceBaseOffset: activeSegment.range.start + blockSourceOffset,
+          )
+        : _clampSourceSelection(sourceSelection);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedBlockFocusNode.requestFocus();
+      }
+    });
+  }
+
+  bool _applyActiveDocumentSelectionCommand(MarkdownEditorCommand command) {
+    final selection = _activeDocumentSelection;
+    if (_mode != MarkdownEditorMode.formatted || selection == null) {
+      return false;
+    }
+
+    var changed = false;
+    if (_isDocumentSelectionInlineCommand(command)) {
+      changed = _controller.applyInlineCommandToDocumentSelection(
+        selection,
+        command,
+      );
+    } else if (_isBlockCommand(command)) {
+      changed = _controller.applyBlockCommandToDocumentSelection(
+        selection,
+        command,
+      );
+    }
+    if (!changed) return false;
+
+    final nextSelection =
+        _documentSelectionBlockIds(selection).isEmpty ? null : selection;
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeDocumentSelection = nextSelection;
+      _activeListItemSelection = null;
+    });
+    final sourceSelection = nextSelection == null
+        ? null
+        : _sourceSelectionForDocumentSelection(nextSelection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _isDocumentSelectionInlineCommand(MarkdownEditorCommand command) {
+    return switch (command) {
+      MarkdownEditorCommand.bold ||
+      MarkdownEditorCommand.italic ||
+      MarkdownEditorCommand.strikethrough ||
+      MarkdownEditorCommand.inlineCode =>
+        true,
+      _ => false,
+    };
+  }
+
+  bool _applyActiveTableSelectionCommand(MarkdownEditorCommand command) {
+    final selection = _activeTableSelection;
+    if (_mode != MarkdownEditorMode.formatted || selection == null) {
+      return false;
+    }
+    if (!_isDocumentSelectionInlineCommand(command)) return false;
+
+    final changed = _controller.applyInlineCommandToTableSelection(
+      selection,
+      command,
+    );
+    if (!changed) return false;
+
+    final table = _controller.document.blockById(selection.tableId);
+    setState(() {
+      _activeTableSelection = table is MarkdownTableBlock ? selection : null;
+      _activeTableCell = null;
+      _activeDocumentSelection = null;
+      _activeListItemSelection = null;
+      _clearStoredMarks();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  bool _applyActiveListItemSelectionCommand(MarkdownEditorCommand command) {
+    final selection = _activeListItemSelection;
+    if (_mode != MarkdownEditorMode.formatted || selection == null) {
+      return false;
+    }
+    if (!_isDocumentSelectionInlineCommand(command)) return false;
+
+    final changed = _controller.applyInlineCommandToListItemSelection(
+      selection,
+      command,
+    );
+    if (!changed) return false;
+
+    final list = _controller.document.blockById(selection.listId);
+    final nextSelection =
+        list is MarkdownListBlock && selection.normalizedFor(list.items) != null
+            ? selection
+            : null;
+    setState(() {
+      _clearActiveFormattedBlock();
+      _activeTableCell = null;
+      _activeListItemSelection = nextSelection;
+    });
+    final sourceSelection = nextSelection == null
+        ? null
+        : _sourceSelectionForListItemSelection(nextSelection);
+    if (sourceSelection != null) {
+      _controller.textController.selection = sourceSelection;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _formattedPaneFocusNode.requestFocus();
+      }
+    });
+    return true;
+  }
+
+  void _applyCommand(MarkdownEditorCommand command) {
+    if (!widget.enabled) return;
+    if (!_isCommandEnabled(command)) return;
+    widget.onCommand?.call(command);
+
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeListItemSelection != null) {
+      if (_applyActiveListItemSelectionCommand(command)) {
+        return;
+      }
+      _formattedPaneFocusNode.requestFocus();
+      return;
+    }
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeDocumentSelection != null) {
+      if (_applyActiveDocumentSelectionCommand(command)) {
+        return;
+      }
+      _formattedPaneFocusNode.requestFocus();
+      return;
+    }
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeTableSelection != null) {
+      if (_applyActiveTableSelectionCommand(command)) {
+        return;
+      }
+      _formattedPaneFocusNode.requestFocus();
+      return;
+    }
+    if (command == MarkdownEditorCommand.image) {
+      unawaited(_insertImageCommand());
+      return;
+    }
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeTableCell != null &&
+        _isInlineCommand(command)) {
+      if (command == MarkdownEditorCommand.link) {
+        unawaited(_editActiveTableCellLink());
+        return;
+      }
+      _applyActiveTableCellInlineCommand(command);
+      return;
+    }
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeFormattedPlainText &&
+        _activeFormattedBlockId != null) {
+      if (command == MarkdownEditorCommand.blockMath) {
+        unawaited(_insertBlockMathFromActiveFormattedText());
+        return;
+      }
+      if (_isInlineCommand(command)) {
+        if (command == MarkdownEditorCommand.link) {
+          unawaited(_editActiveInlineLink());
+          return;
+        }
+        _applyActiveInlineCommand(command);
+        return;
+      }
+      if (_isBlockCommand(command)) {
+        _controller.applyBlockCommand(_activeFormattedBlockId!, command);
+        setState(_clearActiveFormattedBlock);
+        return;
+      }
+    }
+
+    _controller.applyCommand(command);
+    if (_mode == MarkdownEditorMode.formatted) {
+      setState(_clearActiveFormattedBlock);
+    } else {
+      _focusNode.requestFocus();
+    }
+  }
+
+  void _insertTable({
+    required int rows,
+    required int columns,
+  }) {
+    if (!widget.enabled) return;
+
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeFormattedPlainText &&
+        _activeFormattedBlockId != null) {
+      _controller.documentEditor.replaceBlockWithTable(
+        _activeFormattedBlockId!,
+        rows: rows,
+        columns: columns,
+      );
+      setState(_clearActiveFormattedBlock);
+      return;
+    }
+
+    _controller.insertTable(rows: rows, columns: columns);
+    if (_mode == MarkdownEditorMode.formatted) {
+      setState(_clearActiveFormattedBlock);
+    } else {
+      _focusNode.requestFocus();
+    }
+  }
+
+  void _applyActiveInlineCommand(MarkdownEditorCommand command) {
+    final selection = _formattedBlockController.selection;
+    if (!selection.isValid || selection.isCollapsed) {
+      if (selection.isValid &&
+          selection.isCollapsed &&
+          _toggleStoredMarkCommand(command)) {
+        return;
+      }
+      _formattedBlockFocusNode.requestFocus();
+      return;
+    }
+    _clearStoredMarks();
+
+    final localRange = TextRange(
+      start: selection.start,
+      end: selection.end,
+    );
+    _controller.applyInlineCommand(
+      _activeFormattedBlockId!,
+      localRange,
+      command,
+    );
+
+    final block = _controller.document.blockById(_activeFormattedBlockId!);
+    if (_activeFormattedRange != null && block != null) {
+      _activeFormattedRange = _rangeForActiveContainer(
+        _activeFormattedRange!.start,
+        block,
+      );
+    }
+    _formattedBlockController
+      ..block = block
+      ..selection = selection;
+    _formattedBlockFocusNode.requestFocus();
+    setState(() {});
+  }
+
+  Future<void> _editActiveInlineLink() async {
+    final blockId = _activeFormattedBlockId;
+    if (blockId == null) return;
+
+    final selection = _formattedBlockController.selection;
+    if (!selection.isValid) {
+      _formattedBlockFocusNode.requestFocus();
+      return;
+    }
+
+    final range = TextRange(start: selection.start, end: selection.end);
+    final existing = _controller.documentEditor.linkAtTextRange(
+      blockId,
+      range,
+    );
+    final result = await _showLinkEditorDialog(
+      initialUrl: existing?.url ?? '',
+      initialText: selection.isCollapsed && existing == null ? '' : null,
+      canRemove: existing != null,
+    );
+    if (result == null || !mounted) {
+      _formattedBlockFocusNode.requestFocus();
+      return;
+    }
+
+    if (result.remove) {
+      _controller.documentEditor.unlinkAtTextRange(blockId, range);
+      _syncActiveFormattedBlock(blockId,
+          selectionOffset: existing?.range.start ?? selection.start);
+      return;
+    }
+
+    final url = _normalizeAllowedLinkUrl(result.url);
+    if (url == null) {
+      _formattedBlockFocusNode.requestFocus();
+      return;
+    }
+    if (url.isEmpty) {
+      if (existing != null) {
+        _controller.documentEditor.unlinkAtTextRange(blockId, range);
+        _syncActiveFormattedBlock(blockId,
+            selectionOffset: existing.range.start);
+        return;
+      }
+      _formattedBlockFocusNode.requestFocus();
+      return;
+    }
+
+    if (result.text != null) {
+      final text = result.text!.trim();
+      if (text.isEmpty) {
+        _formattedBlockFocusNode.requestFocus();
+        return;
+      }
+      _controller.documentEditor.replaceTextRangeWithInlineNodes(
+        blockId,
+        range,
+        [
+          MarkdownLink(
+            url: url,
+            children: [MarkdownText(text)],
+          ),
+        ],
+      );
+      _syncActiveFormattedBlock(
+        blockId,
+        selectionOffset: range.start + text.length,
+      );
+      return;
+    }
+
+    if (existing != null) {
+      _controller.documentEditor.updateLinkAtTextRange(
+        blockId,
+        range,
+        url: url,
+        title: existing.title,
+      );
+      _syncActiveFormattedBlock(
+        blockId,
+        selectionOffset: existing.range.end,
+      );
+      return;
+    }
+
+    if (selection.isCollapsed) {
+      _formattedBlockFocusNode.requestFocus();
+      return;
+    }
+
+    _controller.applyInlineCommand(
+      blockId,
+      range,
+      MarkdownEditorCommand.link,
+      argument: url,
+    );
+    _syncActiveFormattedBlock(blockId, selectionOffset: selection.end);
+  }
+
+  void _applyActiveTableCellInlineCommand(MarkdownEditorCommand command) {
+    final cell = _activeTableCell;
+    if (cell == null) return;
+
+    final selection = _tableCellController.selection;
+    if (!selection.isValid || selection.isCollapsed) {
+      if (selection.isValid &&
+          selection.isCollapsed &&
+          _toggleStoredMarkCommand(command)) {
+        return;
+      }
+      _tableCellFocusNode.requestFocus();
+      return;
+    }
+    _clearStoredMarks();
+
+    final applied = _controller.documentEditor.applyTableCellInlineCommand(
+      blockId: cell.tableId,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+      range: TextRange(start: selection.start, end: selection.end),
+      command: command,
+    );
+    if (!applied) {
+      _tableCellFocusNode.requestFocus();
+      return;
+    }
+
+    final table = _controller.document.blockById(cell.tableId);
+    if (table is MarkdownTableBlock) {
+      _tableCellController
+        ..inlineNodes = _tableCellChildren(
+          table,
+          rowIndex: cell.rowIndex,
+          columnIndex: cell.columnIndex,
+          header: cell.header,
+        )
+        ..selection = selection;
+    }
+    _tableCellFocusNode.requestFocus();
+    setState(() {});
+  }
+
+  Future<void> _editActiveTableCellLink() async {
+    final cell = _activeTableCell;
+    if (cell == null) return;
+
+    final selection = _tableCellController.selection;
+    if (!selection.isValid) {
+      _tableCellFocusNode.requestFocus();
+      return;
+    }
+
+    final range = TextRange(start: selection.start, end: selection.end);
+    final existing = _controller.documentEditor.tableCellLinkAtRange(
+      blockId: cell.tableId,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+      range: range,
+    );
+    final result = await _showLinkEditorDialog(
+      initialUrl: existing?.url ?? '',
+      initialText: selection.isCollapsed && existing == null ? '' : null,
+      canRemove: existing != null,
+    );
+    if (result == null || !mounted) {
+      _tableCellFocusNode.requestFocus();
+      return;
+    }
+
+    if (result.remove) {
+      _controller.documentEditor.unlinkTableCellAtRange(
+        blockId: cell.tableId,
+        rowIndex: cell.rowIndex,
+        columnIndex: cell.columnIndex,
+        header: cell.header,
+        range: range,
+      );
+      _syncActiveTableCell(
+          selectionOffset: existing?.range.start ?? selection.start);
+      return;
+    }
+
+    final url = _normalizeAllowedLinkUrl(result.url);
+    if (url == null) {
+      _tableCellFocusNode.requestFocus();
+      return;
+    }
+    if (url.isEmpty) {
+      if (existing != null) {
+        _controller.documentEditor.unlinkTableCellAtRange(
+          blockId: cell.tableId,
+          rowIndex: cell.rowIndex,
+          columnIndex: cell.columnIndex,
+          header: cell.header,
+          range: range,
+        );
+        _syncActiveTableCell(selectionOffset: existing.range.start);
+        return;
+      }
+      _tableCellFocusNode.requestFocus();
+      return;
+    }
+
+    if (result.text != null) {
+      final text = result.text!.trim();
+      if (text.isEmpty) {
+        _tableCellFocusNode.requestFocus();
+        return;
+      }
+      _controller.documentEditor.replaceTableCellRangeWithInlineNodes(
+        blockId: cell.tableId,
+        rowIndex: cell.rowIndex,
+        columnIndex: cell.columnIndex,
+        header: cell.header,
+        range: range,
+        replacement: [
+          MarkdownLink(
+            url: url,
+            children: [MarkdownText(text)],
+          ),
+        ],
+      );
+      _syncActiveTableCell(selectionOffset: range.start + text.length);
+      return;
+    }
+
+    if (existing != null) {
+      _controller.documentEditor.updateTableCellLinkAtRange(
+        blockId: cell.tableId,
+        rowIndex: cell.rowIndex,
+        columnIndex: cell.columnIndex,
+        header: cell.header,
+        range: range,
+        url: url,
+        title: existing.title,
+      );
+      _syncActiveTableCell(selectionOffset: existing.range.end);
+      return;
+    }
+
+    if (selection.isCollapsed) {
+      _tableCellFocusNode.requestFocus();
+      return;
+    }
+
+    final applied = _controller.documentEditor.applyTableCellInlineCommand(
+      blockId: cell.tableId,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+      range: range,
+      command: MarkdownEditorCommand.link,
+      argument: url,
+    );
+    if (applied) {
+      _syncActiveTableCell(selectionOffset: selection.end);
+    } else {
+      _tableCellFocusNode.requestFocus();
+    }
+  }
+
+  Future<void> _insertImageCommand() async {
+    final initialAlt = _selectedImageAltText();
+    _notifyImagePickEvent(
+      const MarkdownEditorImagePickEvent(
+        status: MarkdownEditorImagePickStatus.picking,
+      ),
+    );
+
+    late final _ImageEditorResult? result;
+    try {
+      result = await _pickImageForInsert(initialAlt);
+    } catch (error, stackTrace) {
+      _notifyImagePickEvent(
+        MarkdownEditorImagePickEvent(
+          status: MarkdownEditorImagePickStatus.failed,
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      );
+      _requestActiveEditorFocus();
+      return;
+    }
+    if (!mounted) return;
+
+    if (result == null) {
+      _notifyImagePickEvent(
+        const MarkdownEditorImagePickEvent(
+          status: MarkdownEditorImagePickStatus.cancelled,
+        ),
+      );
+      _requestActiveEditorFocus();
+      return;
+    }
+
+    final url = result.url.trim();
+    if (url.isEmpty) {
+      _notifyImagePickEvent(
+        const MarkdownEditorImagePickEvent(
+          status: MarkdownEditorImagePickStatus.failed,
+          error: 'Image URL is empty',
+        ),
+      );
+      _requestActiveEditorFocus();
+      return;
+    }
+
+    final alt = result.alt.trim();
+    final title = _normalizeOptionalMarkdownTitle(result.title);
+    final selection = MarkdownEditorImageSelection(
+      url: url,
+      alt: alt,
+      title: title,
+    );
+    if (_mode == MarkdownEditorMode.formatted && _activeTableCell != null) {
+      _insertImageInActiveTableCell(url: url, alt: alt, title: title);
+      _notifyImageInserted(selection);
+      return;
+    }
+
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeFormattedBlockId == null &&
+        _controller.text.trim().isEmpty) {
+      _insertFormattedImageIntoEmptyDocument(url: url, alt: alt, title: title);
+      _notifyImageInserted(selection);
+      return;
+    }
+
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeFormattedPlainText &&
+        _activeFormattedBlockId != null) {
+      _insertFormattedImageBlock(url: url, alt: alt, title: title);
+      _notifyImageInserted(selection);
+      return;
+    }
+
+    _insertSourceImageBlock(url: url, alt: alt, title: title);
+    _notifyImageInserted(selection);
+  }
+
+  void _notifyImageInserted(MarkdownEditorImageSelection selection) {
+    _notifyImagePickEvent(
+      MarkdownEditorImagePickEvent(
+        status: MarkdownEditorImagePickStatus.inserted,
+        selection: selection,
+      ),
+    );
+  }
+
+  void _notifyImagePickEvent(MarkdownEditorImagePickEvent event) {
+    widget.onImagePickEvent?.call(event);
+  }
+
+  void _insertFormattedImageIntoEmptyDocument({
+    required String url,
+    required String alt,
+    String? title,
+  }) {
+    final inserted =
+        _controller.documentEditor.replaceEmptyDocumentWithImageBlock(
+      url: url,
+      alt: alt,
+      title: title,
+    );
+    if (inserted == null) {
+      _insertSourceImageBlock(url: url, alt: alt, title: title);
+      return;
+    }
+
+    _syncActiveFormattedBlock(
+      inserted.activeBlockId,
+      selectionOffset: inserted.selectionOffset,
+    );
+  }
+
+  Future<_ImageEditorResult?> _pickImageForInsert(String initialAlt) async {
+    final pickImage = widget.onPickImage;
+    if (pickImage == null) {
+      return _showImageEditorDialog(
+        initialUrl: '',
+        initialAlt: initialAlt,
+        initialTitle: '',
+      );
+    }
+
+    final selection = await Future<MarkdownEditorImageSelection?>.value(
+      pickImage(),
+    );
+    if (selection == null) return null;
+    return _ImageEditorResult(
+      url: selection.url,
+      alt: selection.alt.trim().isEmpty ? initialAlt : selection.alt,
+      title: selection.title,
+    );
+  }
+
+  String _selectedImageAltText() {
+    if (_mode == MarkdownEditorMode.formatted && _activeTableCell != null) {
+      final selection = _tableCellController.selection;
+      if (selection.isValid && !selection.isCollapsed) {
+        return _tableCellController.text.substring(
+          selection.start,
+          selection.end,
+        );
+      }
+      return '';
+    }
+
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeFormattedPlainText &&
+        _activeFormattedBlockId != null) {
+      final selection = _formattedBlockController.selection;
+      if (selection.isValid && !selection.isCollapsed) {
+        return _formattedBlockController.text.substring(
+          selection.start,
+          selection.end,
+        );
+      }
+    }
+    return '';
+  }
+
+  void _insertImageInActiveTableCell({
+    required String url,
+    required String alt,
+    String? title,
+  }) {
+    final cell = _activeTableCell;
+    if (cell == null) return;
+
+    final selection = _tableCellController.selection;
+    final textLength = _tableCellController.text.length;
+    final range = selection.isValid
+        ? TextRange(start: selection.start, end: selection.end)
+        : TextRange.collapsed(textLength);
+    final imageAlt = alt.isEmpty && !range.isCollapsed
+        ? _tableCellController.text.substring(range.start, range.end)
+        : alt;
+
+    final inserted =
+        _controller.documentEditor.replaceTableCellRangeWithInlineNodes(
+      blockId: cell.tableId,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+      range: range,
+      replacement: [
+        MarkdownImage(url: url, alt: imageAlt, title: title),
+      ],
+    );
+    if (inserted) {
+      _syncActiveTableCell(selectionOffset: range.start + imageAlt.length);
+    } else {
+      _tableCellFocusNode.requestFocus();
+    }
+  }
+
+  void _insertFormattedImageBlock({
+    required String url,
+    required String alt,
+    String? title,
+  }) {
+    final blockId = _activeFormattedBlockId;
+    if (blockId == null) return;
+
+    final block = _controller.document.blockById(blockId);
+    if (block == null) return;
+
+    final selection = _formattedBlockController.selection;
+    final imageAlt = alt.isEmpty && selection.isValid && !selection.isCollapsed
+        ? _formattedBlockController.text
+            .substring(selection.start, selection.end)
+        : alt;
+    final textLength = block.plainText.length;
+    final range = selection.isValid
+        ? TextRange(start: selection.start, end: selection.end)
+        : TextRange.collapsed(textLength);
+    final container = _topLevelBlockContaining(block.id);
+    final preserveEmptyListParagraph = container is MarkdownListBlock &&
+        range.start == 0 &&
+        range.end >= textLength;
+
+    final inserted = _controller.documentEditor.replaceTextRangeWithImageBlock(
+      block.id,
+      range,
+      url: url,
+      alt: imageAlt,
+      title: title,
+      preserveEmptyBefore: preserveEmptyListParagraph,
+    );
+    if (inserted == null) {
+      _formattedBlockFocusNode.requestFocus();
+      return;
+    }
+
+    _syncActiveFormattedBlock(
+      inserted.activeBlockId,
+      selectionOffset: inserted.selectionOffset,
+    );
+  }
+
+  void _insertSourceImageBlock({
+    required String url,
+    required String alt,
+    String? title,
+  }) {
+    final markdown = MarkdownImageBlock(
+      id: 'source-image',
+      url: url,
+      alt: alt,
+      title: title,
+    ).toMarkdown();
+    _insertSeparatedMarkdown(markdown);
+    _focusNode.requestFocus();
+  }
+
+  void _insertSeparatedMarkdown(String markdown) {
+    final value = _controller.textController.value;
+    final text = value.text;
+    final selection = value.selection.isValid
+        ? TextRange(
+            start: value.selection.start,
+            end: value.selection.end,
+          )
+        : TextRange.collapsed(text.length);
+    final before = text.substring(0, selection.start);
+    final after = text.substring(selection.end);
+    final prefix = before.isEmpty || before.endsWith('\n\n')
+        ? ''
+        : before.endsWith('\n')
+            ? '\n'
+            : '\n\n';
+    final suffix = after.isEmpty || after.startsWith('\n\n')
+        ? ''
+        : after.startsWith('\n')
+            ? '\n'
+            : '\n\n';
+    final replacement = '$prefix$markdown$suffix';
+    _controller.replaceRange(
+      selection,
+      replacement,
+      selection: TextSelection.collapsed(
+        offset: selection.start + prefix.length + markdown.length,
+      ),
+    );
+  }
+
+  Future<void> _insertBlockMathFromActiveFormattedText({
+    TextRange? range,
+  }) async {
+    final blockId = _activeFormattedBlockId;
+    if (blockId == null) return;
+
+    final block = _controller.document.blockById(blockId);
+    if (!_usesPlainTextEditing(block)) return;
+
+    final text = _formattedBlockController.text;
+    final selection = _formattedBlockController.selection;
+    final effectiveRange = range ??
+        (selection.isValid
+            ? TextRange(start: selection.start, end: selection.end)
+            : TextRange.collapsed(text.length));
+    final start = effectiveRange.start.clamp(0, text.length).toInt();
+    final end = effectiveRange.end.clamp(start, text.length).toInt();
+    final normalizedRange = TextRange(start: start, end: end);
+    final selectedText = normalizedRange.isCollapsed
+        ? ''
+        : text.substring(normalizedRange.start, normalizedRange.end);
+    final initialLatex = _normalizeBlockMathSource(selectedText);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => _BlockMathEditorDialog(
+        initialLatex: initialLatex,
+      ),
+    );
+
+    if (result == null || !mounted) {
+      _requestActiveEditorFocus();
+      return;
+    }
+
+    final latex = result.trim();
+    if (latex.isEmpty) {
+      _requestActiveEditorFocus();
+      return;
+    }
+
+    final inserted = _controller.documentEditor.replaceTextRangeWithBlockMath(
+      blockId,
+      normalizedRange,
+      latex: latex,
+    );
+    if (inserted == null) {
+      _requestActiveEditorFocus();
+      return;
+    }
+
+    final activeBlock = _controller.document.blockById(inserted.activeBlockId);
+    if (_usesPlainTextEditing(activeBlock)) {
+      _syncActiveFormattedBlock(
+        inserted.activeBlockId,
+        selectionOffset: inserted.selectionOffset,
+      );
+    } else {
+      setState(_clearActiveFormattedBlock);
+      _formattedBlockFocusNode.requestFocus();
+    }
+  }
+
+  void _requestActiveEditorFocus() {
+    if (_mode == MarkdownEditorMode.formatted &&
+        _activeDocumentSelection != null) {
+      _formattedPaneFocusNode.requestFocus();
+    } else if (_mode == MarkdownEditorMode.formatted &&
+        _activeTableCell != null) {
+      _tableCellFocusNode.requestFocus();
+    } else if (_mode == MarkdownEditorMode.formatted &&
+        _activeFormattedPlainText) {
+      _formattedBlockFocusNode.requestFocus();
+    } else {
+      _focusNode.requestFocus();
+    }
+  }
+
+  void _syncActiveTableCell({required int selectionOffset}) {
+    final cell = _activeTableCell;
+    if (cell == null) return;
+
+    final table = _controller.document.blockById(cell.tableId);
+    if (table is! MarkdownTableBlock) {
+      setState(() {
+        _activeTableCell = null;
+        _activeTableSelection = null;
+      });
+      return;
+    }
+
+    final children = _tableCellChildren(
+      table,
+      rowIndex: cell.rowIndex,
+      columnIndex: cell.columnIndex,
+      header: cell.header,
+    );
+    final plainText = _inlinePlainText(children);
+    final clampedSelection = selectionOffset.clamp(0, plainText.length).toInt();
+
+    _syncingTableCell = true;
+    _tableCellController
+      ..inlineNodes = children
+      ..value = TextEditingValue(
+        text: plainText,
+        selection: TextSelection.collapsed(offset: clampedSelection),
+      );
+    _syncingTableCell = false;
+    _tableCellFocusNode.requestFocus();
+    setState(() {});
+  }
+
+  Future<_LinkEditorResult?> _showLinkEditorDialog({
+    required String initialUrl,
+    required String? initialText,
+    required bool canRemove,
+  }) {
+    return showDialog<_LinkEditorResult>(
+      context: context,
+      builder: (context) => _LinkEditorDialog(
+        initialUrl: initialUrl,
+        initialText: initialText,
+        canRemove: canRemove,
+      ),
+    );
+  }
+
+  Future<_ImageEditorResult?> _showImageEditorDialog({
+    required String initialUrl,
+    required String initialAlt,
+    required String initialTitle,
+  }) {
+    return showDialog<_ImageEditorResult>(
+      context: context,
+      builder: (context) => _ImageEditorDialog(
+        initialUrl: initialUrl,
+        initialAlt: initialAlt,
+        initialTitle: initialTitle,
+      ),
+    );
+  }
+
+  Future<void> _showImageBlockEditor(MarkdownImageBlock block) async {
+    final result = await _showImageEditorDialog(
+      initialUrl: block.url,
+      initialAlt: block.alt,
+      initialTitle: block.title ?? '',
+    );
+    if (result == null || !mounted) return;
+
+    final url = result.url.trim();
+    if (url.isEmpty) return;
+
+    _controller.documentEditor.updateImageBlock(
+      block.id,
+      url: url,
+      alt: result.alt.trim(),
+      title: _normalizeOptionalMarkdownTitle(result.title),
+    );
+    setState(_clearActiveFormattedBlock);
+  }
+
+  String? _normalizeOptionalMarkdownTitle(String? title) {
+    final trimmed = title?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  String _normalizeLinkUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return '';
+    if (RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:').hasMatch(trimmed)) {
+      return trimmed;
+    }
+    return 'https://$trimmed';
+  }
+
+  String? _normalizeAllowedLinkUrl(String url) {
+    final normalized = _normalizeLinkUrl(url);
+    if (normalized.isEmpty) return '';
+    return _isAllowedEditorLinkUrl(normalized) ? normalized : null;
+  }
+
+  bool _isAllowedEditorLinkUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    return switch (uri.scheme.toLowerCase()) {
+      'http' || 'https' || 'mailto' => true,
+      _ => false,
+    };
+  }
+
+  String _normalizeAutoLinkUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return '';
+    if (_autoLinkEmailRegExp.hasMatch(trimmed)) {
+      return 'mailto:$trimmed';
+    }
+    final normalized = _normalizeLinkUrl(trimmed);
+    return _isAllowedEditorLinkUrl(normalized) ? normalized : '';
+  }
+
+  bool _isInlineCommand(MarkdownEditorCommand command) {
+    return switch (command) {
+      MarkdownEditorCommand.bold ||
+      MarkdownEditorCommand.italic ||
+      MarkdownEditorCommand.strikethrough ||
+      MarkdownEditorCommand.inlineCode ||
+      MarkdownEditorCommand.link ||
+      MarkdownEditorCommand.image ||
+      MarkdownEditorCommand.wikilink =>
+        true,
+      _ => false,
+    };
+  }
+
+  bool _isBlockCommand(MarkdownEditorCommand command) {
+    return switch (command) {
+      MarkdownEditorCommand.paragraph ||
+      MarkdownEditorCommand.heading1 ||
+      MarkdownEditorCommand.heading2 ||
+      MarkdownEditorCommand.heading3 ||
+      MarkdownEditorCommand.heading4 ||
+      MarkdownEditorCommand.heading5 ||
+      MarkdownEditorCommand.heading6 ||
+      MarkdownEditorCommand.unorderedList ||
+      MarkdownEditorCommand.orderedList ||
+      MarkdownEditorCommand.taskList ||
+      MarkdownEditorCommand.blockquote ||
+      MarkdownEditorCommand.codeBlock ||
+      MarkdownEditorCommand.blockMath ||
+      MarkdownEditorCommand.mermaidDiagram ||
+      MarkdownEditorCommand.horizontalRule ||
+      MarkdownEditorCommand.table =>
+        true,
+      _ => false,
+    };
+  }
+
+  Future<void> _copyCodeBlock(
+    _MarkdownBlockSegment segment,
+    _FencedCodeBlock codeBlock,
+  ) async {
+    if (codeBlock.code.trim().isEmpty) return;
+
+    try {
+      await Clipboard.setData(ClipboardData(text: codeBlock.code));
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+
+    _copiedCodeBlockResetTimer?.cancel();
+    setState(() => _copiedCodeBlockStart = segment.range.start);
+    _copiedCodeBlockResetTimer = Timer(_codeCopyFeedbackDuration, () {
+      if (!mounted) return;
+      setState(() {
+        if (_copiedCodeBlockStart == segment.range.start) {
+          _copiedCodeBlockStart = null;
+        }
+      });
+    });
+  }
+
+  Future<void> _copyMarkdown() {
+    return Clipboard.setData(ClipboardData(text: _controller.text));
+  }
+
+  Future<void> _copyPlainText() {
+    return Clipboard.setData(
+      ClipboardData(text: markdownToPlainText(_controller.text)),
+    );
+  }
+
+  Future<void> _copyHtml() {
+    return Clipboard.setData(
+      ClipboardData(text: markdownToHtml(_controller.text)),
+    );
+  }
+
+  Future<void> _exportPdf() async {
+    final markdown = _controller.text;
+    final html = markdownToHtml(markdown);
+    final export = widget.onExportPdf;
+    if (export == null) {
+      await Clipboard.setData(ClipboardData(text: html));
+      return;
+    }
+    await Future<void>.value(export(markdown, html));
+  }
+
+  Future<void> _exportMarkdown() async {
+    final export = widget.onExportMarkdown;
+    if (export == null) {
+      await _copyMarkdown();
+      return;
+    }
+    await Future<void>.value(export(_controller.text));
+  }
+
+  Future<void> _importMarkdown() async {
+    if (!widget.enabled) return;
+
+    final import = widget.onImportMarkdown;
+    if (import == null) return;
+
+    final markdown = await Future<String?>.value(import());
+    if (!mounted ||
+        !widget.enabled ||
+        markdown == null ||
+        markdown.trim().isEmpty) {
+      return;
+    }
+
+    _controller.insertMarkdownBlock(markdown);
+    setState(_clearActiveFormattedBlock);
+    _focusNode.requestFocus();
+  }
+
+  void _openSearch() {
+    setState(() => _searchOpen = true);
+    _refreshSearchMatches();
+  }
+
+  void _refreshSearchMatches() {
+    final query = _searchController.text;
+    final matches = _findSearchMatches(query);
+    final queryChanged = query != _lastSearchQuery;
+    var nextIndex = _currentSearchMatchIndex;
+    if (queryChanged) {
+      nextIndex = 0;
+      _lastSearchQuery = query;
+    }
+    if (matches.isEmpty) {
+      nextIndex = 0;
+    } else if (nextIndex >= matches.length) {
+      nextIndex = matches.length - 1;
+    }
+
+    if (mounted) {
+      setState(() {
+        _searchMatches = matches;
+        _currentSearchMatchIndex = nextIndex;
+      });
+    } else {
+      _searchMatches = matches;
+      _currentSearchMatchIndex = nextIndex;
+    }
+
+    if (queryChanged &&
+        matches.isNotEmpty &&
+        _mode == MarkdownEditorMode.formatted) {
+      final match = matches[nextIndex];
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _mode == MarkdownEditorMode.formatted) {
+          _scrollFormattedSearchMatchIntoView(match);
+        }
+      });
+    }
+  }
+
+  void _selectNextSearchMatch() {
+    if (_searchMatches.isEmpty) return;
+    _goToSearchMatch((_currentSearchMatchIndex + 1) % _searchMatches.length);
+  }
+
+  void _selectPreviousSearchMatch() {
+    if (_searchMatches.isEmpty) return;
+    _goToSearchMatch(
+      (_currentSearchMatchIndex - 1 + _searchMatches.length) %
+          _searchMatches.length,
+    );
+  }
+
+  void _goToSearchMatch(int index) {
+    final match = _searchMatches[index];
+    setState(() => _currentSearchMatchIndex = index);
+    _controller.textController.selection = TextSelection(
+      baseOffset: match.start,
+      extentOffset: match.end,
+    );
+
+    if (_mode == MarkdownEditorMode.formatted) {
+      final target = _formattedActivationTargetForSelection(
+        TextSelection(baseOffset: match.start, extentOffset: match.end),
+      );
+      if (target != null) {
+        _activateFormattedSegment(
+          target.segment,
+          selection: target.segmentSelection,
+        );
+        return;
+      }
+    }
+    _focusNode.requestFocus();
+  }
+
+  void _scrollFormattedSearchMatchIntoView(TextRange match) {
+    final segments = _documentBlockSegments();
+    if (segments.isEmpty) return;
+
+    final blockIndex = _blockIndexForSourceOffset(match.start);
+    final clampedIndex = blockIndex.clamp(0, segments.length - 1).toInt();
+    final context =
+        _formattedSegmentGlobalKey(segments[clampedIndex]).currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0,
+        duration: Duration.zero,
+      );
+      return;
+    }
+
+    _jumpFormattedScrollNearSourceOffset(match.start);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _mode == MarkdownEditorMode.formatted) {
+        _scrollFormattedBlockToTop(clampedIndex, retryAfterJump: false);
+      }
+    });
+  }
+
+  List<TextRange> _findSearchMatches(String query) {
+    if (query.isEmpty) return const [];
+    if (_mode == MarkdownEditorMode.source) {
+      return _controller.findMatches(query);
+    }
+
+    final matches = <TextRange>[];
+    for (final segment in _documentBlockSegments()) {
+      final block = segment.block;
+      if (block == null) {
+        _addSourceSearchMatches(
+          matches,
+          segment.source,
+          query,
+          sourceBaseOffset: segment.range.start,
+        );
+      } else {
+        _addSemanticBlockSearchMatches(
+          matches,
+          block,
+          query,
+          sourceBaseOffset: segment.range.start,
+          source: segment.source,
+        );
+      }
+      if (matches.length >= 500) break;
+    }
+    matches.sort((a, b) => a.start == b.start
+        ? a.end.compareTo(b.end)
+        : a.start.compareTo(b.start));
+    return matches.length <= 500 ? matches : matches.take(500).toList();
+  }
+
+  void _addSemanticBlockSearchMatches(
+    List<TextRange> matches,
+    MarkdownBlock block,
+    String query, {
+    required int sourceBaseOffset,
+    required String source,
+  }) {
+    if (matches.length >= 500) return;
+
+    switch (block) {
+      case MarkdownParagraphBlock() || MarkdownHeadingBlock():
+        _addPlainTextSearchMatches(
+          matches,
+          block.plainText,
+          query,
+          sourceOffsetForPlainTextOffset: (offset) =>
+              sourceBaseOffset +
+              _sourceOffsetForPlainTextOffset(block, source, offset),
+        );
+      case MarkdownBlockquoteBlock():
+        for (var index = 0; index < block.blocks.length; index++) {
+          final child = block.blocks[index];
+          _addSemanticBlockSearchMatches(
+            matches,
+            child,
+            query,
+            sourceBaseOffset:
+                sourceBaseOffset + _blockquoteChildSourceOffset(block, index),
+            source: child.toMarkdown(),
+          );
+          if (matches.length >= 500) return;
+        }
+      case MarkdownListBlock():
+        for (var itemIndex = 0; itemIndex < block.items.length; itemIndex++) {
+          final item = block.items[itemIndex];
+          for (var childIndex = 0;
+              childIndex < item.blocks.length;
+              childIndex++) {
+            final child = item.blocks[childIndex];
+            _addSemanticBlockSearchMatches(
+              matches,
+              child,
+              query,
+              sourceBaseOffset: sourceBaseOffset +
+                  _listItemChildBlockSourceOffset(
+                    block,
+                    itemIndex,
+                    childIndex,
+                  ),
+              source: child.toMarkdown(),
+            );
+            if (matches.length >= 500) return;
+          }
+        }
+      case MarkdownCodeBlock() ||
+            MarkdownMermaidBlock() ||
+            MarkdownBlockMathBlock():
+        break;
+      default:
+        _addSourceBackedPlainTextSearchMatches(
+          matches,
+          block.plainText,
+          source,
+          query,
+          sourceBaseOffset: sourceBaseOffset,
+        );
+    }
+  }
+
+  void _addPlainTextSearchMatches(
+    List<TextRange> matches,
+    String text,
+    String query, {
+    required int Function(int offset) sourceOffsetForPlainTextOffset,
+  }) {
+    if (text.isEmpty || query.isEmpty) return;
+
+    final haystack = text.toLowerCase();
+    final needle = query.toLowerCase();
+    var index = haystack.indexOf(needle);
+    while (index != -1 && matches.length < 500) {
+      matches.add(
+        TextRange(
+          start: sourceOffsetForPlainTextOffset(index),
+          end: sourceOffsetForPlainTextOffset(index + query.length),
+        ),
+      );
+      index = haystack.indexOf(needle, index + needle.length);
+    }
+  }
+
+  void _addSourceBackedPlainTextSearchMatches(
+    List<TextRange> matches,
+    String text,
+    String source,
+    String query, {
+    required int sourceBaseOffset,
+  }) {
+    if (text.isEmpty || source.isEmpty || query.isEmpty) return;
+
+    final plainHaystack = text.toLowerCase();
+    final sourceHaystack = source.toLowerCase();
+    final needle = query.toLowerCase();
+    var plainIndex = plainHaystack.indexOf(needle);
+    var sourceCursor = 0;
+    while (plainIndex != -1 && matches.length < 500) {
+      final matchedText = text.substring(plainIndex, plainIndex + query.length);
+      final sourceIndex = sourceHaystack.indexOf(
+        matchedText.toLowerCase(),
+        sourceCursor,
+      );
+      if (sourceIndex == -1) break;
+
+      matches.add(
+        TextRange(
+          start: sourceBaseOffset + sourceIndex,
+          end: sourceBaseOffset + sourceIndex + matchedText.length,
+        ),
+      );
+      sourceCursor = sourceIndex + matchedText.length;
+      plainIndex = plainHaystack.indexOf(needle, plainIndex + needle.length);
+    }
+  }
+
+  void _addSourceSearchMatches(
+    List<TextRange> matches,
+    String source,
+    String query, {
+    required int sourceBaseOffset,
+  }) {
+    if (source.isEmpty || query.isEmpty) return;
+
+    final haystack = source.toLowerCase();
+    final needle = query.toLowerCase();
+    var index = haystack.indexOf(needle);
+    while (index != -1 && matches.length < 500) {
+      matches.add(
+        TextRange(
+          start: sourceBaseOffset + index,
+          end: sourceBaseOffset + index + query.length,
+        ),
+      );
+      index = haystack.indexOf(needle, index + needle.length);
+    }
+  }
+
+  void _refreshInlineSuggestions() {
+    if (_mode != MarkdownEditorMode.formatted) {
+      _slashMatch = null;
+      _wikilinkMatch = null;
+      _slashSelectedIndex = 0;
+      _wikilinkSelectedIndex = 0;
+      return;
+    }
+
+    final selection = _controller.selection;
+    if (!selection.isValid || !selection.isCollapsed) {
+      _slashMatch = null;
+      _wikilinkMatch = null;
+      return;
+    }
+
+    final cursor = selection.extentOffset;
+    final text = _controller.text;
+    final lineStart = cursor <= 0 ? 0 : text.lastIndexOf('\n', cursor - 1) + 1;
+    final linePrefix = text.substring(lineStart, cursor);
+    final richSuggestionsAllowed = _sourceRichSuggestionsAllowedAt(cursor);
+    _slashSelectedIndex = 0;
+    _wikilinkSelectedIndex = 0;
+
+    if (widget.enableSlashCommands && richSuggestionsAllowed) {
+      _slashMatch = _formattedSlashMatchForActiveTextBlock() ??
+          _sourceSlashMatch(
+            lineStart: lineStart,
+            cursor: cursor,
+            linePrefix: linePrefix,
+          );
+    } else {
+      _slashMatch = null;
+    }
+
+    if (widget.enableWikilinks && richSuggestionsAllowed) {
+      final open = text.lastIndexOf('[[', cursor);
+      final close = text.lastIndexOf(']]', cursor);
+      if (open != -1 && open > close && _wikilinkTriggerPrefixAllowed(open)) {
+        final query = text.substring(open + 2, cursor);
+        if (!query.contains('\n')) {
+          _wikilinkMatch = _TriggerMatch(
+            range: TextRange(start: open, end: cursor),
+            query: query,
+          );
+          return;
+        }
+      }
+    }
+    _wikilinkMatch = null;
+  }
+
+  _TriggerMatch? _formattedSlashMatchForActiveTextBlock() {
+    if (!_activeFormattedPlainText ||
+        _activeFormattedBlockId == null ||
+        _activeFormattedRange == null) {
+      return null;
+    }
+
+    final block = _formattedBlockController.block ??
+        _controller.document.blockById(_activeFormattedBlockId!);
+    if (!_usesPlainTextEditing(block)) return null;
+
+    final selection = _formattedBlockController.selection;
+    if (!selection.isValid || !selection.isCollapsed) return null;
+
+    final visibleText = _formattedBlockController.text;
+    final cursor = selection.extentOffset.clamp(0, visibleText.length).toInt();
+    final lineStart =
+        cursor <= 0 ? 0 : visibleText.lastIndexOf('\n', cursor - 1) + 1;
+    final linePrefix = visibleText.substring(lineStart, cursor);
+    if (!_isSlashCommandLinePrefix(linePrefix)) return null;
+
+    final markdown = block!.toMarkdown();
+    final sourceOffset = _activeFormattedRange!.start +
+        _activeFormattedBlockSourceOffset +
+        _plainTextSourceOffsetFor(block, markdown);
+    final range = TextRange(
+      start: sourceOffset + lineStart,
+      end: sourceOffset + cursor,
+    );
+    if (range.start < 0 || range.end > _controller.text.length) return null;
+
+    return _TriggerMatch(
+      range: range,
+      query: linePrefix.substring(1),
+    );
+  }
+
+  _TriggerMatch? _sourceSlashMatch({
+    required int lineStart,
+    required int cursor,
+    required String linePrefix,
+  }) {
+    if (!_isSlashCommandLinePrefix(linePrefix)) return null;
+    return _TriggerMatch(
+      range: TextRange(start: lineStart, end: cursor),
+      query: linePrefix.substring(1),
+    );
+  }
+
+  bool _isSlashCommandLinePrefix(String linePrefix) {
+    return linePrefix.startsWith('/') &&
+        !linePrefix.substring(1).contains(RegExp(r'\s'));
+  }
+
+  bool _wikilinkTriggerPrefixAllowed(int openOffset) {
+    if (openOffset <= 0) return true;
+    final text = _controller.text;
+    final previous = text.codeUnitAt(openOffset - 1);
+    return previous == 0x20 || previous == 0x0A || previous == 0x0D;
+  }
+
+  bool _sourceRichSuggestionsAllowedAt(int sourceOffset) {
+    final text = _controller.text;
+    if (text.isEmpty) return true;
+
+    final offset = sourceOffset.clamp(0, text.length).toInt();
+    for (final segment in _markdownBlockSegments(text)) {
+      if (offset < segment.range.start || offset > segment.range.end) {
+        continue;
+      }
+
+      final firstLine = segment.source.split('\n').first;
+      final trimmed = firstLine.trimLeft();
+      if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+        return false;
+      }
+      if (segment.range.start == 0 && _isFrontmatterOpeningLine(firstLine)) {
+        return false;
+      }
+      break;
+    }
+
+    return !_isInlineCodeSourceContext(offset);
+  }
+
+  bool _isInlineCodeSourceContext(int sourceOffset) {
+    final text = _controller.text;
+    if (text.isEmpty) return false;
+
+    final offset = sourceOffset.clamp(0, text.length).toInt();
+    final lineStart = offset <= 0 ? 0 : text.lastIndexOf('\n', offset - 1) + 1;
+    final prefix = text.substring(lineStart, offset);
+    var activeRunLength = 0;
+
+    for (var index = 0; index < prefix.length; index++) {
+      if (prefix.codeUnitAt(index) != 0x60 ||
+          (index > 0 && prefix.codeUnitAt(index - 1) == 0x5C)) {
+        continue;
+      }
+
+      var runEnd = index + 1;
+      while (runEnd < prefix.length && prefix.codeUnitAt(runEnd) == 0x60) {
+        runEnd++;
+      }
+      final runLength = runEnd - index;
+      activeRunLength = activeRunLength == runLength
+          ? 0
+          : activeRunLength == 0
+              ? runLength
+              : activeRunLength;
+      index = runEnd - 1;
+    }
+
+    return activeRunLength != 0;
+  }
+
+  bool get _shouldShowSlashCommands {
+    return _mode == MarkdownEditorMode.formatted &&
+        _slashMatch != null &&
+        _filteredSlashCommands().isNotEmpty;
+  }
+
+  bool get _shouldShowWikilinkSuggestions {
+    return _mode == MarkdownEditorMode.formatted && _wikilinkMatch != null;
+  }
+
+  List<_EditorCommandItem> _filteredSlashCommands() {
+    final query = _slashMatch?.query.toLowerCase() ?? '';
+    final commands = _allSlashCommands();
+    if (query.isEmpty) return commands;
+    return commands
+        .where(
+          (item) =>
+              item.title.toLowerCase().contains(query) ||
+              item.searchText.toLowerCase().contains(query),
+        )
+        .toList();
+  }
+
+  List<_EditorCommandItem> _visibleSlashCommands() {
+    return _filteredSlashCommands();
+  }
+
+  List<_EditorCommandItem> _allSlashCommands() {
+    return [
+      for (final item in _builtInSlashCommands)
+        if (item.command == null || _isCommandEnabled(item.command!)) item,
+      for (final command in widget.customSlashCommands)
+        _EditorCommandItem.custom(command),
+    ];
+  }
+
+  List<String> _filteredWikilinkSuggestions() {
+    final query = _wikilinkMatch?.query.toLowerCase() ?? '';
+    return widget.wikilinkSuggestions
+        .where((title) => title.toLowerCase().contains(query))
+        .toList();
+  }
+
+  List<String> _visibleWikilinkSuggestions() {
+    return _filteredWikilinkSuggestions().take(10).toList(growable: false);
+  }
+
+  void _runSlashCommand(_EditorCommandItem item) {
+    final match = _slashMatch;
+    if (match == null) return;
+
+    if (item.customCommand != null) {
+      unawaited(_runCustomSlashCommand(item.customCommand!, match));
+      return;
+    }
+    final command = item.command;
+    if (command == null) return;
+    if (!_isCommandEnabled(command)) return;
+
+    if (_runFormattedSlashCommand(item, match)) {
+      return;
+    }
+
+    if (command == MarkdownEditorCommand.wikilink) {
+      _controller.replaceRange(
+        match.range,
+        '[[',
+        selection: TextSelection.collapsed(offset: match.range.start + 2),
+      );
+      if (_mode == MarkdownEditorMode.formatted) {
+        setState(_clearActiveFormattedBlock);
+        _formattedBlockFocusNode.requestFocus();
+      } else {
+        _focusNode.requestFocus();
+      }
+      return;
+    }
+
+    _controller.runTransaction(() {
+      _controller
+        ..replaceRange(
+          match.range,
+          '',
+          selection: TextSelection.collapsed(offset: match.range.start),
+        )
+        ..applyCommand(command);
+    });
+    if (_mode == MarkdownEditorMode.formatted) {
+      setState(_clearActiveFormattedBlock);
+    }
+    _focusNode.requestFocus();
+  }
+
+  Future<void> _runCustomSlashCommand(
+    MarkdownEditorSlashCommand command,
+    _TriggerMatch match,
+  ) async {
+    final triggerText = '/${match.query}';
+    if (!_currentRangeMatches(match.range, triggerText)) return;
+
+    String? markdown;
+    try {
+      markdown = command.markdown ??
+          await Future<String?>.value(command.onSelected?.call(match.query));
+    } catch (_) {
+      return;
+    }
+    if (!mounted ||
+        !widget.enabled ||
+        markdown == null ||
+        markdown.trim().isEmpty ||
+        !_currentRangeMatches(match.range, triggerText)) {
+      return;
+    }
+    final markdownToInsert = markdown;
+
+    if (_runFormattedCustomSlashCommand(markdownToInsert, match)) {
+      return;
+    }
+
+    _controller.runTransaction(() {
+      _controller
+        ..replaceRange(
+          match.range,
+          '',
+          selection: TextSelection.collapsed(offset: match.range.start),
+        )
+        ..insertMarkdownBlock(markdownToInsert);
+    });
+    if (_mode == MarkdownEditorMode.formatted) {
+      setState(_clearActiveFormattedBlock);
+    }
+    _focusNode.requestFocus();
+  }
+
+  bool _runFormattedCustomSlashCommand(
+    String markdown,
+    _TriggerMatch match,
+  ) {
+    if (_mode != MarkdownEditorMode.formatted ||
+        !_activeFormattedPlainText ||
+        _activeFormattedBlockId == null ||
+        _activeFormattedRange == null) {
+      return false;
+    }
+
+    final block = _controller.document.blockById(_activeFormattedBlockId!);
+    if (!_usesPlainTextEditing(block)) return false;
+
+    final sourceOffset = _activeFormattedRange!.start +
+        _activeFormattedBlockSourceOffset +
+        _plainTextSourceOffsetFor(block!, block.toMarkdown());
+    final localRange = TextRange(
+      start: match.range.start - sourceOffset,
+      end: match.range.end - sourceOffset,
+    );
+    if (localRange.start < 0 ||
+        localRange.end < localRange.start ||
+        localRange.end > block.plainText.length) {
+      return false;
+    }
+
+    final parsed = MarkdownDocumentCodec(plugins: widget.plugins).parse(
+      markdown,
+    );
+    if (parsed.blocks.isEmpty) return false;
+
+    final previousContainer = _topLevelBlockContaining(block.id);
+    final replacingTopLevel = previousContainer?.id == block.id;
+    final inserted = _controller.documentEditor.replaceTextRangeWithBlocks(
+      block.id,
+      localRange,
+      parsed.blocks,
+    );
+    if (inserted == null) return false;
+
+    final nextContainer = previousContainer == null
+        ? null
+        : _controller.document.blockById(previousContainer.id);
+    final selectionOffset = replacingTopLevel
+        ? _activeFormattedRange!.start + inserted.selectionOffset
+        : _activeFormattedRange!.start +
+            (nextContainer?.toMarkdown().length ?? inserted.selectionOffset);
+
+    setState(_clearActiveFormattedBlock);
+    _controller.textController.selection = _clampSourceSelection(
+      TextSelection.collapsed(offset: selectionOffset),
+    );
+    _formattedBlockFocusNode.requestFocus();
+    return true;
+  }
+
+  bool _currentRangeMatches(TextRange range, String expected) {
+    final text = _controller.text;
+    return _rangeFitsText(range, text) &&
+        text.substring(range.start, range.end) == expected;
+  }
+
+  bool _rangeFitsText(TextRange range, String text) {
+    return range.start >= 0 &&
+        range.end >= range.start &&
+        range.end <= text.length;
+  }
+
+  bool _runFormattedSlashCommand(
+    _EditorCommandItem item,
+    _TriggerMatch match,
+  ) {
+    if (_mode != MarkdownEditorMode.formatted ||
+        !_activeFormattedPlainText ||
+        _activeFormattedBlockId == null ||
+        _activeFormattedRange == null) {
+      return false;
+    }
+
+    final block = _controller.document.blockById(_activeFormattedBlockId!);
+    if (!_usesPlainTextEditing(block)) return false;
+
+    final sourceOffset = _activeFormattedRange!.start +
+        _activeFormattedBlockSourceOffset +
+        _plainTextSourceOffsetFor(block!, block.toMarkdown());
+    final localRange = TextRange(
+      start: match.range.start - sourceOffset,
+      end: match.range.end - sourceOffset,
+    );
+    if (localRange.start < 0 ||
+        localRange.end < localRange.start ||
+        localRange.end > block.plainText.length) {
+      return false;
+    }
+
+    final command = item.command;
+    if (command == null) return false;
+
+    if (command == MarkdownEditorCommand.wikilink) {
+      _controller.replaceRange(
+        match.range,
+        '[[',
+        selection: TextSelection.collapsed(offset: match.range.start + 2),
+      );
+      _syncActiveFormattedBlock(
+        block.id,
+        selectionOffset: localRange.start + 2,
+        sourceSelection: TextSelection.collapsed(
+          offset: match.range.start + 2,
+        ),
+      );
+      return true;
+    }
+
+    if (!_isBlockCommand(command)) return false;
+
+    if (command == MarkdownEditorCommand.blockMath) {
+      unawaited(_insertBlockMathFromActiveFormattedText(range: localRange));
+      return true;
+    }
+
+    _controller.documentEditor.runTransaction(() {
+      _controller.documentEditor.replaceTextRange(block.id, localRange, '');
+      _controller.applyBlockCommand(block.id, command);
+    });
+
+    final preferredBlock = _preferredFormattedBlockAfterCommand(block.id);
+    if (preferredBlock == null) {
+      setState(_clearActiveFormattedBlock);
+      _formattedBlockFocusNode.requestFocus();
+    } else {
+      _syncActiveFormattedBlock(preferredBlock.id, selectionOffset: 0);
+    }
+    return true;
+  }
+
+  MarkdownBlock? _preferredFormattedBlockAfterCommand(String blockId) {
+    final block = _controller.document.blockById(blockId);
+    if (_usesPlainTextEditing(block)) return block;
+    if (block is MarkdownListBlock && block.items.isNotEmpty) {
+      return _firstEditableListItemBlock(block.items.first);
+    }
+    if (block is MarkdownBlockquoteBlock && block.blocks.isNotEmpty) {
+      final child = block.blocks.first;
+      return _usesPlainTextEditing(child) ? child : null;
+    }
+    return null;
+  }
+
+  void _insertWikilinkSuggestion(String title) {
+    final match = _wikilinkMatch;
+    if (match == null) return;
+
+    if (_insertWikilinkSuggestionInActiveFormattedBlock(title, match)) {
+      return;
+    }
+
+    _controller.replaceRange(
+      match.range,
+      '[[$title]]',
+      selection: TextSelection.collapsed(
+        offset: match.range.start + title.length + 4,
+      ),
+    );
+    if (_mode == MarkdownEditorMode.formatted) {
+      _formattedBlockFocusNode.requestFocus();
+    } else {
+      _focusNode.requestFocus();
+    }
+  }
+
+  bool _insertWikilinkSuggestionInActiveFormattedBlock(
+    String title,
+    _TriggerMatch match,
+  ) {
+    if (_mode != MarkdownEditorMode.formatted ||
+        !_activeFormattedPlainText ||
+        _activeFormattedBlockId == null ||
+        _activeFormattedRange == null) {
+      return false;
+    }
+
+    final blockId = _activeFormattedBlockId!;
+    final block = _controller.document.blockById(blockId);
+    if (!_usesPlainTextEditing(block)) return false;
+
+    final localRange = _activeFormattedWikilinkTriggerRange(match);
+    if (localRange == null) return false;
+
+    final applied = _controller.documentEditor.replaceTextRangeWithInlineNodes(
+      blockId,
+      localRange,
+      [MarkdownWikilink(target: title)],
+    );
+    if (!applied) return false;
+
+    _syncActiveFormattedBlock(
+      blockId,
+      selectionOffset: localRange.start + title.length,
+    );
+    _slashMatch = null;
+    _wikilinkMatch = null;
+    _slashSelectedIndex = 0;
+    _wikilinkSelectedIndex = 0;
+    return true;
+  }
+
+  TextRange? _activeFormattedWikilinkTriggerRange(_TriggerMatch match) {
+    final selection = _formattedBlockController.selection;
+    if (!selection.isValid || !selection.isCollapsed) return null;
+
+    final text = _formattedBlockController.text;
+    final cursor = selection.extentOffset.clamp(0, text.length).toInt();
+    final expectedTrigger = '[[${match.query}';
+    final expectedStart = cursor - expectedTrigger.length;
+    if (expectedStart >= 0 &&
+        text.substring(expectedStart, cursor) == expectedTrigger) {
+      return TextRange(start: expectedStart, end: cursor);
+    }
+
+    final open = text.lastIndexOf('[[', cursor);
+    if (open == -1) return null;
+    final query = text.substring(open + 2, cursor);
+    if (query != match.query || query.contains('\n')) return null;
+    return TextRange(start: open, end: cursor);
+  }
+
+  List<_MarkdownBlockSegment> _documentBlockSegments() {
+    final text = _controller.text;
+    if (text.trim().isEmpty) return const [];
+
+    final sourceSegments = _markdownBlockSegments(text);
+    final blocks = _controller.document.blocks;
+    if (blocks.isEmpty) return sourceSegments;
+
+    final segments = <_MarkdownBlockSegment>[];
+    var sourceIndex = 0;
+    var sourceSearchOffset = 0;
+    var canonicalOffset = 0;
+    for (final block in blocks) {
+      final source = block.toMarkdown();
+      final sourceIsEmpty = source.trim().isEmpty;
+      final sourceRange = sourceIsEmpty
+          ? TextRange.collapsed(canonicalOffset)
+          : _sourceRangeForDocumentBlock(
+              source,
+              text,
+              sourceSegments,
+              sourceIndex,
+              sourceSearchOffset,
+              canonicalOffset,
+            );
+
+      segments.add(
+        _MarkdownBlockSegment(
+          range: sourceRange,
+          source: source,
+          block: block,
+          containerBlockId: block.id,
+        ),
+      );
+      if (!sourceIsEmpty) {
+        canonicalOffset = sourceRange.end + 2;
+        sourceSearchOffset = sourceRange.end;
+        while (sourceIndex < sourceSegments.length &&
+            sourceSegments[sourceIndex].range.end <= sourceRange.end) {
+          sourceIndex++;
+        }
+      }
+    }
+
+    return segments;
+  }
+
+  TextRange _sourceRangeForDocumentBlock(
+    String source,
+    String text,
+    List<_MarkdownBlockSegment> fallbackSegments,
+    int fallbackIndex,
+    int sourceSearchOffset,
+    int canonicalOffset,
+  ) {
+    final sourceIndex = text.indexOf(source, sourceSearchOffset);
+    if (sourceIndex != -1) {
+      return TextRange(
+        start: sourceIndex,
+        end: sourceIndex + source.length,
+      );
+    }
+
+    if (fallbackIndex < fallbackSegments.length) {
+      return fallbackSegments[fallbackIndex].range;
+    }
+
+    return TextRange(
+      start: canonicalOffset,
+      end: canonicalOffset + source.length,
+    );
+  }
+
+  List<_MarkdownBlockSegment> _markdownBlockSegments(String text) {
+    if (text.trim().isEmpty) return const [];
+
+    final lines = text.split('\n');
+    final offsets = <int>[];
+    var offset = 0;
+    for (final line in lines) {
+      offsets.add(offset);
+      offset += line.length + 1;
+    }
+
+    final segments = <_MarkdownBlockSegment>[];
+    var lineIndex = 0;
+    while (lineIndex < lines.length) {
+      while (lineIndex < lines.length && lines[lineIndex].trim().isEmpty) {
+        lineIndex++;
+      }
+      if (lineIndex >= lines.length) break;
+
+      final startLine = lineIndex;
+      var endLine = lineIndex;
+      final firstTrimmed = lines[lineIndex].trimLeft();
+
+      if (startLine == 0 &&
+          _isFrontmatterOpeningLine(lines[lineIndex]) &&
+          _frontmatterClosingLine(lines, lineIndex + 1) != null) {
+        endLine = _frontmatterClosingLine(lines, lineIndex + 1)!;
+        lineIndex = endLine + 1;
+      } else if (firstTrimmed.startsWith('```') ||
+          firstTrimmed.startsWith('~~~')) {
+        final fence = firstTrimmed.substring(0, 3);
+        lineIndex++;
+        while (lineIndex < lines.length) {
+          endLine = lineIndex;
+          if (lines[lineIndex].trimLeft().startsWith(fence)) {
+            lineIndex++;
+            break;
+          }
+          lineIndex++;
+        }
+      } else if (firstTrimmed == r'$$') {
+        lineIndex++;
+        while (lineIndex < lines.length) {
+          endLine = lineIndex;
+          if (lines[lineIndex].trim() == r'$$') {
+            lineIndex++;
+            break;
+          }
+          lineIndex++;
+        }
+      } else if (_isTableLine(lines[lineIndex])) {
+        lineIndex++;
+        while (lineIndex < lines.length && _isTableLine(lines[lineIndex])) {
+          endLine = lineIndex;
+          lineIndex++;
+        }
+      } else if (_isListOrQuoteLine(lines[lineIndex])) {
+        lineIndex++;
+        while (lineIndex < lines.length &&
+            (lines[lineIndex].trim().isEmpty ||
+                _isListOrQuoteLine(lines[lineIndex]))) {
+          if (lines[lineIndex].trim().isNotEmpty) {
+            endLine = lineIndex;
+          }
+          lineIndex++;
+        }
+      } else {
+        lineIndex++;
+        while (lineIndex < lines.length && lines[lineIndex].trim().isNotEmpty) {
+          endLine = lineIndex;
+          lineIndex++;
+        }
+      }
+
+      final start = offsets[startLine];
+      final end = offsets[endLine] + lines[endLine].length;
+      segments.add(
+        _MarkdownBlockSegment(
+          range: TextRange(start: start, end: end),
+          source: text.substring(start, end),
+        ),
+      );
+    }
+
+    return segments;
+  }
+
+  bool _isFrontmatterOpeningLine(String line) {
+    return RegExp('^(?:\uFEFF)?---[ \\t]*\$').hasMatch(line);
+  }
+
+  bool _isFrontmatterClosingLine(String line) {
+    return RegExp('^---[ \\t]*\$').hasMatch(line);
+  }
+
+  int? _frontmatterClosingLine(List<String> lines, int startLine) {
+    for (var index = startLine; index < lines.length; index++) {
+      if (_isFrontmatterClosingLine(lines[index])) {
+        return index;
+      }
+    }
+    return null;
+  }
+
+  bool _isTableLine(String line) {
+    final trimmed = line.trim();
+    return trimmed.contains('|') && trimmed.length > 1;
+  }
+
+  bool _isListOrQuoteLine(String line) {
+    final trimmed = line.trimLeft();
+    return trimmed.startsWith('>') ||
+        RegExp(r'^[-*+]\s+').hasMatch(trimmed) ||
+        RegExp(r'^\d+[.)]\s+').hasMatch(trimmed);
+  }
+
+  ParserPluginRegistry? _previewPlugins() {
+    final registry = widget.plugins?.copy() ?? ParserPluginRegistry();
+    if (registry.getBlockPlugin('mermaid') == null) {
+      registry.register(const MermaidPlugin());
+    }
+
+    if (!widget.enableWikilinks) return registry;
+
+    if (registry.getInlinePlugin('wikilink') == null) {
+      registry.register(const WikilinkPlugin());
+    }
+    return registry;
+  }
+
+  BuilderRegistry? _previewBuilderRegistry() {
+    final searchQuery = _searchOpen ? _searchController.text : '';
+    final needsSearchHighlight = searchQuery.isNotEmpty;
+    final needsWikilinks = widget.enableWikilinks;
+
+    final registry = BuilderRegistry()
+      ..register('mermaid', const MermaidBuilder());
+
+    if (needsWikilinks) {
+      registry.register(
+        'wikilink',
+        WikilinkBuilder(onTapWikilink: widget.onTapWikilink),
+      );
+    }
+
+    if (widget.builderRegistry != null) {
+      for (final entry in widget.builderRegistry!.entries) {
+        registry.register(entry.key, entry.value);
+      }
+    }
+
+    if (needsSearchHighlight) {
+      registry.register(
+        'text',
+        _SearchHighlightTextBuilder(
+          query: searchQuery,
+          backgroundColor:
+              Theme.of(context).colorScheme.primary.withOpacity(0.22),
+        ),
+      );
+    }
+
+    return registry;
+  }
+}
+
+class _FrontmatterEditor extends StatefulWidget {
+  const _FrontmatterEditor({
+    required this.fieldKey,
+    required this.content,
+    required this.enabled,
+    required this.textStyle,
+    required this.onChanged,
+    super.key,
+  });
+
+  final ValueKey<String> fieldKey;
+  final String content;
+  final bool enabled;
+  final TextStyle? textStyle;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_FrontmatterEditor> createState() => _FrontmatterEditorState();
+}
+
+class _FrontmatterEditorState extends State<_FrontmatterEditor> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.content);
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FrontmatterEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.content == _controller.text) return;
+
+    final selection = _controller.selection;
+    _controller.value = TextEditingValue(
+      text: widget.content,
+      selection: selection.isValid
+          ? TextSelection.collapsed(
+              offset: selection.baseOffset.clamp(0, widget.content.length),
+            )
+          : TextSelection.collapsed(offset: widget.content.length),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      key: widget.fieldKey,
+      controller: _controller,
+      focusNode: _focusNode,
+      enabled: widget.enabled,
+      minLines: 3,
+      maxLines: null,
+      style: widget.textStyle,
+      keyboardType: TextInputType.multiline,
+      autocorrect: false,
+      spellCheckConfiguration: const SpellCheckConfiguration.disabled(),
+      decoration: const InputDecoration(
+        border: InputBorder.none,
+        isDense: true,
+        contentPadding: EdgeInsets.zero,
+      ),
+      onChanged: widget.onChanged,
+    );
+  }
+}
+
+class _SearchHighlightTextBuilder extends MarkdownWidgetBuilder {
+  const _SearchHighlightTextBuilder({
+    required this.query,
+    required this.backgroundColor,
+  });
+
+  final String query;
+  final Color backgroundColor;
+
+  @override
+  bool canBuild(MarkdownNode node) => node is TextNode;
+
+  @override
+  Widget build(
+    MarkdownNode node,
+    MarkdownStyleSheet styleSheet,
+    MarkdownRenderContext context,
+  ) {
+    final text = (node as TextNode).content;
+    if (query.isEmpty || text.isEmpty) {
+      return Text(text);
+    }
+
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    final spans = <TextSpan>[];
+    var cursor = 0;
+    var matchStart = lowerText.indexOf(lowerQuery);
+
+    while (matchStart != -1) {
+      if (matchStart > cursor) {
+        spans.add(TextSpan(text: text.substring(cursor, matchStart)));
+      }
+
+      final matchEnd = matchStart + query.length;
+      spans.add(
+        TextSpan(
+          text: text.substring(matchStart, matchEnd),
+          style: TextStyle(backgroundColor: backgroundColor),
+        ),
+      );
+
+      cursor = matchEnd;
+      matchStart = lowerText.indexOf(lowerQuery, cursor);
+    }
+
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor)));
+    }
+
+    return RichText(text: TextSpan(children: spans));
+  }
+}
+
+class _FormattedInlineTextController extends TextEditingController {
+  List<MarkdownInlineNode>? inlineNodes;
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    required bool withComposing,
+    TextStyle? style,
+  }) {
+    final nodes = inlineNodes;
+    if (nodes == null || _plainText(nodes) != text) {
+      return super.buildTextSpan(
+        context: context,
+        style: style,
+        withComposing: withComposing,
+      );
+    }
+
+    final baseStyle = style ?? DefaultTextStyle.of(context).style;
+    return TextSpan(
+      style: baseStyle,
+      children: _buildInlineSpans(context, nodes, baseStyle),
+    );
+  }
+
+  List<TextSpan> _buildInlineSpans(
+    BuildContext context,
+    List<MarkdownInlineNode> nodes,
+    TextStyle style,
+  ) {
+    return [
+      for (final node in nodes) ..._spansForNode(context, node, style),
+    ];
+  }
+
+  List<TextSpan> _spansForNode(
+    BuildContext context,
+    MarkdownInlineNode node,
+    TextStyle style,
+  ) {
+    switch (node) {
+      case MarkdownText():
+        return [TextSpan(text: node.text, style: style)];
+      case MarkdownStrong():
+        return _buildInlineSpans(
+          context,
+          node.children,
+          style.copyWith(fontWeight: FontWeight.w700),
+        );
+      case MarkdownEmphasis():
+        return _buildInlineSpans(
+          context,
+          node.children,
+          style.copyWith(fontStyle: FontStyle.italic),
+        );
+      case MarkdownStrikethrough():
+        return _buildInlineSpans(
+          context,
+          node.children,
+          style.copyWith(decoration: _mergeLineThrough(style.decoration)),
+        );
+      case MarkdownInlineCode():
+        return [
+          TextSpan(
+            text: node.code,
+            style: style.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6),
+            ),
+          ),
+        ];
+      case MarkdownHardBreak():
+        return [TextSpan(text: '\n', style: style)];
+      case MarkdownInlineMath():
+        return [
+          TextSpan(
+            text: node.latex,
+            style: style.copyWith(
+              fontFamily: 'monospace',
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+          ),
+        ];
+      case MarkdownLink():
+        return _buildInlineSpans(
+          context,
+          node.children,
+          style.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+            decoration: _mergeUnderline(style.decoration),
+          ),
+        );
+      case MarkdownImage():
+        return [
+          TextSpan(
+            text: node.alt,
+            style: style.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ];
+      case MarkdownWikilink():
+        return [
+          TextSpan(
+            text: node.label,
+            style: style.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              decoration: _mergeUnderline(style.decoration),
+            ),
+          ),
+        ];
+      default:
+        return [TextSpan(text: node.plainText, style: style)];
+    }
+  }
+
+  TextDecoration _mergeUnderline(TextDecoration? decoration) {
+    return TextDecoration.combine([
+      if (decoration != null) decoration,
+      TextDecoration.underline,
+    ]);
+  }
+
+  TextDecoration _mergeLineThrough(TextDecoration? decoration) {
+    return TextDecoration.combine([
+      if (decoration != null) decoration,
+      TextDecoration.lineThrough,
+    ]);
+  }
+
+  String _plainText(List<MarkdownInlineNode> nodes) {
+    return nodes.map((node) => node.plainText).join();
+  }
+}
+
+const _autoLinkEmailPattern =
+    r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}";
+const _autoLinkTokenPattern =
+    r"(?:https?://|mailto:|www\.)[^\s<>()\[\]{}]+|[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}|(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}(?:/[^\s<>()\[\]{}]*)?";
+final _autoLinkEmailRegExp = RegExp('^$_autoLinkEmailPattern\$');
+final _autoLinkTokenRegExp = RegExp('^$_autoLinkTokenPattern\$');
+
+class _PlainTextDiff {
+  const _PlainTextDiff({
+    required this.range,
+    required this.replacement,
+  });
+
+  final TextRange range;
+  final String replacement;
+}
+
+class _ImageInputRuleMatch {
+  const _ImageInputRuleMatch({
+    required this.url,
+    required this.alt,
+    required this.title,
+  });
+
+  final String url;
+  final String alt;
+  final String? title;
+}
+
+class _FormattedBlockTextController extends _FormattedInlineTextController {
+  MarkdownBlock? _block;
+
+  MarkdownBlock? get block => _block;
+
+  set block(MarkdownBlock? value) {
+    _block = value;
+    inlineNodes = switch (value) {
+      MarkdownParagraphBlock() => value.children,
+      MarkdownHeadingBlock() => value.children,
+      _ => null,
+    };
+  }
+}
+
+class _HeadingMenuItem extends StatelessWidget {
+  const _HeadingMenuItem({
+    required this.label,
+    required this.title,
+  });
+
+  final String label;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+        );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 32,
+          child: Text(label, style: labelStyle),
+        ),
+        const SizedBox(width: 8),
+        Text(title),
+      ],
+    );
+  }
+}
+
+class _SuggestionPanel extends StatelessWidget {
+  const _SuggestionPanel({
+    required this.label,
+    required this.maxHeight,
+    required this.children,
+    this.backgroundColor,
+    this.selectedColor,
+  });
+
+  final String label;
+  final double maxHeight;
+  final List<Widget> children;
+  final Color? backgroundColor;
+  final Color? selectedColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: label,
+      child: Material(
+        color: backgroundColor ?? Theme.of(context).colorScheme.surface,
+        elevation: 3,
+        child: ListTileTheme(
+          selectedTileColor: selectedColor,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: ListView(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              children: children,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TriggerMatch {
+  const _TriggerMatch({
+    required this.range,
+    required this.query,
+  });
+
+  final TextRange range;
+  final String query;
+}
+
+class _InlineInputRuleMatch {
+  const _InlineInputRuleMatch({
+    required this.range,
+    required this.replacement,
+    required this.plainText,
+    required this.markdown,
+    this.imageBlock,
+  });
+
+  final TextRange range;
+  final List<MarkdownInlineNode> replacement;
+  final String plainText;
+  final String markdown;
+  final _ImageInputRuleMatch? imageBlock;
+}
+
+class _ModeTransitionAnchor {
+  const _ModeTransitionAnchor({
+    required this.topBlockIndex,
+    required this.sourceSelection,
+  });
+
+  final int topBlockIndex;
+  final TextSelection sourceSelection;
+}
+
+class _FormattedActivationTarget {
+  const _FormattedActivationTarget({
+    required this.segment,
+    required this.segmentSelection,
+  });
+
+  final _MarkdownBlockSegment segment;
+  final TextSelection segmentSelection;
+}
+
+class _TableCellSelection {
+  const _TableCellSelection({
+    required this.tableId,
+    required this.rowIndex,
+    required this.columnIndex,
+    required this.header,
+  });
+
+  final String tableId;
+  final int rowIndex;
+  final int columnIndex;
+  final bool header;
+
+  bool matches(
+    String otherTableId, {
+    required int rowIndex,
+    required int columnIndex,
+    required bool header,
+  }) {
+    return tableId == otherTableId &&
+        this.rowIndex == rowIndex &&
+        this.columnIndex == columnIndex &&
+        this.header == header;
+  }
+
+  _TableCellSelection copyWith({
+    String? tableId,
+    int? rowIndex,
+    int? columnIndex,
+    bool? header,
+  }) {
+    return _TableCellSelection(
+      tableId: tableId ?? this.tableId,
+      rowIndex: rowIndex ?? this.rowIndex,
+      columnIndex: columnIndex ?? this.columnIndex,
+      header: header ?? this.header,
+    );
+  }
+}
+
+class _StoredMarkTarget {
+  const _StoredMarkTarget.formattedBlock(this.blockId)
+      : tableId = null,
+        rowIndex = null,
+        columnIndex = null,
+        header = null;
+
+  const _StoredMarkTarget.tableCell({
+    required this.tableId,
+    required this.rowIndex,
+    required this.columnIndex,
+    required this.header,
+  }) : blockId = null;
+
+  final String? blockId;
+  final String? tableId;
+  final int? rowIndex;
+  final int? columnIndex;
+  final bool? header;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _StoredMarkTarget &&
+        other.blockId == blockId &&
+        other.tableId == tableId &&
+        other.rowIndex == rowIndex &&
+        other.columnIndex == columnIndex &&
+        other.header == header;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        blockId,
+        tableId,
+        rowIndex,
+        columnIndex,
+        header,
+      );
+}
+
+class _MarkdownBlockSegment {
+  const _MarkdownBlockSegment({
+    required this.range,
+    required this.source,
+    this.block,
+    this.containerBlockId,
+    this.blockSourceOffset = 0,
+  });
+
+  final TextRange range;
+  final String source;
+  final MarkdownBlock? block;
+  final String? containerBlockId;
+  final int blockSourceOffset;
+}
+
+class _DocumentTextBlockLocation {
+  const _DocumentTextBlockLocation({
+    required this.parentId,
+    required this.siblings,
+    required this.index,
+    required this.block,
+  });
+
+  final String? parentId;
+  final List<MarkdownBlock> siblings;
+  final int index;
+  final MarkdownBlock block;
+}
+
+class _ListItemLocation {
+  const _ListItemLocation({
+    required this.list,
+    required this.item,
+    required this.itemIndex,
+    required this.primaryBlock,
+  });
+
+  final MarkdownListBlock list;
+  final MarkdownListItem item;
+  final int itemIndex;
+  final MarkdownBlock? primaryBlock;
+}
+
+class _FormattedBlockDragPayload {
+  const _FormattedBlockDragPayload({
+    required this.blockId,
+  });
+
+  final String blockId;
+}
+
+enum _FormattedRangeSelectionDragKind {
+  document,
+  listItem,
+  tableCell,
+}
+
+class _FormattedRangeSelectionDragPayload {
+  const _FormattedRangeSelectionDragPayload({
+    required this.kind,
+    this.listId,
+    this.tableId,
+  });
+
+  final _FormattedRangeSelectionDragKind kind;
+  final String? listId;
+  final String? tableId;
+}
+
+class _FencedCodeBlock {
+  const _FencedCodeBlock({
+    required this.fence,
+    required this.language,
+    required this.code,
+    this.info,
+  });
+
+  final String fence;
+  final String language;
+  final String code;
+  final String? info;
+}
+
+class _TableDimensions {
+  const _TableDimensions({
+    required this.rows,
+    required this.columns,
+  });
+
+  final int rows;
+  final int columns;
+}
+
+enum _TableContextAction {
+  addColumnBefore,
+  addColumnAfter,
+  deleteColumn,
+  alignColumnDefault,
+  alignColumnLeft,
+  alignColumnCenter,
+  alignColumnRight,
+  addRowAbove,
+  addRowBelow,
+  deleteRow,
+  toggleHeaderRow,
+  toggleHeaderColumn,
+  deleteTable,
+}
+
+class _TablePickerMenuEntry extends PopupMenuEntry<_TableDimensions> {
+  const _TablePickerMenuEntry({required this.editorTheme});
+
+  final MarkdownEditorThemeData editorTheme;
+
+  static const double _cellSize = 22;
+  static const double _gap = 4;
+  static const double _padding = 12;
+
+  @override
+  double get height => (_cellSize * 5) + (_gap * 4) + (_padding * 2) + 30;
+
+  @override
+  bool represents(_TableDimensions? value) => false;
+
+  @override
+  State<_TablePickerMenuEntry> createState() => _TablePickerMenuEntryState();
+}
+
+class _TablePickerMenuEntryState extends State<_TablePickerMenuEntry> {
+  _TableDimensions _hovered = const _TableDimensions(rows: 3, columns: 3);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      key: const ValueKey('smooth_markdown_editor_table_picker'),
+      padding: const EdgeInsets.all(_TablePickerMenuEntry._padding),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var row = 1; row <= 5; row++) ...[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var column = 1; column <= 5; column++) ...[
+                  _TablePickerCell(
+                    row: row,
+                    column: column,
+                    editorTheme: widget.editorTheme,
+                    highlighted:
+                        row <= _hovered.rows && column <= _hovered.columns,
+                    onHover: () => setState(
+                      () => _hovered = _TableDimensions(
+                        rows: row,
+                        columns: column,
+                      ),
+                    ),
+                    onSelect: () => Navigator.of(context).pop(
+                      _TableDimensions(rows: row, columns: column),
+                    ),
+                  ),
+                  if (column < 5)
+                    const SizedBox(width: _TablePickerMenuEntry._gap),
+                ],
+              ],
+            ),
+            if (row < 5) const SizedBox(height: _TablePickerMenuEntry._gap),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            '${_hovered.rows} x ${_hovered.columns} table',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TablePickerCell extends StatelessWidget {
+  const _TablePickerCell({
+    required this.row,
+    required this.column,
+    required this.editorTheme,
+    required this.highlighted,
+    required this.onHover,
+    required this.onSelect,
+  });
+
+  final int row;
+  final int column;
+  final MarkdownEditorThemeData editorTheme;
+  final bool highlighted;
+  final VoidCallback onHover;
+  final VoidCallback onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = highlighted
+        ? editorTheme.tableSelectionColor ??
+            theme.colorScheme.primary.withOpacity(0.18)
+        : editorTheme.suggestionPanelColor ?? theme.colorScheme.surface;
+    final borderColor = highlighted
+        ? editorTheme.tableActiveBorderColor ??
+            theme.colorScheme.primary.withOpacity(0.65)
+        : editorTheme.tableBorderColor ?? theme.dividerColor;
+
+    return MouseRegion(
+      onEnter: (_) => onHover(),
+      child: InkWell(
+        key: ValueKey(
+          'smooth_markdown_editor_table_picker_cell_${row}_$column',
+        ),
+        onTap: onSelect,
+        borderRadius: BorderRadius.circular(3),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 80),
+          width: _TablePickerMenuEntry._cellSize,
+          height: _TablePickerMenuEntry._cellSize,
+          decoration: BoxDecoration(
+            color: color,
+            border: Border.all(color: borderColor),
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LinkEditorResult {
+  const _LinkEditorResult({
+    required this.url,
+    this.text,
+    this.remove = false,
+  });
+
+  final String url;
+  final String? text;
+  final bool remove;
+}
+
+class _LinkEditorDialog extends StatefulWidget {
+  const _LinkEditorDialog({
+    required this.initialUrl,
+    required this.initialText,
+    required this.canRemove,
+  });
+
+  final String initialUrl;
+  final String? initialText;
+  final bool canRemove;
+
+  @override
+  State<_LinkEditorDialog> createState() => _LinkEditorDialogState();
+}
+
+class _LinkEditorDialogState extends State<_LinkEditorDialog> {
+  late final TextEditingController _urlController;
+  late final TextEditingController? _textController;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController = TextEditingController(text: widget.initialUrl);
+    _textController = widget.initialText == null
+        ? null
+        : TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _textController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) {
+          return KeyEventResult.ignored;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.escape) {
+          Navigator.of(context).pop();
+          return KeyEventResult.handled;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+          _submit();
+          return KeyEventResult.handled;
+        }
+
+        return KeyEventResult.ignored;
+      },
+      child: AlertDialog(
+        title: const Text('Edit Link'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_textController != null) ...[
+                TextField(
+                  key: const ValueKey('smooth_markdown_editor_link_text_input'),
+                  controller: _textController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Link text',
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                ),
+                const SizedBox(height: 12),
+              ],
+              TextField(
+                key: const ValueKey('smooth_markdown_editor_link_url_input'),
+                controller: _urlController,
+                autofocus: _textController == null,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'URL',
+                ),
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          if (widget.canRemove)
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).pop(
+                const _LinkEditorResult(url: '', remove: true),
+              ),
+              icon: const Icon(Icons.link_off),
+              label: const Text('Remove link'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _submit,
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _submit() {
+    Navigator.of(context).pop(
+      _LinkEditorResult(
+        url: _urlController.text,
+        text: _textController?.text,
+      ),
+    );
+  }
+}
+
+class _ImageEditorResult {
+  const _ImageEditorResult({
+    required this.url,
+    required this.alt,
+    this.title,
+  });
+
+  final String url;
+  final String alt;
+  final String? title;
+}
+
+class _ImageEditorDialog extends StatefulWidget {
+  const _ImageEditorDialog({
+    required this.initialUrl,
+    required this.initialAlt,
+    required this.initialTitle,
+  });
+
+  final String initialUrl;
+  final String initialAlt;
+  final String initialTitle;
+
+  @override
+  State<_ImageEditorDialog> createState() => _ImageEditorDialogState();
+}
+
+class _ImageEditorDialogState extends State<_ImageEditorDialog> {
+  late final TextEditingController _urlController;
+  late final TextEditingController _altController;
+  late final TextEditingController _titleController;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController = TextEditingController(text: widget.initialUrl);
+    _altController = TextEditingController(text: widget.initialAlt);
+    _titleController = TextEditingController(text: widget.initialTitle);
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _altController.dispose();
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Image'),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              key: const ValueKey('smooth_markdown_editor_image_url_input'),
+              controller: _urlController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Image URL',
+              ),
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('smooth_markdown_editor_image_alt_input'),
+              controller: _altController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Alt text',
+              ),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('smooth_markdown_editor_image_title_input'),
+              controller: _titleController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Title',
+              ),
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Apply'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    Navigator.of(context).pop(
+      _ImageEditorResult(
+        url: _urlController.text,
+        alt: _altController.text,
+        title: _titleController.text,
+      ),
+    );
+  }
+}
+
+class _BlockMathEditorDialog extends StatefulWidget {
+  const _BlockMathEditorDialog({required this.initialLatex});
+
+  final String initialLatex;
+
+  @override
+  State<_BlockMathEditorDialog> createState() => _BlockMathEditorDialogState();
+}
+
+class _BlockMathEditorDialogState extends State<_BlockMathEditorDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialLatex);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _controller.text.length,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) {
+          return KeyEventResult.ignored;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.escape) {
+          Navigator.of(context).pop();
+          return KeyEventResult.handled;
+        }
+
+        final submitShortcut = event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter;
+        final modifierPressed = HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed;
+        if (submitShortcut && modifierPressed) {
+          Navigator.of(context).pop(_controller.text);
+          return KeyEventResult.handled;
+        }
+
+        return KeyEventResult.ignored;
+      },
+      child: AlertDialog(
+        title: const Text('Edit Block Math'),
+        content: SizedBox(
+          width: 360,
+          child: TextField(
+            key: const ValueKey('smooth_markdown_editor_block_math_input'),
+            controller: _controller,
+            autofocus: true,
+            minLines: 5,
+            maxLines: 8,
+            keyboardType: TextInputType.multiline,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Enter KaTeX expression...',
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(_controller.text),
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CodeLanguage {
+  const _CodeLanguage(this.value, this.label);
+
+  final String value;
+  final String label;
+}
+
+class _EditorCommandItem {
+  const _EditorCommandItem({
+    required this.title,
+    required this.searchText,
+    required this.icon,
+    required this.command,
+  }) : customCommand = null;
+
+  _EditorCommandItem.custom(MarkdownEditorSlashCommand command)
+      : title = command.title,
+        searchText = command.searchText,
+        icon = command.icon,
+        command = null,
+        customCommand = command;
+
+  final String title;
+  final String searchText;
+  final IconData icon;
+  final MarkdownEditorCommand? command;
+  final MarkdownEditorSlashCommand? customCommand;
+}
+
+const _supportedCodeLanguages = [
+  _CodeLanguage('', 'Plain text'),
+  _CodeLanguage('javascript', 'JavaScript'),
+  _CodeLanguage('typescript', 'TypeScript'),
+  _CodeLanguage('python', 'Python'),
+  _CodeLanguage('rust', 'Rust'),
+  _CodeLanguage('json', 'JSON'),
+  _CodeLanguage('sql', 'SQL'),
+  _CodeLanguage('css', 'CSS'),
+  _CodeLanguage('html', 'HTML'),
+  _CodeLanguage('bash', 'Bash'),
+  _CodeLanguage('markdown', 'Markdown'),
+  _CodeLanguage('yaml', 'YAML'),
+  _CodeLanguage('go', 'Go'),
+  _CodeLanguage('java', 'Java'),
+  _CodeLanguage('cpp', 'C++'),
+  _CodeLanguage('c', 'C'),
+  _CodeLanguage('swift', 'Swift'),
+  _CodeLanguage('ruby', 'Ruby'),
+  _CodeLanguage('php', 'PHP'),
+  _CodeLanguage('diff', 'Diff'),
+  _CodeLanguage('dockerfile', 'Dockerfile'),
+  _CodeLanguage('mermaid', 'Mermaid'),
+];
+
+const _builtInSlashCommands = [
+  _EditorCommandItem(
+    title: 'Text',
+    searchText: 'paragraph body plain normal',
+    icon: Icons.notes_outlined,
+    command: MarkdownEditorCommand.paragraph,
+  ),
+  _EditorCommandItem(
+    title: 'Heading 1',
+    searchText: 'heading h1 title',
+    icon: Icons.title,
+    command: MarkdownEditorCommand.heading1,
+  ),
+  _EditorCommandItem(
+    title: 'Heading 2',
+    searchText: 'h2 heading subtitle',
+    icon: Icons.title,
+    command: MarkdownEditorCommand.heading2,
+  ),
+  _EditorCommandItem(
+    title: 'Heading 3',
+    searchText: 'h3 heading',
+    icon: Icons.title,
+    command: MarkdownEditorCommand.heading3,
+  ),
+  _EditorCommandItem(
+    title: 'Heading 4',
+    searchText: 'heading h4',
+    icon: Icons.title,
+    command: MarkdownEditorCommand.heading4,
+  ),
+  _EditorCommandItem(
+    title: 'Heading 5',
+    searchText: 'heading h5',
+    icon: Icons.title,
+    command: MarkdownEditorCommand.heading5,
+  ),
+  _EditorCommandItem(
+    title: 'Heading 6',
+    searchText: 'heading h6',
+    icon: Icons.title,
+    command: MarkdownEditorCommand.heading6,
+  ),
+  _EditorCommandItem(
+    title: 'Bullet List',
+    searchText: 'bullet unordered ul list',
+    icon: Icons.format_list_bulleted,
+    command: MarkdownEditorCommand.unorderedList,
+  ),
+  _EditorCommandItem(
+    title: 'Numbered List',
+    searchText: 'number ordered ol list numbered',
+    icon: Icons.format_list_numbered,
+    command: MarkdownEditorCommand.orderedList,
+  ),
+  _EditorCommandItem(
+    title: 'Task List',
+    searchText: 'todo checklist checkbox task',
+    icon: Icons.check_box_outlined,
+    command: MarkdownEditorCommand.taskList,
+  ),
+  _EditorCommandItem(
+    title: 'Blockquote',
+    searchText: 'blockquote quote',
+    icon: Icons.format_quote,
+    command: MarkdownEditorCommand.blockquote,
+  ),
+  _EditorCommandItem(
+    title: 'Code Block',
+    searchText: 'code fenced block pre',
+    icon: Icons.data_object,
+    command: MarkdownEditorCommand.codeBlock,
+  ),
+  _EditorCommandItem(
+    title: 'Mermaid Diagram',
+    searchText: 'mermaid diagram flowchart chart',
+    icon: Icons.account_tree_outlined,
+    command: MarkdownEditorCommand.mermaidDiagram,
+  ),
+  _EditorCommandItem(
+    title: 'Block Math',
+    searchText: 'math equation',
+    icon: Icons.functions,
+    command: MarkdownEditorCommand.blockMath,
+  ),
+  _EditorCommandItem(
+    title: 'Horizontal Rule',
+    searchText: 'divider separator hr line horizontal rule',
+    icon: Icons.horizontal_rule,
+    command: MarkdownEditorCommand.horizontalRule,
+  ),
+  _EditorCommandItem(
+    title: 'Image',
+    searchText: 'picture photo img',
+    icon: Icons.image_outlined,
+    command: MarkdownEditorCommand.image,
+  ),
+  _EditorCommandItem(
+    title: 'Table',
+    searchText: 'table grid',
+    icon: Icons.table_chart_outlined,
+    command: MarkdownEditorCommand.table,
+  ),
+  _EditorCommandItem(
+    title: 'Wikilink',
+    searchText: 'wiki note link wikilink [[',
+    icon: Icons.notes_outlined,
+    command: MarkdownEditorCommand.wikilink,
+  ),
+];

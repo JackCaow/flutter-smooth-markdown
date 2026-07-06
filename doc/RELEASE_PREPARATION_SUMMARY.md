@@ -135,7 +135,7 @@ issue_tracker: https://github.com/JackCaow/flutter-smooth-markdown/issues
 
 ### Dependencies
 All dependencies properly declared:
-- Core: markdown, flutter_highlight, cached_network_image, url_launcher
+- Core: markdown, flutter_highlight, cached_network_image; URL opening is handled by host callbacks
 - Features: flutter_math_fork, flutter_svg
 - Dev: flutter_test, flutter_lints, mockito, build_runner
 
