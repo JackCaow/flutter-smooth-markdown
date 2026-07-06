@@ -1041,6 +1041,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   List<_MarkdownBlockSegment>? _cachedBlockSegments;
   bool _lastFormattedSegmentCacheHit = false;
   bool _performanceSnapshotScheduled = false;
+  bool _pendingSnapshotIsComposing = false;
 
   final TextEditingController _searchController = TextEditingController();
   final _FormattedBlockTextController _formattedBlockController =
@@ -1172,13 +1173,18 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   void _handleControllerChanged() {
-    _refreshInlineSuggestions();
-    _refreshSearchMatches(notify: false);
-    _clearActiveDocumentSelectionIfInvalid();
+    final composing = _hasActiveComposing(_controller.textController.value);
+    if (!composing) {
+      _refreshInlineSuggestions();
+      _refreshSearchMatches(notify: false);
+      _clearActiveDocumentSelectionIfInvalid();
+    }
     _reportSelectionChanged();
-    widget.onChanged?.call(_controller.text);
-    _schedulePerformanceSnapshot();
-    if (mounted) {
+    if (!composing) {
+      widget.onChanged?.call(_controller.text);
+    }
+    _schedulePerformanceSnapshot(isComposing: composing);
+    if (mounted && !composing) {
       setState(() {});
     }
   }
@@ -1187,10 +1193,15 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     widget.onFocusChanged?.call(_focusNode.hasFocus);
   }
 
-  void _schedulePerformanceSnapshot({bool? formattedSegmentCacheHit}) {
+  void _schedulePerformanceSnapshot({
+    bool? formattedSegmentCacheHit,
+    bool? isComposing,
+  }) {
     if (formattedSegmentCacheHit != null) {
       _lastFormattedSegmentCacheHit = formattedSegmentCacheHit;
     }
+    _pendingSnapshotIsComposing =
+        isComposing ?? _hasActiveComposing(_controller.textController.value);
     if (widget.onPerformanceSnapshot == null || _performanceSnapshotScheduled) {
       return;
     }
@@ -1208,7 +1219,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           formattedSegmentCacheHit: _lastFormattedSegmentCacheHit,
           retainedFormattedSegmentKeyCount: _formattedSegmentKeys.length,
           mode: _mode,
-          isComposing: _hasActiveComposing(_controller.textController.value),
+          isComposing: _pendingSnapshotIsComposing,
           searchMatchCount: _searchMatches.length,
           slashSuggestionsVisible: _slashMatch != null,
           wikilinkSuggestionsVisible: _wikilinkMatch != null,
@@ -1956,7 +1967,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             IconButton(
               tooltip: 'Close find',
               icon: const Icon(Icons.close),
-              onPressed: () => setState(() => _searchOpen = false),
+              onPressed: _closeSearch,
             ),
           ],
         ),
@@ -7775,7 +7786,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.escape) {
       if (_searchOpen) {
-        setState(() => _searchOpen = false);
+        _closeSearch();
       }
       _focusNode.requestFocus();
       return KeyEventResult.handled;
@@ -10331,12 +10342,25 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _refreshSearchMatches();
   }
 
+  void _closeSearch() {
+    setState(() {
+      _searchOpen = false;
+      _searchMatches = const [];
+      _currentSearchMatchIndex = 0;
+      _lastSearchQuery = '';
+    });
+  }
+
   void _refreshSearchMatches({bool notify = true}) {
     final query = _searchController.text;
-    if (!_searchOpen &&
-        query.isEmpty &&
-        _lastSearchQuery.isEmpty &&
-        _searchMatches.isEmpty) {
+    if (!_searchOpen) {
+      if (_searchMatches.isNotEmpty ||
+          _lastSearchQuery.isNotEmpty ||
+          _currentSearchMatchIndex != 0) {
+        _searchMatches = const [];
+        _currentSearchMatchIndex = 0;
+        _lastSearchQuery = '';
+      }
       return;
     }
 
@@ -11155,6 +11179,14 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final text = _controller.text;
     final document = _controller.document;
     final cached = _cachedBlockSegments;
+    if (_hasActiveComposing(_controller.textController.value) &&
+        cached != null) {
+      _schedulePerformanceSnapshot(
+        formattedSegmentCacheHit: true,
+        isComposing: true,
+      );
+      return cached;
+    }
     if (_cachedBlockSegmentsText == text &&
         identical(_cachedBlockSegmentsDocument, document) &&
         cached != null) {

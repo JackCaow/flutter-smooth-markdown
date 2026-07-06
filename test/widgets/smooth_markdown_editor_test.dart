@@ -1198,6 +1198,20 @@ void main() {
         snapshots.last.retainedFormattedSegmentKeyCount,
         greaterThanOrEqualTo(2),
       );
+
+      await tester.enterText(find.byType(TextField).first, 'Body');
+      await tester.pump();
+      expect(find.text('1/1'), findsOneWidget);
+
+      snapshots.clear();
+      await tester.tap(find.byTooltip('Close find'));
+      await tester.pump();
+      controller.text = '# Title\n\nBody changed';
+      await tester.pump();
+      await tester.pump();
+
+      expect(snapshots, isNotEmpty);
+      expect(snapshots.last.searchMatchCount, 0);
     });
 
     testWidgets('formatted preview defaults to dark theme colors',
@@ -1386,6 +1400,53 @@ void main() {
       await tester.pump();
 
       expect(focusModeChanges, <bool>[true]);
+    });
+
+    testWidgets('defers host updates and reports composing snapshots',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Draft');
+      final textChanges = <String>[];
+      final snapshots = <MarkdownEditorPerformanceSnapshot>[];
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            initialMode: MarkdownEditorMode.source,
+            height: 240,
+            onChanged: textChanges.add,
+            onPerformanceSnapshot: snapshots.add,
+          ),
+        ),
+      );
+
+      snapshots.clear();
+      controller.textController.value = const TextEditingValue(
+        text: '# 标题',
+        selection: TextSelection.collapsed(offset: 4),
+        composing: TextRange(start: 2, end: 4),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(textChanges, isEmpty);
+      expect(_singleScratchContentBlock(controller),
+          isA<MarkdownParagraphBlock>());
+      expect(snapshots, isNotEmpty);
+      expect(snapshots.last.isComposing, isTrue);
+
+      controller.textController.value = const TextEditingValue(
+        text: '# 标题',
+        selection: TextSelection.collapsed(offset: 4),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(textChanges, contains('# 标题'));
+      expect(
+          _singleScratchContentBlock(controller), isA<MarkdownHeadingBlock>());
+      expect(snapshots.last.isComposing, isFalse);
     });
 
     testWidgets('formatted pane lazily renders long documents', (tester) async {

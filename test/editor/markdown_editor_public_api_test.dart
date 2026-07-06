@@ -119,6 +119,10 @@ void main() {
         timestamp: DateTime(2026),
       );
       expect(snapshot.formattedSegmentCacheHit, isTrue);
+      expect(snapshot.sourceLength, 4);
+      expect(snapshot.blockCount, 1);
+      expect(snapshot.mode, editor_api.MarkdownEditorMode.formatted);
+      expect(snapshot.isComposing, isFalse);
     });
   });
 }
