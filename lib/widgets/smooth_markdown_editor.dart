@@ -1200,8 +1200,11 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     if (formattedSegmentCacheHit != null) {
       _lastFormattedSegmentCacheHit = formattedSegmentCacheHit;
     }
-    _pendingSnapshotIsComposing =
+    final nextIsComposing =
         isComposing ?? _hasActiveComposing(_controller.textController.value);
+    if (!_performanceSnapshotScheduled || isComposing != null) {
+      _pendingSnapshotIsComposing = nextIsComposing;
+    }
     if (widget.onPerformanceSnapshot == null || _performanceSnapshotScheduled) {
       return;
     }
@@ -11179,14 +11182,6 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final text = _controller.text;
     final document = _controller.document;
     final cached = _cachedBlockSegments;
-    if (_hasActiveComposing(_controller.textController.value) &&
-        cached != null) {
-      _schedulePerformanceSnapshot(
-        formattedSegmentCacheHit: true,
-        isComposing: true,
-      );
-      return cached;
-    }
     if (_cachedBlockSegmentsText == text &&
         identical(_cachedBlockSegmentsDocument, document) &&
         cached != null) {
