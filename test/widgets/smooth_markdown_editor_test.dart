@@ -441,6 +441,8 @@ void main() {
         const TextRange(start: 2, end: 4),
       );
       expect(controller.canUndo, isFalse);
+      expect(_singleScratchContentBlock(controller),
+          isA<MarkdownParagraphBlock>());
 
       controller.textController.value = const TextEditingValue(
         text: '# 标题',
@@ -1159,6 +1161,59 @@ void main() {
       expect(controller.text, '# Edited\n\nBody');
     });
 
+    testWidgets(
+        'reports performance snapshots and formatted segment cache hits',
+        (tester) async {
+      final controller = MarkdownEditorController(text: '# Title\n\nBody');
+      addTearDown(controller.dispose);
+      final snapshots = <MarkdownEditorPerformanceSnapshot>[];
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            height: 240,
+            onPerformanceSnapshot: snapshots.add,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(snapshots, isNotEmpty);
+      expect(snapshots.last.sourceLength, controller.text.length);
+      expect(snapshots.last.blockCount, controller.document.blocks.length);
+      expect(snapshots.last.formattedSegmentCount, greaterThanOrEqualTo(2));
+
+      snapshots.clear();
+      await _tapToolbarIcon(tester, Icons.search);
+      await tester.pump();
+      await tester.pump();
+
+      expect(snapshots, isNotEmpty);
+      expect(
+        snapshots.last.formattedSegmentCacheHit,
+        isTrue,
+      );
+      expect(
+        snapshots.last.retainedFormattedSegmentKeyCount,
+        greaterThanOrEqualTo(2),
+      );
+
+      await tester.enterText(find.byType(TextField).first, 'Body');
+      await tester.pump();
+      expect(find.text('1/1'), findsOneWidget);
+
+      snapshots.clear();
+      await tester.tap(find.byTooltip('Close find'));
+      await tester.pump();
+      controller.text = '# Title\n\nBody changed';
+      await tester.pump();
+      await tester.pump();
+
+      expect(snapshots, isNotEmpty);
+      expect(snapshots.last.searchMatchCount, 0);
+    });
+
     testWidgets('formatted preview defaults to dark theme colors',
         (tester) async {
       final controller = MarkdownEditorController(text: '# Title\n\nBody');
@@ -1345,6 +1400,53 @@ void main() {
       await tester.pump();
 
       expect(focusModeChanges, <bool>[true]);
+    });
+
+    testWidgets('defers host updates and reports composing snapshots',
+        (tester) async {
+      final controller = MarkdownEditorController(text: 'Draft');
+      final textChanges = <String>[];
+      final snapshots = <MarkdownEditorPerformanceSnapshot>[];
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        _wrap(
+          SmoothMarkdownEditor(
+            controller: controller,
+            initialMode: MarkdownEditorMode.source,
+            height: 240,
+            onChanged: textChanges.add,
+            onPerformanceSnapshot: snapshots.add,
+          ),
+        ),
+      );
+
+      snapshots.clear();
+      controller.textController.value = const TextEditingValue(
+        text: '# 标题',
+        selection: TextSelection.collapsed(offset: 4),
+        composing: TextRange(start: 2, end: 4),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(textChanges, isEmpty);
+      expect(_singleScratchContentBlock(controller),
+          isA<MarkdownParagraphBlock>());
+      expect(snapshots, isNotEmpty);
+      expect(snapshots.last.isComposing, isTrue);
+
+      controller.textController.value = const TextEditingValue(
+        text: '# 标题',
+        selection: TextSelection.collapsed(offset: 4),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(textChanges, contains('# 标题'));
+      expect(
+          _singleScratchContentBlock(controller), isA<MarkdownHeadingBlock>());
+      expect(snapshots.last.isComposing, isFalse);
     });
 
     testWidgets('formatted pane lazily renders long documents', (tester) async {

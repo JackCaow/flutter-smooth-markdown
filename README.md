@@ -160,6 +160,13 @@ colors, active button states, search/suggestion panels, selection/drop
 highlights, block chrome, table grid/header/selection colors, source and preview
 decorations, source text style, radii, and content padding.
 
+Large-document integrations can observe lightweight editor telemetry with
+`onPerformanceSnapshot`. The snapshot reports source length, semantic block
+count, formatted segment count, formatted segment cache hits, retained formatted
+segment keys, mode, IME composing state, search match count, and visible
+suggestion panels. This is intended for host-side logging, perf dashboards, or
+debug overlays without reaching into private editor state.
+
 Custom block integrations can pair parser plugins with editor builders. Provide
 `customBlockBuilder` to render unsupported/custom blocks in formatted mode and
 `customBlockEditorBuilder` to supply an editor that calls `replaceMarkdown()`,
