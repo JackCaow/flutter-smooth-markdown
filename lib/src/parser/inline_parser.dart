@@ -1,4 +1,6 @@
+import 'ast/html_nodes.dart';
 import 'ast/markdown_node.dart';
+import 'html/html_utils.dart';
 import 'parser_plugin.dart';
 
 /// Parser for inline-level Markdown elements
@@ -10,22 +12,31 @@ import 'parser_plugin.dart';
 /// - Links ([text](url))
 /// - Images (![alt](url))
 /// - Strikethrough (~~text~~)
+/// - Whitelisted HTML tags (when [InlineParser.new] `enableHtml` is set)
 ///
 /// Supports custom inline plugins through [ParserPluginRegistry].
 class InlineParser {
   /// Creates a new inline parser
   ///
   /// Optionally accepts a [ParserPluginRegistry] for custom inline plugins.
-  InlineParser({ParserPluginRegistry? plugins}) : _plugins = plugins;
+  /// When [enableHtml] is true, whitelisted inline HTML tags such as
+  /// `<b>`, `<mark>`, or `<img>` are parsed; unknown tags are stripped
+  /// while their content is kept.
+  InlineParser({ParserPluginRegistry? plugins, bool enableHtml = false})
+      : _plugins = plugins,
+        _enableHtml = enableHtml;
 
   /// Plugin registry for custom inline parsers
   final ParserPluginRegistry? _plugins;
+
+  /// Whether whitelisted inline HTML tags are parsed
+  final bool _enableHtml;
 
   /// Maximum recursion depth to prevent stack overflow on deeply nested input
   static const _maxDepth = 16;
 
   /// Characters that can be escaped with backslash per CommonMark spec
-  static const _escapableChars = r'\`*_{}[]()#+-.!~$|>';
+  static const _escapableChars = r'\`*_{}[]()#+-.!~$|><';
 
   /// Parses inline elements from text
   List<MarkdownNode> parse(String text, {int depth = 0}) {
@@ -98,6 +109,18 @@ class InlineParser {
         if (result != null) {
           node = result.node;
           consumed = result.consumed;
+        }
+      }
+
+      // Try HTML tag (may yield zero or several nodes, so it bypasses
+      // the single-node flow and continues the loop directly)
+      if (node == null && _enableHtml && text[i] == '<') {
+        final result = _tryParseHtmlTag(text, i, depth);
+        if (result != null) {
+          assert(result.consumed > 0, 'HTML parsing must consume input');
+          nodes.addAll(result.nodes);
+          i += result.consumed;
+          continue;
         }
       }
 
@@ -540,7 +563,8 @@ class InlineParser {
           char == '~' ||
           char == '[' ||
           char == '!' ||
-          char == '\$') {
+          char == '\$' ||
+          (_enableHtml && char == '<')) {
         break;
       }
 
@@ -580,6 +604,246 @@ class InlineParser {
     return null;
   }
 
+  /// Tries to parse a whitelisted HTML tag at [start].
+  ///
+  /// Returns `null` when the text is not a syntactically valid tag, so
+  /// the `<` character falls through as literal text. Valid but unknown
+  /// tags are stripped while their inner content is kept. Unclosed
+  /// whitelisted tags are auto-closed at the end of the text, which
+  /// keeps streaming (incremental re-parse) rendering stable.
+  _HtmlParseResult? _tryParseHtmlTag(String text, int start, int depth) {
+    final tag = lexHtmlTag(text, start);
+    if (tag == null) return null;
+
+    // Stray closing tag with no matching open tag: consume silently.
+    if (tag.isClosing) {
+      return _HtmlParseResult(nodes: const [], consumed: tag.end - start);
+    }
+
+    final name = tag.name;
+
+    // Void tags produce leaf nodes directly.
+    if (name == 'br') {
+      return _HtmlParseResult(
+        nodes: const [HardBreakNode()],
+        consumed: tag.end - start,
+      );
+    }
+    if (name == 'img') {
+      return _HtmlParseResult(
+        nodes: _buildHtmlImageNodes(tag),
+        consumed: tag.end - start,
+      );
+    }
+    if (name == 'hr') {
+      // An inline <hr> has no meaningful inline rendering.
+      return _HtmlParseResult(nodes: const [], consumed: tag.end - start);
+    }
+
+    // Explicitly self-closed non-void tags produce nothing.
+    if (tag.isSelfClosing) {
+      return _HtmlParseResult(nodes: const [], consumed: tag.end - start);
+    }
+
+    // Paired tag: find the matching close with a same-name counter.
+    // A missing close tag auto-closes at the end of the text.
+    final contentStart = tag.end;
+    final close = _findHtmlCloseTag(text, contentStart, name);
+    final contentEnd = close?.start ?? text.length;
+    final consumed = (close?.end ?? text.length) - start;
+    final inner = text.substring(contentStart, contentEnd);
+
+    // <code> keeps its content verbatim, like a backtick code span.
+    if (name == 'code') {
+      return _HtmlParseResult(
+        nodes: [InlineCodeNode(inner)],
+        consumed: consumed,
+      );
+    }
+
+    final children = parse(inner, depth: depth + 1);
+    final node = _buildHtmlInlineNode(name, tag.attributes, children);
+
+    // Unknown tags (and spans without usable styles) are stripped:
+    // their children are spliced into the surrounding content.
+    return _HtmlParseResult(
+      nodes: node != null ? [node] : children,
+      consumed: consumed,
+    );
+  }
+
+  /// Finds the closing tag matching an open [name] tag.
+  ///
+  /// [from] is the index right after the open tag. Uses a same-name
+  /// counter so nested tags of the same name close at matching depth.
+  /// Returns `null` when no matching close tag exists.
+  _HtmlCloseTag? _findHtmlCloseTag(String text, int from, String name) {
+    var nesting = 1;
+    var i = from;
+    while (i < text.length) {
+      if (text[i] != '<') {
+        i++;
+        continue;
+      }
+      final tag = lexHtmlTag(text, i);
+      if (tag == null) {
+        i++;
+        continue;
+      }
+      if (tag.name == name) {
+        if (tag.isClosing) {
+          nesting--;
+          if (nesting == 0) {
+            return _HtmlCloseTag(start: i, end: tag.end);
+          }
+        } else if (!tag.isSelfClosing) {
+          nesting++;
+        }
+      }
+      i = tag.end;
+    }
+    return null;
+  }
+
+  /// Maps a whitelisted inline HTML tag to its AST node.
+  ///
+  /// Returns `null` for unknown tags and for `a`/`span`/`font` tags
+  /// without usable attributes, which callers treat as "strip the tag
+  /// and keep the children".
+  MarkdownNode? _buildHtmlInlineNode(
+    String name,
+    Map<String, String> attributes,
+    List<MarkdownNode> children,
+  ) {
+    switch (name) {
+      case 'b':
+      case 'strong':
+        return BoldNode(children);
+      case 'i':
+      case 'em':
+        return ItalicNode(children);
+      case 's':
+      case 'del':
+      case 'strike':
+        return StrikethroughNode(children);
+      case 'u':
+      case 'ins':
+        return UnderlineNode(children);
+      case 'mark':
+        return HighlightNode(children);
+      case 'sub':
+        return SubscriptNode(children);
+      case 'sup':
+        return SuperscriptNode(children);
+      case 'kbd':
+        return KbdNode(children);
+      case 'a':
+        return _buildHtmlLinkNode(attributes, children);
+      case 'font':
+      case 'span':
+        return _buildStyledSpanNode(name, attributes, children);
+      default:
+        return null;
+    }
+  }
+
+  /// Builds a [LinkNode] from `<a>` attributes.
+  ///
+  /// Returns `null` (strip tag, keep children) when the `href` is
+  /// missing, empty, or uses an unsafe scheme.
+  MarkdownNode? _buildHtmlLinkNode(
+    Map<String, String> attributes,
+    List<MarkdownNode> children,
+  ) {
+    final href = attributes['href'];
+    if (href == null || href.isEmpty || !isSafeHtmlUrl(href)) {
+      return null;
+    }
+    final title = attributes['title'];
+    return LinkNode(
+      url: href,
+      children: children,
+      title: title == null || title.isEmpty ? null : title,
+    );
+  }
+
+  /// Builds a [StyledSpanNode] from `<font>` attributes or a `<span>`
+  /// `style` attribute.
+  ///
+  /// Only the safe subset (color, background color, font size) is
+  /// honored; all other styling is ignored. Returns `null` when no
+  /// usable style remains.
+  MarkdownNode? _buildStyledSpanNode(
+    String name,
+    Map<String, String> attributes,
+    List<MarkdownNode> children,
+  ) {
+    int? color;
+    int? backgroundColor;
+    double? fontSize;
+
+    if (name == 'font') {
+      final colorAttr = attributes['color'];
+      if (colorAttr != null) {
+        color = parseHtmlColor(colorAttr);
+      }
+      final sizeAttr = attributes['size'];
+      if (sizeAttr != null) {
+        fontSize = parseFontSizeAttr(sizeAttr);
+      }
+    } else {
+      final style = attributes['style'];
+      if (style != null) {
+        final declarations = parseInlineCssDeclarations(style);
+        final colorValue = declarations['color'];
+        if (colorValue != null) {
+          color = parseHtmlColor(colorValue);
+        }
+        final backgroundValue = declarations['background-color'];
+        if (backgroundValue != null) {
+          backgroundColor = parseHtmlColor(backgroundValue);
+        }
+        final sizeValue = declarations['font-size'];
+        if (sizeValue != null) {
+          fontSize = parseHtmlFontSize(sizeValue);
+        }
+      }
+    }
+
+    if (color == null && backgroundColor == null && fontSize == null) {
+      return null;
+    }
+    return StyledSpanNode(
+      children: children,
+      color: color,
+      backgroundColor: backgroundColor,
+      fontSize: fontSize,
+    );
+  }
+
+  /// Builds the nodes for an `<img>` tag.
+  ///
+  /// An unsafe or missing `src` degrades to the alt text (or nothing).
+  List<MarkdownNode> _buildHtmlImageNodes(HtmlTag tag) {
+    final src = tag.attributes['src'] ?? '';
+    final alt = tag.attributes['alt'] ?? '';
+    if (src.isEmpty || !isSafeHtmlUrl(src)) {
+      return alt.isEmpty ? const [] : [TextNode(alt)];
+    }
+    final title = tag.attributes['title'];
+    final width = tag.attributes['width'];
+    final height = tag.attributes['height'];
+    return [
+      ImageNode(
+        url: src,
+        alt: alt,
+        title: title == null || title.isEmpty ? null : title,
+        width: width == null ? null : parseHtmlDimension(width),
+        height: height == null ? null : parseHtmlDimension(height),
+      ),
+    ];
+  }
+
   /// Merges consecutive TextNode instances
   List<MarkdownNode> _mergeTextNodes(List<MarkdownNode> nodes) {
     if (nodes.isEmpty) return nodes;
@@ -617,6 +881,31 @@ class _InlineParseResult {
 
   final MarkdownNode node;
   final int consumed;
+}
+
+/// Result of parsing an HTML tag, which may yield zero or more nodes
+class _HtmlParseResult {
+  const _HtmlParseResult({
+    required this.nodes,
+    required this.consumed,
+  });
+
+  final List<MarkdownNode> nodes;
+  final int consumed;
+}
+
+/// Location of a matching HTML closing tag
+class _HtmlCloseTag {
+  const _HtmlCloseTag({
+    required this.start,
+    required this.end,
+  });
+
+  /// Index of the `<` of the closing tag
+  final int start;
+
+  /// Index just past the `>` of the closing tag
+  final int end;
 }
 
 /// URL and optional title

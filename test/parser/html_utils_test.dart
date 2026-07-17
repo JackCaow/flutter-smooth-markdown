@@ -185,6 +185,41 @@ void main() {
     });
   });
 
+  group('parseInlineCssDeclarations', () {
+    test('splits declarations and lowercases property names', () {
+      final decls = parseInlineCssDeclarations(
+        'Color: Red; font-size : 14px;',
+      );
+      expect(decls['color'], 'Red');
+      expect(decls['font-size'], '14px');
+    });
+
+    test('skips malformed declarations', () {
+      final decls = parseInlineCssDeclarations('no-colon; :bad; ok:1');
+      expect(decls, {'ok': '1'});
+    });
+
+    test('keeps first value for duplicate properties', () {
+      final decls = parseInlineCssDeclarations('color:red;color:blue');
+      expect(decls['color'], 'red');
+    });
+  });
+
+  group('parseHtmlDimension', () {
+    test('parses bare and px suffixed numbers', () {
+      expect(parseHtmlDimension('64'), 64);
+      expect(parseHtmlDimension('64px'), 64);
+      expect(parseHtmlDimension(' 32.5 '), 32.5);
+    });
+
+    test('rejects percentages zero and oversized values', () {
+      expect(parseHtmlDimension('100%'), isNull);
+      expect(parseHtmlDimension('0'), isNull);
+      expect(parseHtmlDimension('-5'), isNull);
+      expect(parseHtmlDimension('99999'), isNull);
+    });
+  });
+
   group('isSafeHtmlUrl', () {
     test('allows http and https urls', () {
       expect(isSafeHtmlUrl('https://example.com'), isTrue);

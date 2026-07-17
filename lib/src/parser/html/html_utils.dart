@@ -272,6 +272,41 @@ bool isSafeHtmlUrl(String url) {
   return true; // No scheme at all.
 }
 
+/// Splits an inline CSS `style` attribute into property declarations.
+///
+/// Property names are lowercased and trimmed; values are trimmed with
+/// their original casing preserved. Malformed declarations are skipped
+/// and the first occurrence of a property wins.
+Map<String, String> parseInlineCssDeclarations(String style) {
+  final declarations = <String, String>{};
+  for (final part in style.split(';')) {
+    final colon = part.indexOf(':');
+    if (colon <= 0) continue;
+    final name = part.substring(0, colon).trim().toLowerCase();
+    final value = part.substring(colon + 1).trim();
+    if (name.isEmpty || value.isEmpty) continue;
+    declarations.putIfAbsent(name, () => value);
+  }
+  return declarations;
+}
+
+/// Parses an HTML `width`/`height` attribute into logical pixels.
+///
+/// Accepts positive numbers with an optional `px` suffix, capped at a
+/// sane upper bound. Percentages and other units return `null`.
+double? parseHtmlDimension(String value) {
+  var v = value.trim().toLowerCase();
+  if (v.endsWith('px')) {
+    v = v.substring(0, v.length - 2).trim();
+  }
+  final size = double.tryParse(v);
+  if (size == null || size <= 0 || size > _maxDimension) return null;
+  return size;
+}
+
+/// Upper bound for accepted image dimensions in logical pixels.
+const double _maxDimension = 10000;
+
 int _skipWhitespace(String text, int index, int limit) {
   var i = index;
   while (i < limit && _isWhitespace(text.codeUnitAt(i))) {
