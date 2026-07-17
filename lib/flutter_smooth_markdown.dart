@@ -17,6 +17,7 @@ export 'src/editor/wikilink.dart';
 export 'src/mermaid/mermaid.dart';
 
 // Export AST nodes
+export 'src/parser/ast/html_nodes.dart';
 export 'src/parser/ast/markdown_node.dart';
 
 // Export parser
