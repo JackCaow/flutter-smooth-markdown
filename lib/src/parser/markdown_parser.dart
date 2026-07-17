@@ -91,6 +91,8 @@ class MarkdownParser {
       return _processListItem(node);
     } else if (node is HtmlBlockNode) {
       return _processHtmlBlock(node);
+    } else if (node is DetailsNode) {
+      return _processDetails(node);
     } else {
       // Other nodes (CodeBlock, HorizontalRule, Image, etc.) don't need inline processing
       return node;
@@ -99,6 +101,15 @@ class MarkdownParser {
 
   /// Processes inline elements in an HTML block's children
   HtmlBlockNode _processHtmlBlock(HtmlBlockNode node) {
+    final newChildren = node.children.map(_processInlineElements).toList();
+    return node.copyWith(children: newChildren);
+  }
+
+  /// Processes inline elements in a details block's children
+  ///
+  /// The summary is already inline-parsed by the block parser, so only
+  /// the body content needs recursive processing.
+  DetailsNode _processDetails(DetailsNode node) {
     final newChildren = node.children.map(_processInlineElements).toList();
     return node.copyWith(children: newChildren);
   }
