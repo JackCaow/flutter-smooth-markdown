@@ -648,7 +648,7 @@ class InlineParser {
     // Paired tag: find the matching close with a same-name counter.
     // A missing close tag auto-closes at the end of the text.
     final contentStart = tag.end;
-    final close = _findHtmlCloseTag(text, contentStart, name);
+    final close = findHtmlCloseTag(text, contentStart, name);
     final contentEnd = close?.start ?? text.length;
     final consumed = (close?.end ?? text.length) - start;
     final inner = text.substring(contentStart, contentEnd);
@@ -670,39 +670,6 @@ class InlineParser {
       nodes: node != null ? [node] : children,
       consumed: consumed,
     );
-  }
-
-  /// Finds the closing tag matching an open [name] tag.
-  ///
-  /// [from] is the index right after the open tag. Uses a same-name
-  /// counter so nested tags of the same name close at matching depth.
-  /// Returns `null` when no matching close tag exists.
-  _HtmlCloseTag? _findHtmlCloseTag(String text, int from, String name) {
-    var nesting = 1;
-    var i = from;
-    while (i < text.length) {
-      if (text[i] != '<') {
-        i++;
-        continue;
-      }
-      final tag = lexHtmlTag(text, i);
-      if (tag == null) {
-        i++;
-        continue;
-      }
-      if (tag.name == name) {
-        if (tag.isClosing) {
-          nesting--;
-          if (nesting == 0) {
-            return _HtmlCloseTag(start: i, end: tag.end);
-          }
-        } else if (!tag.isSelfClosing) {
-          nesting++;
-        }
-      }
-      i = tag.end;
-    }
-    return null;
   }
 
   /// Maps a whitelisted inline HTML tag to its AST node.
@@ -892,20 +859,6 @@ class _HtmlParseResult {
 
   final List<MarkdownNode> nodes;
   final int consumed;
-}
-
-/// Location of a matching HTML closing tag
-class _HtmlCloseTag {
-  const _HtmlCloseTag({
-    required this.start,
-    required this.end,
-  });
-
-  /// Index of the `<` of the closing tag
-  final int start;
-
-  /// Index just past the `>` of the closing tag
-  final int end;
 }
 
 /// URL and optional title

@@ -1,3 +1,4 @@
+import 'ast/html_nodes.dart';
 import 'ast/markdown_node.dart';
 import 'block_parser.dart';
 import 'inline_parser.dart';
@@ -33,10 +34,12 @@ class MarkdownParser {
   /// Creates a new Markdown parser
   ///
   /// Optionally accepts a [ParserPluginRegistry] for custom syntax plugins.
-  MarkdownParser({ParserPluginRegistry? plugins})
+  /// When [enableHtml] is true, whitelisted HTML tags and blocks are
+  /// parsed; it is disabled by default for security.
+  MarkdownParser({ParserPluginRegistry? plugins, bool enableHtml = false})
       : _plugins = plugins,
-        _blockParser = BlockParser(plugins: plugins),
-        _inlineParser = InlineParser(plugins: plugins);
+        _blockParser = BlockParser(plugins: plugins, enableHtml: enableHtml),
+        _inlineParser = InlineParser(plugins: plugins, enableHtml: enableHtml);
 
   final BlockParser _blockParser;
   final InlineParser _inlineParser;
@@ -86,10 +89,18 @@ class MarkdownParser {
       return _processList(node);
     } else if (node is ListItemNode) {
       return _processListItem(node);
+    } else if (node is HtmlBlockNode) {
+      return _processHtmlBlock(node);
     } else {
       // Other nodes (CodeBlock, HorizontalRule, Image, etc.) don't need inline processing
       return node;
     }
+  }
+
+  /// Processes inline elements in an HTML block's children
+  HtmlBlockNode _processHtmlBlock(HtmlBlockNode node) {
+    final newChildren = node.children.map(_processInlineElements).toList();
+    return node.copyWith(children: newChildren);
   }
 
   /// Processes inline elements in header content

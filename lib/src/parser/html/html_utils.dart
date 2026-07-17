@@ -272,6 +272,51 @@ bool isSafeHtmlUrl(String url) {
   return true; // No scheme at all.
 }
 
+/// Location of a matching HTML closing tag found by [findHtmlCloseTag].
+class HtmlCloseTagLocation {
+  /// Creates a new closing tag location.
+  const HtmlCloseTagLocation({required this.start, required this.end});
+
+  /// Index of the `<` of the closing tag.
+  final int start;
+
+  /// Index just past the `>` of the closing tag.
+  final int end;
+}
+
+/// Finds the closing tag matching an already-consumed open [name] tag.
+///
+/// [from] is the index right after the open tag. A same-name nesting
+/// counter ensures nested tags of the same name close at matching
+/// depth. Returns `null` when no matching close tag exists in [text].
+HtmlCloseTagLocation? findHtmlCloseTag(String text, int from, String name) {
+  var nesting = 1;
+  var i = from;
+  while (i < text.length) {
+    if (text[i] != '<') {
+      i++;
+      continue;
+    }
+    final tag = lexHtmlTag(text, i);
+    if (tag == null) {
+      i++;
+      continue;
+    }
+    if (tag.name == name) {
+      if (tag.isClosing) {
+        nesting--;
+        if (nesting == 0) {
+          return HtmlCloseTagLocation(start: i, end: tag.end);
+        }
+      } else if (!tag.isSelfClosing) {
+        nesting++;
+      }
+    }
+    i = tag.end;
+  }
+  return null;
+}
+
 /// Splits an inline CSS `style` attribute into property declarations.
 ///
 /// Property names are lowercased and trimmed; values are trimmed with

@@ -1,4 +1,6 @@
+import 'ast/html_nodes.dart';
 import 'ast/markdown_node.dart';
+import 'html/html_utils.dart';
 import 'inline_parser.dart';
 import 'parser_plugin.dart';
 
@@ -12,21 +14,29 @@ import 'parser_plugin.dart';
 /// - Code blocks
 /// - Horizontal rules
 /// - Tables
+/// - Whitelisted HTML blocks (when [BlockParser.new] `enableHtml` is set)
 ///
 /// Supports custom block plugins through [ParserPluginRegistry].
 class BlockParser {
   /// Creates a new block parser
   ///
   /// Optionally accepts a [ParserPluginRegistry] for custom block plugins.
-  BlockParser({ParserPluginRegistry? plugins})
+  /// When [enableHtml] is true, whitelisted HTML blocks (`<div>`, `<p>`,
+  /// `<center>`, `<blockquote>`, standalone `<hr>`) and inline HTML in
+  /// nested content are parsed.
+  BlockParser({ParserPluginRegistry? plugins, bool enableHtml = false})
       : _plugins = plugins,
-        _inlineParser = InlineParser(plugins: plugins);
+        _enableHtml = enableHtml,
+        _inlineParser = InlineParser(plugins: plugins, enableHtml: enableHtml);
 
   /// The inline parser for parsing cell contents
   final InlineParser _inlineParser;
 
   /// Plugin registry for custom block parsers
   final ParserPluginRegistry? _plugins;
+
+  /// Whether whitelisted HTML blocks are parsed
+  final bool _enableHtml;
 
   // Pre-compiled RegExp patterns to avoid recompilation on every call
   static final _hrDashPattern = RegExp(r'^-{3,}$');
@@ -40,6 +50,9 @@ class BlockParser {
   static final _footnotePattern = RegExp(r'^\[\^[^\]]+\]:\s+.+');
   static final _footnoteCapturePattern = RegExp(r'^\[\^([^\]]+)\]:\s+(.+)$');
   static final _tableSeparatorPattern = RegExp(r'^\s*:?-+:?\s*$');
+  static final _htmlBlockStartPattern =
+      RegExp(r'^<(?:div|p|center|blockquote)\b', caseSensitive: false);
+  static final _htmlHrPattern = RegExp(r'^<hr\s*/?>$', caseSensitive: false);
 
   /// Parses a markdown text into a list of block-level nodes
   List<MarkdownNode> parse(String markdown) {
@@ -116,6 +129,17 @@ class BlockParser {
       // Try details block
       if (node == null && _isDetailsStart(line)) {
         final result = _parseDetails(lines, i);
+        node = result.node;
+        consumed = result.linesConsumed;
+      }
+      // Try standalone HTML hr line
+      if (node == null && _isHtmlHrLine(line)) {
+        node = const HorizontalRuleNode();
+        consumed = 1;
+      }
+      // Try HTML block
+      if (node == null && _isHtmlBlockStart(line)) {
+        final result = _parseHtmlBlock(lines, i);
         node = result.node;
         consumed = result.linesConsumed;
       }
@@ -677,7 +701,9 @@ class BlockParser {
           _isListItem(line) ||
           _isHorizontalRule(line) ||
           _isFootnoteDefinition(line) ||
-          _isTableStart(lines, i)) {
+          _isTableStart(lines, i) ||
+          _isHtmlHrLine(line) ||
+          _isHtmlBlockStart(line)) {
         break;
       }
 
@@ -872,6 +898,156 @@ class BlockParser {
     return trimmed == '<details>' || trimmed == '<details open>';
   }
 
+  /// Checks if a line is a standalone HTML `<hr>` tag
+  bool _isHtmlHrLine(String line) {
+    if (!_enableHtml) return false;
+    return _htmlHrPattern.hasMatch(line.trim());
+  }
+
+  /// Checks if a line starts a whitelisted HTML block
+  ///
+  /// A line starts an HTML block only when it begins with an opening
+  /// `<div>`, `<p>`, `<center>`, or `<blockquote>` tag. Mid-line tags
+  /// stay part of the surrounding paragraph and are handled by the
+  /// inline parser instead.
+  bool _isHtmlBlockStart(String line) {
+    if (!_enableHtml) return false;
+    final trimmed = line.trim();
+    if (!_htmlBlockStartPattern.hasMatch(trimmed)) return false;
+    final tag = lexHtmlTag(trimmed, 0);
+    return tag != null && !tag.isClosing && htmlBlockTags.contains(tag.name);
+  }
+
+  /// Parses a whitelisted HTML block
+  ///
+  /// The block ends on the line where the matching close tag (tracked
+  /// with a same-name nesting counter) brings nesting to zero. Text
+  /// after that terminating close tag on the same line is kept as
+  /// trailing content so nothing is silently dropped. A missing close
+  /// tag consumes all remaining lines, which keeps incremental
+  /// (streaming) re-parses stable.
+  _ParseResult _parseHtmlBlock(List<String> lines, int startIndex) {
+    final firstLine = lines[startIndex].trim();
+    final openTag = lexHtmlTag(firstLine, 0);
+    if (openTag == null) {
+      throw FormatException('Invalid HTML block: ${lines[startIndex]}');
+    }
+    final tagName = openTag.name;
+    final align = _parseHtmlBlockAlignment(openTag);
+
+    if (openTag.isSelfClosing) {
+      return _ParseResult(
+        node: _buildHtmlBlockNode(tagName, const [], align),
+        linesConsumed: 1,
+      );
+    }
+
+    final contentLines = <String>[];
+    var nesting = 1;
+    var lineIndex = startIndex;
+
+    while (lineIndex < lines.length) {
+      final isFirst = lineIndex == startIndex;
+      final lineText = isFirst ? firstLine : lines[lineIndex];
+      final from = isFirst ? openTag.end : 0;
+      final scan = _scanHtmlBlockLine(lineText, from, tagName, nesting);
+      nesting = scan.nesting;
+
+      if (scan.closeStart != null) {
+        // Terminating close tag found on this line.
+        final before = lineText.substring(from, scan.closeStart);
+        final after = lineText.substring(scan.closeEnd!);
+        if (before.trim().isNotEmpty) contentLines.add(before);
+        if (after.trim().isNotEmpty) contentLines.add(after);
+        lineIndex++;
+        break;
+      }
+
+      final content = lineText.substring(from);
+      if (!isFirst || content.trim().isNotEmpty) {
+        contentLines.add(content);
+      }
+      lineIndex++;
+    }
+
+    final source = contentLines.join('\n');
+    final children = source.trim().isEmpty ? <MarkdownNode>[] : parse(source);
+
+    return _ParseResult(
+      node: _buildHtmlBlockNode(tagName, children, align),
+      linesConsumed: lineIndex - startIndex,
+    );
+  }
+
+  /// Scans one line of an HTML block, tracking same-name nesting.
+  ///
+  /// Returns the updated nesting count and, when nesting reaches zero
+  /// on this line, the location of the terminating close tag.
+  _HtmlLineScan _scanHtmlBlockLine(
+    String line,
+    int from,
+    String name,
+    int nesting,
+  ) {
+    var currentNesting = nesting;
+    var i = from;
+    while (i < line.length) {
+      if (line[i] != '<') {
+        i++;
+        continue;
+      }
+      final tag = lexHtmlTag(line, i);
+      if (tag == null) {
+        i++;
+        continue;
+      }
+      if (tag.name == name) {
+        if (tag.isClosing) {
+          currentNesting--;
+          if (currentNesting == 0) {
+            return _HtmlLineScan(
+              nesting: 0,
+              closeStart: i,
+              closeEnd: tag.end,
+            );
+          }
+        } else if (!tag.isSelfClosing) {
+          currentNesting++;
+        }
+      }
+      i = tag.end;
+    }
+    return _HtmlLineScan(nesting: currentNesting);
+  }
+
+  /// Reads the alignment of an HTML block from its open tag.
+  HtmlBlockAlignment? _parseHtmlBlockAlignment(HtmlTag tag) {
+    if (tag.name == 'center') return HtmlBlockAlignment.center;
+    switch (tag.attributes['align']?.toLowerCase()) {
+      case 'left':
+        return HtmlBlockAlignment.left;
+      case 'center':
+        return HtmlBlockAlignment.center;
+      case 'right':
+        return HtmlBlockAlignment.right;
+      default:
+        return null;
+    }
+  }
+
+  /// Builds the AST node for a parsed HTML block.
+  ///
+  /// `<blockquote>` reuses the markdown [BlockquoteNode] so it renders
+  /// through the existing blockquote builder.
+  MarkdownNode _buildHtmlBlockNode(
+    String tag,
+    List<MarkdownNode> children,
+    HtmlBlockAlignment? align,
+  ) {
+    if (tag == 'blockquote') return BlockquoteNode(children);
+    return HtmlBlockNode(tag: tag, children: children, align: align);
+  }
+
   /// Parses a details block
   ///
   /// Format:
@@ -1020,4 +1196,22 @@ class _CodeFence {
   final String marker;
   final String literal;
   final String info;
+}
+
+/// Result of scanning one line of an HTML block
+class _HtmlLineScan {
+  const _HtmlLineScan({
+    required this.nesting,
+    this.closeStart,
+    this.closeEnd,
+  });
+
+  /// Same-name nesting count after this line
+  final int nesting;
+
+  /// Index of the terminating close tag's `<`, if nesting reached zero
+  final int? closeStart;
+
+  /// Index just past the terminating close tag's `>`
+  final int? closeEnd;
 }
