@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-17
+
+### Added
+- ✨ **HTML tag rendering** - Opt-in whitelist HTML support behind `MarkdownConfig(enableHtml: true)`: inline formatting tags (`b/strong`, `i/em`, `u/ins`, `s/del/strike`, `mark`, `sub`, `sup`, `kbd`, `code`, `br`), links and sized images (`a`, `img` with `width`/`height`), colored text (`font color/size`, `span style` safe subset), and block elements (`div`, `p`, `center`, `blockquote`, `hr`) with `align` attribute support. Unknown tags are stripped keeping their content; unclosed tags auto-close for streaming stability.
+- ✨ **HTML AST nodes** - New `UnderlineNode`, `HighlightNode`, `SubscriptNode`, `SuperscriptNode`, `KbdNode`, `StyledSpanNode`, and `HtmlBlockNode` node types, plus optional `width`/`height` on `ImageNode`.
+- ✨ **HTML theming** - New `underlineStyle`, `highlightStyle`, `kbdStyle`, `subscriptStyle`, and `superscriptStyle` fields on `MarkdownStyleSheet`, populated in the light and dark themes.
+- 🔒 **HTML safety** - Tag whitelist, URL scheme validation for `href`/`src` (rejects `javascript:`, `data:`, etc.), safe style subset (color, background color, font size), bounded tag lexing, and nesting depth limits. HTML stays fully disabled by default.
+- 🧪 **Tests** - Parser, renderer, integration, and streaming coverage for HTML rendering, including parse-cache isolation across configs and dual builder-registry registration.
+- 📝 **HTML demo page** - New example page with an enable/disable toggle covering all supported tags.
+
+### Fixed
+- 🐛 **Details inline formatting** - Inline markdown (bold, italic, links) inside `<details>` bodies now renders instead of showing literal `**` markers.
+- 🐛 **Parse cache config isolation** - The shared parse cache now keys on the HTML config so widgets with different `enableHtml` settings never reuse each other's ASTs.
+
+### Changed
+- ⚠️ **Escape set** - `\<` is now a recognized CommonMark backslash escape (renders a literal `<`).
+
 ## [0.8.1] - 2026-07-07
 
 ### Added
