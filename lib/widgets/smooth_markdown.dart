@@ -17,6 +17,8 @@ import '../src/renderer/builders/enhanced_link_builder.dart';
 import '../src/renderer/builders/footnote_definition_builder.dart';
 import '../src/renderer/builders/footnote_reference_builder.dart';
 import '../src/renderer/builders/horizontal_rule_builder.dart';
+import '../src/renderer/builders/html_block_builder.dart';
+import '../src/renderer/builders/html_inline_builder.dart';
 import '../src/renderer/builders/image_builder.dart';
 import '../src/renderer/builders/inline_code_builder.dart';
 import '../src/renderer/builders/inline_math_builder.dart';
@@ -704,6 +706,13 @@ class SmoothMarkdown extends StatelessWidget {
         ..register('bold', const BoldBuilder())
         ..register('italic', const ItalicBuilder())
         ..register('strikethrough', const StrikethroughBuilder())
+        ..register('underline', const UnderlineBuilder())
+        ..register('highlight', const HighlightBuilder())
+        ..register('subscript', const SubscriptBuilder())
+        ..register('superscript', const SuperscriptBuilder())
+        ..register('kbd', const KbdBuilder())
+        ..register('styled_span', const StyledSpanBuilder())
+        ..register('html_block', const HtmlBlockBuilder())
         ..register('image', const ImageBuilder())
         ..register('table', const TableBuilder())
         ..register('details', const DetailsBuilder())

@@ -11,6 +11,8 @@ import 'builders/footnote_reference_builder.dart';
 import 'builders/hard_break_builder.dart';
 import 'builders/header_builder.dart';
 import 'builders/horizontal_rule_builder.dart';
+import 'builders/html_block_builder.dart';
+import 'builders/html_inline_builder.dart';
 import 'builders/image_builder.dart';
 import 'builders/inline_code_builder.dart';
 import 'builders/inline_math_builder.dart';
@@ -161,6 +163,13 @@ class BuilderRegistry {
       ..register('bold', const BoldBuilder())
       ..register('italic', const ItalicBuilder())
       ..register('strikethrough', const StrikethroughBuilder())
+      ..register('underline', const UnderlineBuilder())
+      ..register('highlight', const HighlightBuilder())
+      ..register('subscript', const SubscriptBuilder())
+      ..register('superscript', const SuperscriptBuilder())
+      ..register('kbd', const KbdBuilder())
+      ..register('styled_span', const StyledSpanBuilder())
+      ..register('html_block', const HtmlBlockBuilder())
       ..register('link', const LinkBuilder())
       ..register('image', const ImageBuilder());
   }

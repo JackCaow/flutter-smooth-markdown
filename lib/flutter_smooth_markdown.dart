@@ -45,6 +45,8 @@ export 'src/renderer/builders/enhanced_blockquote_builder.dart';
 export 'src/renderer/builders/enhanced_code_block_builder.dart';
 export 'src/renderer/builders/enhanced_header_builder.dart';
 export 'src/renderer/builders/enhanced_link_builder.dart';
+export 'src/renderer/builders/html_block_builder.dart';
+export 'src/renderer/builders/html_inline_builder.dart';
 export 'src/renderer/builders/inline_math_builder.dart';
 export 'src/renderer/builders/mermaid_builder.dart';
 export 'src/renderer/builders/thinking_builder.dart';
