@@ -663,20 +663,25 @@ class SmoothMarkdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Create parser (with plugins if provided)
-    final parser = MarkdownParser(plugins: plugins);
+    // Create parser (with plugins and HTML support if configured)
+    final enableHtml = config?.enableHtml ?? false;
+    final parser = MarkdownParser(plugins: plugins, enableHtml: enableHtml);
 
     // Parse markdown with optional caching
     // Note: When plugins are used, caching is based on data only.
     // If plugin configuration changes, you should disable caching.
+    // The cache key carries the enableHtml flag (NUL-delimited prefix,
+    // which cannot occur in real markdown) so results never leak
+    // across differently configured widgets.
+    final cacheKey = enableHtml ? '\u0000html\u0000$data' : data;
     final List<MarkdownNode> nodes;
     if (enableCache && plugins == null) {
-      final cached = _parseCache.get(data);
+      final cached = _parseCache.get(cacheKey);
       if (cached != null) {
         nodes = cached;
       } else {
         nodes = parser.parse(data);
-        _parseCache.put(data, nodes);
+        _parseCache.put(cacheKey, nodes);
       }
     } else {
       nodes = parser.parse(data);
