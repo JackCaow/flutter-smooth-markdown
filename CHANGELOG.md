@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🐛 **Details inline formatting** - Inline markdown (bold, italic, links) inside `<details>` bodies now renders instead of showing literal `**` markers.
 - 🐛 **Parse cache config isolation** - The shared parse cache now keys on the HTML config so widgets with different `enableHtml` settings never reuse each other's ASTs.
 
+### Improved
+- ⚡ **Plain-text fast path** - Rewrote the inline parser's plain-text scanner (code-unit scan + single substring instead of per-character buffering), cutting typical-document parse time by ~20% for all content, HTML or not.
+- ⚡ **HTML tag pre-filter** - `<` only breaks the text run when followed by a letter or `/`, so prose like `a < b` or `2<3` stays on the fast path; angle-bracket-heavy overhead drops from ~1.4x to ~1.15x.
+- ⚡ **Zero-copy cache keys** - Separate parse caches per HTML config replace the prefixed-key string, removing an O(n) document copy per build for HTML-enabled widgets.
+
 ### Changed
 - ⚠️ **Escape set** - `\<` is now a recognized CommonMark backslash escape (renders a literal `<`).
 

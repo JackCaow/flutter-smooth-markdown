@@ -114,7 +114,10 @@ class InlineParser {
 
       // Try HTML tag (may yield zero or several nodes, so it bypasses
       // the single-node flow and continues the loop directly)
-      if (node == null && _enableHtml && text[i] == '<') {
+      if (node == null &&
+          _enableHtml &&
+          text[i] == '<' &&
+          _canStartHtmlTag(text, i)) {
         final result = _tryParseHtmlTag(text, i, depth);
         if (result != null) {
           assert(result.consumed > 0, 'HTML parsing must consume input');
@@ -544,45 +547,73 @@ class InlineParser {
   }
 
   /// Consumes plain text until a special character
+  ///
+  /// Scans with code units and returns a single substring instead of
+  /// building the run character by character — this is the hottest
+  /// loop in the parser.
   _PlainTextResult _consumePlainText(String text, int start) {
-    final buffer = StringBuffer();
+    final plugins = _plugins;
     var i = start;
 
     while (i < text.length) {
-      final char = text[i];
+      final code = text.codeUnitAt(i);
 
-      if (char == ' ' && _tryParseHardBreak(text, i) != null) {
+      // Stop at special characters (including backslash for escape
+      // handling): \ * _ ` ~ [ ! $
+      if (code == 0x5C ||
+          code == 0x2A ||
+          code == 0x5F ||
+          code == 0x60 ||
+          code == 0x7E ||
+          code == 0x5B ||
+          code == 0x21 ||
+          code == 0x24) {
         break;
       }
 
-      // Stop at special characters (including backslash for escape handling)
-      if (char == r'\' ||
-          char == '*' ||
-          char == '_' ||
-          char == '`' ||
-          char == '~' ||
-          char == '[' ||
-          char == '!' ||
-          char == '\$' ||
-          (_enableHtml && char == '<')) {
+      // Stop at `<` only when it can actually start an HTML tag, so
+      // plain-text uses like `a < b` stay inside this fast path.
+      if (code == 0x3C && _enableHtml && _canStartHtmlTag(text, i)) {
+        break;
+      }
+
+      // Stop at a potential hard line break.
+      if (code == 0x20 && _tryParseHardBreak(text, i) != null) {
         break;
       }
 
       // Stop at plugin trigger characters
-      final plugins = _plugins;
-      if (plugins != null && plugins.isInlineTrigger(char)) {
+      if (plugins != null && plugins.isInlineTrigger(text[i])) {
         break;
       }
 
-      buffer.write(char);
       i++;
     }
 
-    final result = buffer.toString();
+    if (i == start) {
+      // The first character is itself a stop character that no parser
+      // consumed; emit it as a single literal character.
+      return _PlainTextResult(text: text[start], length: 1);
+    }
     return _PlainTextResult(
-      text: result.isEmpty ? text[start] : result,
-      length: result.isEmpty ? 1 : result.length,
+      text: text.substring(start, i),
+      length: i - start,
     );
+  }
+
+  /// Whether the character after the `<` at [index] can start a tag.
+  ///
+  /// Cheap pre-filter shared by the parse loop and the plain-text
+  /// scanner: only an ASCII letter (open tag) or `/` (closing tag) may
+  /// follow `<`, so text like `a < b`, `2<3`, or a trailing `<` never
+  /// fragments the text run nor invokes the tag lexer.
+  static bool _canStartHtmlTag(String text, int index) {
+    final next = index + 1;
+    if (next >= text.length) return false;
+    final code = text.codeUnitAt(next);
+    return (code >= 0x41 && code <= 0x5A) ||
+        (code >= 0x61 && code <= 0x7A) ||
+        code == 0x2F;
   }
 
   /// Tries to parse using registered plugins

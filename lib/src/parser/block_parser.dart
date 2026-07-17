@@ -992,7 +992,8 @@ class BlockParser {
     var currentNesting = nesting;
     var i = from;
     while (i < line.length) {
-      if (line[i] != '<') {
+      // 0x3C == '<'; codeUnitAt avoids per-character string allocation.
+      if (line.codeUnitAt(i) != 0x3C) {
         i++;
         continue;
       }

@@ -293,7 +293,9 @@ HtmlCloseTagLocation? findHtmlCloseTag(String text, int from, String name) {
   var nesting = 1;
   var i = from;
   while (i < text.length) {
-    if (text[i] != '<') {
+    // 0x3C == '<'; codeUnitAt avoids a per-character string allocation
+    // in this forward scan, which runs over the whole tag content.
+    if (text.codeUnitAt(i) != 0x3C) {
       i++;
       continue;
     }
