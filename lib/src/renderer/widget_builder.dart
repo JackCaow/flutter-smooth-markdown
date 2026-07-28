@@ -34,6 +34,30 @@ typedef BlockRenderer = Widget Function(
   List<MarkdownNode> nodes,
 );
 
+/// Extracts plain text from a list of nodes by joining [TextNode] content.
+///
+/// Used as a fallback when no inline/block renderer is available, so the
+/// content is still readable instead of rendering nothing.
+String extractPlainText(List<MarkdownNode> nodes) {
+  return nodes.whereType<TextNode>().map((n) => n.content).join();
+}
+
+/// Renders [children] via the inline renderer when available, otherwise
+/// falls back to a flat [Text] widget built from [extractPlainText].
+///
+/// Shared by inline-style builders (bold, italic, underline, etc.) so the
+/// null-check dispatch lives in one place.
+Widget renderInlineOrFallback(
+  List<MarkdownNode> children,
+  TextStyle? style,
+  MarkdownRenderContext context,
+) {
+  final inlineRenderer = context.inlineRenderer;
+  return inlineRenderer != null
+      ? inlineRenderer(children, style)
+      : Text(extractPlainText(children), style: style);
+}
+
 /// Base class for building widgets from Markdown nodes
 ///
 /// Each type of Markdown element (header, paragraph, list, etc.)

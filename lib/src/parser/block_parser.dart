@@ -907,15 +907,17 @@ class BlockParser {
   /// Checks if a line starts a whitelisted HTML block
   ///
   /// A line starts an HTML block only when it begins with an opening
-  /// `<div>`, `<p>`, `<center>`, or `<blockquote>` tag. Mid-line tags
-  /// stay part of the surrounding paragraph and are handled by the
-  /// inline parser instead.
+  /// `<div>`, `<p>`, `<center>`, or `<blockquote>` tag (the names are
+  /// fixed by [_htmlBlockStartPattern], so a successful regex match
+  /// already guarantees the tag name and that it is not a closing tag).
+  /// The follow-up [lexHtmlTag] call only rejects malformed tags such
+  /// as an unterminated quote. Mid-line tags stay part of the
+  /// surrounding paragraph and are handled by the inline parser instead.
   bool _isHtmlBlockStart(String line) {
     if (!_enableHtml) return false;
     final trimmed = line.trim();
     if (!_htmlBlockStartPattern.hasMatch(trimmed)) return false;
-    final tag = lexHtmlTag(trimmed, 0);
-    return tag != null && !tag.isClosing && htmlBlockTags.contains(tag.name);
+    return lexHtmlTag(trimmed, 0) != null;
   }
 
   /// Parses a whitelisted HTML block

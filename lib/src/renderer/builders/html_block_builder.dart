@@ -30,7 +30,8 @@ class HtmlBlockBuilder extends MarkdownWidgetBuilder {
 
     final content = blockRenderer != null
         ? blockRenderer(blockNode.children)
-        : Text(_extractText(blockNode.children), style: styleSheet.textStyle);
+        : Text(extractPlainText(blockNode.children),
+            style: styleSheet.textStyle);
 
     return switch (blockNode.align) {
       null || HtmlBlockAlignment.left => content,
@@ -42,9 +43,5 @@ class HtmlBlockBuilder extends MarkdownWidgetBuilder {
           child: IntrinsicWidth(child: content),
         ),
     };
-  }
-
-  String _extractText(List<MarkdownNode> nodes) {
-    return nodes.whereType<TextNode>().map((n) => n.content).join();
   }
 }

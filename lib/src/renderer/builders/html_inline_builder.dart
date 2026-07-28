@@ -15,10 +15,6 @@ const double _subscriptShiftFactor = 0.15;
 /// Fallback border color for `<kbd>` keys
 const Color _kbdFallbackBorderColor = Color(0xFFBDBDBD);
 
-String _extractText(List<MarkdownNode> nodes) {
-  return nodes.whereType<TextNode>().map((n) => n.content).join();
-}
-
 double _baseFontSize(MarkdownStyleSheet styleSheet) {
   return styleSheet.textStyle?.fontSize ?? 16;
 }
@@ -41,14 +37,7 @@ class UnderlineBuilder extends MarkdownWidgetBuilder {
     final style = styleSheet.underlineStyle ??
         (styleSheet.textStyle ?? const TextStyle())
             .copyWith(decoration: TextDecoration.underline);
-    final inlineRenderer = context.inlineRenderer;
-
-    if (inlineRenderer != null) {
-      return inlineRenderer(underlineNode.children, style);
-    }
-
-    // Fallback
-    return Text(_extractText(underlineNode.children), style: style);
+    return renderInlineOrFallback(underlineNode.children, style, context);
   }
 }
 
@@ -70,14 +59,7 @@ class HighlightBuilder extends MarkdownWidgetBuilder {
     final style = styleSheet.highlightStyle ??
         (styleSheet.textStyle ?? const TextStyle())
             .copyWith(backgroundColor: const Color(0xFFFFF176));
-    final inlineRenderer = context.inlineRenderer;
-
-    if (inlineRenderer != null) {
-      return inlineRenderer(highlightNode.children, style);
-    }
-
-    // Fallback
-    return Text(_extractText(highlightNode.children), style: style);
+    return renderInlineOrFallback(highlightNode.children, style, context);
   }
 }
 
@@ -150,10 +132,7 @@ Widget _buildShiftedText({
   final effectiveStyle = style ??
       (styleSheet.textStyle ?? const TextStyle())
           .copyWith(fontSize: baseFontSize * _subSupFontScale);
-  final inlineRenderer = context.inlineRenderer;
-  final inner = inlineRenderer != null
-      ? inlineRenderer(children, effectiveStyle)
-      : Text(_extractText(children), style: effectiveStyle);
+  final inner = renderInlineOrFallback(children, effectiveStyle, context);
 
   return Transform.translate(
     offset: Offset(0, baseFontSize * shiftFactor),
@@ -189,7 +168,7 @@ class KbdBuilder extends MarkdownWidgetBuilder {
         borderRadius: BorderRadius.circular(4),
         color: borderColor.withValues(alpha: 0.12),
       ),
-      child: Text(_extractText(kbdNode.children), style: style),
+      child: Text(extractPlainText(kbdNode.children), style: style),
     );
   }
 }
@@ -220,13 +199,6 @@ class StyledSpanBuilder extends MarkdownWidgetBuilder {
       backgroundColor: backgroundValue == null ? null : Color(backgroundValue),
       fontSize: spanNode.fontSize,
     );
-    final inlineRenderer = context.inlineRenderer;
-
-    if (inlineRenderer != null) {
-      return inlineRenderer(spanNode.children, style);
-    }
-
-    // Fallback
-    return Text(_extractText(spanNode.children), style: style);
+    return renderInlineOrFallback(spanNode.children, style, context);
   }
 }

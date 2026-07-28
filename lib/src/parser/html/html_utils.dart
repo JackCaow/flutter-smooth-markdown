@@ -13,12 +13,6 @@ const int maxHtmlTagLength = 512;
 /// HTML void tags that never have a matching closing tag.
 const Set<String> htmlVoidTags = {'br', 'hr', 'img'};
 
-/// Block-level HTML tags recognized at the start of a line.
-///
-/// `<details>`/`<summary>` are deliberately absent — they keep their
-/// dedicated parsing path in `BlockParser`.
-const Set<String> htmlBlockTags = {'div', 'p', 'center', 'blockquote'};
-
 /// URL schemes allowed for HTML `href`/`src` attributes.
 const Set<String> _allowedUrlSchemes = {'http', 'https', 'mailto', 'tel'};
 
@@ -121,26 +115,18 @@ HtmlTag? lexHtmlTag(String text, int start) {
     if (i >= limit) return null;
 
     final char = text[i];
-    if (char == '>') {
+    if (char == '>' || char == '/') {
+      final isSelfClosing = char == '/';
+      if (isSelfClosing && (i + 1 >= limit || text[i + 1] != '>')) {
+        return null;
+      }
       return HtmlTag(
         name: name,
         attributes: attributes,
         isClosing: isClosing,
-        isSelfClosing: false,
-        end: i + 1,
+        isSelfClosing: isSelfClosing,
+        end: i + (isSelfClosing ? 2 : 1),
       );
-    }
-    if (char == '/') {
-      if (i + 1 < limit && text[i + 1] == '>') {
-        return HtmlTag(
-          name: name,
-          attributes: attributes,
-          isClosing: isClosing,
-          isSelfClosing: true,
-          end: i + 2,
-        );
-      }
-      return null;
     }
 
     // Attribute name: [a-zA-Z][a-zA-Z0-9-]*
