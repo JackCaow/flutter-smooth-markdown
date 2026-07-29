@@ -646,34 +646,35 @@ class InlineParser {
     final tag = lexHtmlTag(text, start);
     if (tag == null) return null;
 
+    // Span consumed by tags that carry no separate close tag.
+    final openConsumed = tag.end - start;
+
     // Stray closing tag with no matching open tag: consume silently.
     if (tag.isClosing) {
-      return _HtmlParseResult(nodes: const [], consumed: tag.end - start);
+      return _HtmlParseResult(nodes: const [], consumed: openConsumed);
     }
 
     final name = tag.name;
 
     // Void tags produce leaf nodes directly.
-    if (name == 'br') {
-      return _HtmlParseResult(
-        nodes: const [HardBreakNode()],
-        consumed: tag.end - start,
-      );
-    }
-    if (name == 'img') {
-      return _HtmlParseResult(
-        nodes: _buildHtmlImageNodes(tag),
-        consumed: tag.end - start,
-      );
-    }
-    if (name == 'hr') {
-      // An inline <hr> has no meaningful inline rendering.
-      return _HtmlParseResult(nodes: const [], consumed: tag.end - start);
+    if (htmlVoidTags.contains(name)) {
+      return switch (name) {
+        'br' => _HtmlParseResult(
+            nodes: const [HardBreakNode()],
+            consumed: openConsumed,
+          ),
+        'img' => _HtmlParseResult(
+            nodes: _buildHtmlImageNodes(tag),
+            consumed: openConsumed,
+          ),
+        // An inline <hr> has no meaningful inline rendering.
+        _ => _HtmlParseResult(nodes: const [], consumed: openConsumed),
+      };
     }
 
     // Explicitly self-closed non-void tags produce nothing.
     if (tag.isSelfClosing) {
-      return _HtmlParseResult(nodes: const [], consumed: tag.end - start);
+      return _HtmlParseResult(nodes: const [], consumed: openConsumed);
     }
 
     // Paired tag: find the matching close with a same-name counter.

@@ -85,6 +85,11 @@ import 'package:flutter/material.dart';
 ///
 /// - [SmoothMarkdown], which uses this stylesheet for rendering
 /// - [MarkdownConfig], for configuring parsing behavior
+
+/// Font scale applied to subscript and superscript text, relative to the
+/// surrounding text size.
+const double markdownSubSupFontScale = 0.75;
+
 class MarkdownStyleSheet {
   /// Creates a custom Markdown style sheet.
   ///
@@ -249,10 +254,10 @@ class MarkdownStyleSheet {
         color: Colors.black87,
       ),
       subscriptStyle: base.copyWith(
-        fontSize: (base.fontSize ?? 16) * 0.75,
+        fontSize: (base.fontSize ?? 16) * markdownSubSupFontScale,
       ),
       superscriptStyle: base.copyWith(
-        fontSize: (base.fontSize ?? 16) * 0.75,
+        fontSize: (base.fontSize ?? 16) * markdownSubSupFontScale,
       ),
       listBulletStyle: base,
       tableHeaderStyle: base.copyWith(fontWeight: FontWeight.bold),
@@ -597,10 +602,10 @@ class MarkdownStyleSheet {
         fontSize: 13,
       ),
       subscriptStyle: base.copyWith(
-        fontSize: (base.fontSize ?? 16) * 0.75,
+        fontSize: (base.fontSize ?? 16) * markdownSubSupFontScale,
       ),
       superscriptStyle: base.copyWith(
-        fontSize: (base.fontSize ?? 16) * 0.75,
+        fontSize: (base.fontSize ?? 16) * markdownSubSupFontScale,
       ),
       listBulletStyle: base,
       tableHeaderStyle: base.copyWith(

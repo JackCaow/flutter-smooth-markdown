@@ -5,9 +5,6 @@ import '../../parser/ast/html_nodes.dart';
 import '../../parser/ast/markdown_node.dart';
 import '../widget_builder.dart';
 
-/// Font scale applied to subscript and superscript text
-const double _subSupFontScale = 0.75;
-
 /// Vertical shift factors relative to the base font size
 const double _superscriptShiftFactor = -0.35;
 const double _subscriptShiftFactor = 0.15;
@@ -18,6 +15,12 @@ const Color _kbdFallbackBorderColor = Color(0xFFBDBDBD);
 double _baseFontSize(MarkdownStyleSheet styleSheet) {
   return styleSheet.textStyle?.fontSize ?? 16;
 }
+
+/// The base text style, defaulting to a plain [TextStyle] so HTML-specific
+/// decorations can layer onto inherited text styling when no explicit style
+/// is provided for an element.
+TextStyle _inheritedBase(MarkdownStyleSheet styleSheet) =>
+    styleSheet.textStyle ?? const TextStyle();
 
 /// Builder for underline nodes from HTML `<u>`/`<ins>` tags
 class UnderlineBuilder extends MarkdownWidgetBuilder {
@@ -35,7 +38,7 @@ class UnderlineBuilder extends MarkdownWidgetBuilder {
   ) {
     final underlineNode = node as UnderlineNode;
     final style = styleSheet.underlineStyle ??
-        (styleSheet.textStyle ?? const TextStyle())
+        _inheritedBase(styleSheet)
             .copyWith(decoration: TextDecoration.underline);
     return renderInlineOrFallback(underlineNode.children, style, context);
   }
@@ -57,7 +60,7 @@ class HighlightBuilder extends MarkdownWidgetBuilder {
   ) {
     final highlightNode = node as HighlightNode;
     final style = styleSheet.highlightStyle ??
-        (styleSheet.textStyle ?? const TextStyle())
+        _inheritedBase(styleSheet)
             .copyWith(backgroundColor: const Color(0xFFFFF176));
     return renderInlineOrFallback(highlightNode.children, style, context);
   }
@@ -130,8 +133,8 @@ Widget _buildShiftedText({
 }) {
   final baseFontSize = _baseFontSize(styleSheet);
   final effectiveStyle = style ??
-      (styleSheet.textStyle ?? const TextStyle())
-          .copyWith(fontSize: baseFontSize * _subSupFontScale);
+      _inheritedBase(styleSheet)
+          .copyWith(fontSize: baseFontSize * markdownSubSupFontScale);
   final inner = renderInlineOrFallback(children, effectiveStyle, context);
 
   return Transform.translate(
@@ -158,7 +161,7 @@ class KbdBuilder extends MarkdownWidgetBuilder {
     final borderColor =
         styleSheet.horizontalRuleColor ?? _kbdFallbackBorderColor;
     final style = styleSheet.kbdStyle ??
-        (styleSheet.textStyle ?? const TextStyle())
+        _inheritedBase(styleSheet)
             .copyWith(fontFamily: 'monospace', fontSize: 13);
 
     return Container(

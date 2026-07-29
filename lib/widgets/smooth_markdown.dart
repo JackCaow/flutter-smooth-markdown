@@ -660,7 +660,6 @@ class SmoothMarkdown extends StatelessWidget {
   /// Plugin builders take precedence.
   final BuilderRegistry? builderRegistry;
 
-  /// Global shared parse cache for all SmoothMarkdown instances
   /// Global shared parse caches for all SmoothMarkdown instances.
   ///
   /// One cache per HTML config keeps results isolated between widgets

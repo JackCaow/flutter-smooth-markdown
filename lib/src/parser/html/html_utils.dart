@@ -163,7 +163,7 @@ HtmlTag? lexHtmlTag(String text, int start) {
         value = text.substring(valueStart, i);
       }
     }
-    attributes.putIfAbsent(attrName, () => value);
+    if (!attributes.containsKey(attrName)) attributes[attrName] = value;
   }
 }
 
@@ -179,16 +179,12 @@ int? parseHtmlColor(String value) {
 
   if (v.startsWith('#')) {
     final hex = v.substring(1);
-    if (hex.length == 3) {
-      final expanded = hex.split('').map((c) => '$c$c').join();
-      final parsed = int.tryParse(expanded, radix: 16);
-      return parsed == null ? null : 0xFF000000 | parsed;
-    }
-    if (hex.length == 6) {
-      final parsed = int.tryParse(hex, radix: 16);
-      return parsed == null ? null : 0xFF000000 | parsed;
-    }
-    return null;
+    // Expand shorthand `#RGB` to `#RRGGBB` so both forms parse once.
+    final normalized =
+        hex.length == 3 ? hex.split('').map((c) => '$c$c').join() : hex;
+    if (normalized.length != 6) return null;
+    final parsed = int.tryParse(normalized, radix: 16);
+    return parsed == null ? null : 0xFF000000 | parsed;
   }
   return _namedColors[v];
 }
@@ -270,13 +266,23 @@ class HtmlCloseTagLocation {
   final int end;
 }
 
-/// Finds the closing tag matching an already-consumed open [name] tag.
+/// Result of a forward scan for a matching HTML close tag.
+typedef HtmlCloseTagScan = ({int nesting, HtmlCloseTagLocation? close});
+
+/// Scans forward from [from] for the close tag matching an already-consumed
+/// open [name] tag, tracking same-name nesting across the whole scan.
 ///
-/// [from] is the index right after the open tag. A same-name nesting
-/// counter ensures nested tags of the same name close at matching
-/// depth. Returns `null` when no matching close tag exists in [text].
-HtmlCloseTagLocation? findHtmlCloseTag(String text, int from, String name) {
-  var nesting = 1;
+/// [initialNesting] is the nesting depth at [from] (normally `1`, right
+/// after a single open tag). The returned `nesting` field is the depth at
+/// the end of [text]; the `close` field is the location of the terminating
+/// close tag when nesting reaches zero, otherwise `null`.
+HtmlCloseTagScan scanHtmlCloseTag(
+  String text,
+  int from,
+  String name, {
+  int initialNesting = 1,
+}) {
+  var nesting = initialNesting;
   var i = from;
   while (i < text.length) {
     // 0x3C == '<'; codeUnitAt avoids a per-character string allocation
@@ -294,7 +300,10 @@ HtmlCloseTagLocation? findHtmlCloseTag(String text, int from, String name) {
       if (tag.isClosing) {
         nesting--;
         if (nesting == 0) {
-          return HtmlCloseTagLocation(start: i, end: tag.end);
+          return (
+            nesting: 0,
+            close: HtmlCloseTagLocation(start: i, end: tag.end),
+          );
         }
       } else if (!tag.isSelfClosing) {
         nesting++;
@@ -302,7 +311,16 @@ HtmlCloseTagLocation? findHtmlCloseTag(String text, int from, String name) {
     }
     i = tag.end;
   }
-  return null;
+  return (nesting: nesting, close: null);
+}
+
+/// Finds the closing tag matching an already-consumed open [name] tag.
+///
+/// Equivalent to [scanHtmlCloseTag] with an initial nesting of `1`,
+/// returning only the close location. Returns `null` when no matching
+/// close tag exists in [text].
+HtmlCloseTagLocation? findHtmlCloseTag(String text, int from, String name) {
+  return scanHtmlCloseTag(text, from, name).close;
 }
 
 /// Splits an inline CSS `style` attribute into property declarations.
@@ -318,7 +336,7 @@ Map<String, String> parseInlineCssDeclarations(String style) {
     final name = part.substring(0, colon).trim().toLowerCase();
     final value = part.substring(colon + 1).trim();
     if (name.isEmpty || value.isEmpty) continue;
-    declarations.putIfAbsent(name, () => value);
+    if (!declarations.containsKey(name)) declarations[name] = value;
   }
   return declarations;
 }

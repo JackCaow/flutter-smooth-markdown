@@ -900,7 +900,7 @@ class BlockParser {
 
   /// Checks if a line is a standalone HTML `<hr>` tag
   bool _isHtmlHrLine(String line) {
-    if (!_enableHtml) return false;
+    if (!_enableHtml || !_couldStartHtmlLine(line)) return false;
     return _htmlHrPattern.hasMatch(line.trim());
   }
 
@@ -914,10 +914,22 @@ class BlockParser {
   /// as an unterminated quote. Mid-line tags stay part of the
   /// surrounding paragraph and are handled by the inline parser instead.
   bool _isHtmlBlockStart(String line) {
-    if (!_enableHtml) return false;
+    if (!_enableHtml || !_couldStartHtmlLine(line)) return false;
     final trimmed = line.trim();
     if (!_htmlBlockStartPattern.hasMatch(trimmed)) return false;
     return lexHtmlTag(trimmed, 0) != null;
+  }
+
+  /// Cheap gate ahead of [String.trim] for HTML line detection.
+  ///
+  /// A block tag can only begin with `<` after leading whitespace, so a
+  /// line whose first character is neither `<` nor whitespace cannot
+  /// match. Skipping [String.trim] for the common case (plain paragraph
+  /// text) avoids a per-line string allocation on the parse hot path.
+  static bool _couldStartHtmlLine(String line) {
+    if (line.isEmpty) return false;
+    final first = line.codeUnitAt(0);
+    return first <= 0x20 || first == 0x3C; // whitespace or '<'
   }
 
   /// Parses a whitelisted HTML block
@@ -952,13 +964,19 @@ class BlockParser {
       final isFirst = lineIndex == startIndex;
       final lineText = isFirst ? firstLine : lines[lineIndex];
       final from = isFirst ? openTag.end : 0;
-      final scan = _scanHtmlBlockLine(lineText, from, tagName, nesting);
+      final scan = scanHtmlCloseTag(
+        lineText,
+        from,
+        tagName,
+        initialNesting: nesting,
+      );
       nesting = scan.nesting;
 
-      if (scan.closeStart != null) {
+      final close = scan.close;
+      if (close != null) {
         // Terminating close tag found on this line.
-        final before = lineText.substring(from, scan.closeStart);
-        final after = lineText.substring(scan.closeEnd!);
+        final before = lineText.substring(from, close.start);
+        final after = lineText.substring(close.end);
         if (before.trim().isNotEmpty) contentLines.add(before);
         if (after.trim().isNotEmpty) contentLines.add(after);
         lineIndex++;
@@ -979,48 +997,6 @@ class BlockParser {
       node: _buildHtmlBlockNode(tagName, children, align),
       linesConsumed: lineIndex - startIndex,
     );
-  }
-
-  /// Scans one line of an HTML block, tracking same-name nesting.
-  ///
-  /// Returns the updated nesting count and, when nesting reaches zero
-  /// on this line, the location of the terminating close tag.
-  _HtmlLineScan _scanHtmlBlockLine(
-    String line,
-    int from,
-    String name,
-    int nesting,
-  ) {
-    var currentNesting = nesting;
-    var i = from;
-    while (i < line.length) {
-      // 0x3C == '<'; codeUnitAt avoids per-character string allocation.
-      if (line.codeUnitAt(i) != 0x3C) {
-        i++;
-        continue;
-      }
-      final tag = lexHtmlTag(line, i);
-      if (tag == null) {
-        i++;
-        continue;
-      }
-      if (tag.name == name) {
-        if (tag.isClosing) {
-          currentNesting--;
-          if (currentNesting == 0) {
-            return _HtmlLineScan(
-              nesting: 0,
-              closeStart: i,
-              closeEnd: tag.end,
-            );
-          }
-        } else if (!tag.isSelfClosing) {
-          currentNesting++;
-        }
-      }
-      i = tag.end;
-    }
-    return _HtmlLineScan(nesting: currentNesting);
   }
 
   /// Reads the alignment of an HTML block from its open tag.
@@ -1199,22 +1175,4 @@ class _CodeFence {
   final String marker;
   final String literal;
   final String info;
-}
-
-/// Result of scanning one line of an HTML block
-class _HtmlLineScan {
-  const _HtmlLineScan({
-    required this.nesting,
-    this.closeStart,
-    this.closeEnd,
-  });
-
-  /// Same-name nesting count after this line
-  final int nesting;
-
-  /// Index of the terminating close tag's `<`, if nesting reached zero
-  final int? closeStart;
-
-  /// Index just past the terminating close tag's `>`
-  final int? closeEnd;
 }
