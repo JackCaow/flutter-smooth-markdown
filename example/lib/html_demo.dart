@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
 
@@ -16,6 +18,8 @@ class HtmlDemo extends StatefulWidget {
 
 class _HtmlDemoState extends State<HtmlDemo> {
   bool _enableHtml = true;
+  bool _isStreaming = false;
+  StreamController<String>? _streamController;
 
   static const String _htmlContent = '''
 # HTML Tags Demo
@@ -87,6 +91,52 @@ Plain comparisons stay literal: 1 < 2, a < b, and <3 hearts.
 Inline code is protected: `<b>not bold</b>`.
 ''';
 
+  /// Splits the demo content into word-level chunks with their trailing
+  /// whitespace, approximating how a token stream would arrive.
+  static List<String> _chunkContent(String content) {
+    return RegExp(r'\S+\s*')
+        .allMatches(content)
+        .map((match) => match[0]!)
+        .toList();
+  }
+
+  /// Streams the demo content chunk by chunk to simulate live output.
+  Future<void> _startStreaming() async {
+    if (_isStreaming) return;
+
+    final controller = StreamController<String>();
+    setState(() {
+      _isStreaming = true;
+      _streamController = controller;
+    });
+
+    for (final chunk in _chunkContent(_htmlContent)) {
+      if (!mounted || controller.isClosed) break;
+      controller.add(chunk);
+      await Future.delayed(const Duration(milliseconds: 40));
+    }
+
+    if (mounted) {
+      setState(() => _isStreaming = false);
+      await controller.close();
+    }
+  }
+
+  /// Stops the active stream and returns to the static view.
+  void _stopStreaming() {
+    _streamController?.close();
+    setState(() {
+      _streamController = null;
+      _isStreaming = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _streamController?.close();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,15 +152,35 @@ Inline code is protected: `<b>not bold</b>`.
               ),
             ],
           ),
+          IconButton(
+            tooltip: _isStreaming ? 'Stop streaming' : 'Simulate streaming',
+            icon: Icon(_isStreaming ? Icons.stop : Icons.play_arrow),
+            onPressed: _isStreaming ? _stopStreaming : _startStreaming,
+          ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: SmoothMarkdown(
-          data: _htmlContent,
-          styleSheet: widget.styleSheet,
-          config: MarkdownConfig(enableHtml: _enableHtml),
-        ),
+      body: Column(
+        children: [
+          if (_isStreaming) const LinearProgressIndicator(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: _streamController == null
+                  ? SmoothMarkdown(
+                      data: _htmlContent,
+                      styleSheet: widget.styleSheet,
+                      config: MarkdownConfig(enableHtml: _enableHtml),
+                    )
+                  : StreamMarkdown(
+                      stream: _streamController!.stream,
+                      styleSheet: widget.styleSheet,
+                      config: MarkdownConfig(enableHtml: _enableHtml),
+                      loadingWidget:
+                          const Center(child: CircularProgressIndicator()),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
