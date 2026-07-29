@@ -146,5 +146,30 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(findRichTextContaining('second line'), findsOneWidget);
     });
+
+    testWidgets('withholds a partial html tag until it completes',
+        (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(wrap(StreamMarkdown(
+        stream: controller.stream,
+        config: const MarkdownConfig(enableHtml: true),
+      )));
+
+      // First chunk ends mid-tag: `<font colo` has no closing `>`.
+      controller.add('lead <font colo');
+      await tester.pump(const Duration(milliseconds: 100));
+      // The leading text renders, but the partial tag is withheld rather
+      // than flashing as the literal text "<font".
+      expect(findRichTextContaining('lead'), findsOneWidget);
+      expect(findRichTextContaining('<font'), findsNothing);
+
+      // Completing the tag renders the styled content with no literal tag.
+      controller.add('r="red">red</font>');
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(findRichTextContaining('red'), findsOneWidget);
+      expect(findRichTextContaining('<font'), findsNothing);
+    });
   });
 }

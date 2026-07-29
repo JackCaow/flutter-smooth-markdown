@@ -191,7 +191,7 @@ void main() {
       expect(find.byType(Align), findsNothing);
     });
 
-    testWidgets('wraps centered blocks in an alignment widget', (tester) async {
+    testWidgets('applies text alignment to centered blocks', (tester) async {
       await tester.pumpWidget(MaterialApp(
         home: builder.build(
           const HtmlBlockNode(
@@ -203,8 +203,12 @@ void main() {
           renderContext,
         ),
       ));
-      expect(find.byType(Align), findsOneWidget);
-      expect(find.byType(IntrinsicWidth), findsOneWidget);
+      expect(find.text('centered'), findsOneWidget);
+      // Alignment is applied at the text level, not via shrink-wrap widgets.
+      expect(find.byType(Align), findsNothing);
+      expect(find.byType(IntrinsicWidth), findsNothing);
+      final text = tester.widget<Text>(find.text('centered'));
+      expect(text.textAlign, TextAlign.center);
     });
   });
 

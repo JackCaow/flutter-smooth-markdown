@@ -28,20 +28,30 @@ class HtmlBlockBuilder extends MarkdownWidgetBuilder {
     final blockNode = node as HtmlBlockNode;
     final blockRenderer = context.blockRenderer;
 
-    final content = blockRenderer != null
-        ? blockRenderer(blockNode.children)
-        : Text(extractPlainText(blockNode.children),
-            style: styleSheet.textStyle);
-
-    return switch (blockNode.align) {
-      null || HtmlBlockAlignment.left => content,
-      HtmlBlockAlignment.center => Align(
-          child: IntrinsicWidth(child: content),
-        ),
-      HtmlBlockAlignment.right => Align(
-          alignment: Alignment.centerRight,
-          child: IntrinsicWidth(child: content),
-        ),
+    // Alignment is applied as text-level alignment rather than by shrink-
+    // wrapping the block. IntrinsicWidth would recompute the block width on
+    // every streaming update (horizontal jitter) and force an expensive
+    // intrinsic layout pass; textAlign reflows smoothly and matches browser
+    // behavior for `<center>` and `align`.
+    final textAlign = switch (blockNode.align) {
+      HtmlBlockAlignment.center => TextAlign.center,
+      HtmlBlockAlignment.right => TextAlign.right,
+      null || HtmlBlockAlignment.left => null,
     };
+
+    if (blockRenderer != null) {
+      return textAlign == null
+          ? blockRenderer(blockNode.children)
+          : blockRenderer(
+              blockNode.children,
+              context: context.copyWith(textAlign: textAlign),
+            );
+    }
+
+    return Text(
+      extractPlainText(blockNode.children),
+      style: styleSheet.textStyle,
+      textAlign: textAlign,
+    );
   }
 }
