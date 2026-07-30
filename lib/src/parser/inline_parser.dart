@@ -1,6 +1,5 @@
-import 'ast/html_nodes.dart';
 import 'ast/markdown_node.dart';
-import 'html/html_utils.dart';
+import 'html/html_inline_parser.dart';
 import 'parser_plugin.dart';
 
 /// Parser for inline-level Markdown elements
@@ -31,6 +30,12 @@ class InlineParser {
 
   /// Whether whitelisted inline HTML tags are parsed
   final bool _enableHtml;
+
+  late final HtmlInlineParser? _htmlParser = _enableHtml
+      ? HtmlInlineParser(
+          parseChildren: (source, depth) => parse(source, depth: depth),
+        )
+      : null;
 
   /// Maximum recursion depth to prevent stack overflow on deeply nested input
   static const _maxDepth = 16;
@@ -118,7 +123,7 @@ class InlineParser {
           _enableHtml &&
           text[i] == '<' &&
           _canStartHtmlTag(text, i)) {
-        final result = _tryParseHtmlTag(text, i, depth);
+        final result = _htmlParser!.tryParse(text, i, depth);
         if (result != null) {
           assert(result.consumed > 0, 'HTML parsing must consume input');
           nodes.addAll(result.nodes);
@@ -635,214 +640,6 @@ class InlineParser {
     return null;
   }
 
-  /// Tries to parse a whitelisted HTML tag at [start].
-  ///
-  /// Returns `null` when the text is not a syntactically valid tag, so
-  /// the `<` character falls through as literal text. Valid but unknown
-  /// tags are stripped while their inner content is kept. Unclosed
-  /// whitelisted tags are auto-closed at the end of the text, which
-  /// keeps streaming (incremental re-parse) rendering stable.
-  _HtmlParseResult? _tryParseHtmlTag(String text, int start, int depth) {
-    final tag = lexHtmlTag(text, start);
-    if (tag == null) return null;
-
-    // Span consumed by tags that carry no separate close tag.
-    final openConsumed = tag.end - start;
-
-    // Stray closing tag with no matching open tag: consume silently.
-    if (tag.isClosing) {
-      return _HtmlParseResult(nodes: const [], consumed: openConsumed);
-    }
-
-    final name = tag.name;
-
-    // Void tags produce leaf nodes directly.
-    if (htmlVoidTags.contains(name)) {
-      return switch (name) {
-        'br' => _HtmlParseResult(
-            nodes: const [HardBreakNode()],
-            consumed: openConsumed,
-          ),
-        'img' => _HtmlParseResult(
-            nodes: _buildHtmlImageNodes(tag),
-            consumed: openConsumed,
-          ),
-        // An inline <hr> has no meaningful inline rendering.
-        _ => _HtmlParseResult(nodes: const [], consumed: openConsumed),
-      };
-    }
-
-    // Explicitly self-closed non-void tags produce nothing.
-    if (tag.isSelfClosing) {
-      return _HtmlParseResult(nodes: const [], consumed: openConsumed);
-    }
-
-    // Paired tag: find the matching close with a same-name counter.
-    // A missing close tag auto-closes at the end of the text.
-    final contentStart = tag.end;
-    final close = findHtmlCloseTag(text, contentStart, name);
-    final contentEnd = close?.start ?? text.length;
-    final consumed = (close?.end ?? text.length) - start;
-    final inner = text.substring(contentStart, contentEnd);
-
-    // <code> keeps its content verbatim, like a backtick code span.
-    if (name == 'code') {
-      return _HtmlParseResult(
-        nodes: [InlineCodeNode(inner)],
-        consumed: consumed,
-      );
-    }
-
-    final children = parse(inner, depth: depth + 1);
-    final node = _buildHtmlInlineNode(name, tag.attributes, children);
-
-    // Unknown tags (and spans without usable styles) are stripped:
-    // their children are spliced into the surrounding content.
-    return _HtmlParseResult(
-      nodes: node != null ? [node] : children,
-      consumed: consumed,
-    );
-  }
-
-  /// Maps a whitelisted inline HTML tag to its AST node.
-  ///
-  /// Returns `null` for unknown tags and for `a`/`span`/`font` tags
-  /// without usable attributes, which callers treat as "strip the tag
-  /// and keep the children".
-  MarkdownNode? _buildHtmlInlineNode(
-    String name,
-    Map<String, String> attributes,
-    List<MarkdownNode> children,
-  ) {
-    switch (name) {
-      case 'b':
-      case 'strong':
-        return BoldNode(children);
-      case 'i':
-      case 'em':
-        return ItalicNode(children);
-      case 's':
-      case 'del':
-      case 'strike':
-        return StrikethroughNode(children);
-      case 'u':
-      case 'ins':
-        return UnderlineNode(children);
-      case 'mark':
-        return HighlightNode(children);
-      case 'sub':
-        return SubscriptNode(children);
-      case 'sup':
-        return SuperscriptNode(children);
-      case 'kbd':
-        return KbdNode(children);
-      case 'a':
-        return _buildHtmlLinkNode(attributes, children);
-      case 'font':
-      case 'span':
-        return _buildStyledSpanNode(name, attributes, children);
-      default:
-        return null;
-    }
-  }
-
-  /// Builds a [LinkNode] from `<a>` attributes.
-  ///
-  /// Returns `null` (strip tag, keep children) when the `href` is
-  /// missing, empty, or uses an unsafe scheme.
-  MarkdownNode? _buildHtmlLinkNode(
-    Map<String, String> attributes,
-    List<MarkdownNode> children,
-  ) {
-    final href = attributes['href'];
-    if (href == null || href.isEmpty || !isSafeHtmlUrl(href)) {
-      return null;
-    }
-    final title = attributes['title'];
-    return LinkNode(
-      url: href,
-      children: children,
-      title: title == null || title.isEmpty ? null : title,
-    );
-  }
-
-  /// Builds a [StyledSpanNode] from `<font>` attributes or a `<span>`
-  /// `style` attribute.
-  ///
-  /// Only the safe subset (color, background color, font size) is
-  /// honored; all other styling is ignored. Returns `null` when no
-  /// usable style remains.
-  MarkdownNode? _buildStyledSpanNode(
-    String name,
-    Map<String, String> attributes,
-    List<MarkdownNode> children,
-  ) {
-    int? color;
-    int? backgroundColor;
-    double? fontSize;
-
-    if (name == 'font') {
-      final colorAttr = attributes['color'];
-      if (colorAttr != null) {
-        color = parseHtmlColor(colorAttr);
-      }
-      final sizeAttr = attributes['size'];
-      if (sizeAttr != null) {
-        fontSize = parseFontSizeAttr(sizeAttr);
-      }
-    } else {
-      final style = attributes['style'];
-      if (style != null) {
-        final declarations = parseInlineCssDeclarations(style);
-        final colorValue = declarations['color'];
-        if (colorValue != null) {
-          color = parseHtmlColor(colorValue);
-        }
-        final backgroundValue = declarations['background-color'];
-        if (backgroundValue != null) {
-          backgroundColor = parseHtmlColor(backgroundValue);
-        }
-        final sizeValue = declarations['font-size'];
-        if (sizeValue != null) {
-          fontSize = parseHtmlFontSize(sizeValue);
-        }
-      }
-    }
-
-    if (color == null && backgroundColor == null && fontSize == null) {
-      return null;
-    }
-    return StyledSpanNode(
-      children: children,
-      color: color,
-      backgroundColor: backgroundColor,
-      fontSize: fontSize,
-    );
-  }
-
-  /// Builds the nodes for an `<img>` tag.
-  ///
-  /// An unsafe or missing `src` degrades to the alt text (or nothing).
-  List<MarkdownNode> _buildHtmlImageNodes(HtmlTag tag) {
-    final src = tag.attributes['src'] ?? '';
-    final alt = tag.attributes['alt'] ?? '';
-    if (src.isEmpty || !isSafeHtmlUrl(src)) {
-      return alt.isEmpty ? const [] : [TextNode(alt)];
-    }
-    final title = tag.attributes['title'];
-    final width = tag.attributes['width'];
-    final height = tag.attributes['height'];
-    return [
-      ImageNode(
-        url: src,
-        alt: alt,
-        title: title == null || title.isEmpty ? null : title,
-        width: width == null ? null : parseHtmlDimension(width),
-        height: height == null ? null : parseHtmlDimension(height),
-      ),
-    ];
-  }
-
   /// Merges consecutive TextNode instances
   List<MarkdownNode> _mergeTextNodes(List<MarkdownNode> nodes) {
     if (nodes.isEmpty) return nodes;
@@ -879,17 +676,6 @@ class _InlineParseResult {
   });
 
   final MarkdownNode node;
-  final int consumed;
-}
-
-/// Result of parsing an HTML tag, which may yield zero or more nodes
-class _HtmlParseResult {
-  const _HtmlParseResult({
-    required this.nodes,
-    required this.consumed,
-  });
-
-  final List<MarkdownNode> nodes;
   final int consumed;
 }
 
