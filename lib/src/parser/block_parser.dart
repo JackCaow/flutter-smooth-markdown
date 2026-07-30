@@ -1,6 +1,5 @@
-import 'ast/html_nodes.dart';
 import 'ast/markdown_node.dart';
-import 'html/html_utils.dart';
+import 'html/html_block_parser.dart';
 import 'inline_parser.dart';
 import 'parser_plugin.dart';
 
@@ -26,8 +25,9 @@ class BlockParser {
   /// nested content are parsed.
   BlockParser({ParserPluginRegistry? plugins, bool enableHtml = false})
       : _plugins = plugins,
-        _enableHtml = enableHtml,
-        _inlineParser = InlineParser(plugins: plugins, enableHtml: enableHtml);
+        _inlineParser = InlineParser(plugins: plugins, enableHtml: enableHtml) {
+    _htmlParser = enableHtml ? HtmlBlockParser(parseChildren: parse) : null;
+  }
 
   /// The inline parser for parsing cell contents
   final InlineParser _inlineParser;
@@ -35,8 +35,7 @@ class BlockParser {
   /// Plugin registry for custom block parsers
   final ParserPluginRegistry? _plugins;
 
-  /// Whether whitelisted HTML blocks are parsed
-  final bool _enableHtml;
+  late final HtmlBlockParser? _htmlParser;
 
   // Pre-compiled RegExp patterns to avoid recompilation on every call
   static final _hrDashPattern = RegExp(r'^-{3,}$');
@@ -50,9 +49,6 @@ class BlockParser {
   static final _footnotePattern = RegExp(r'^\[\^[^\]]+\]:\s+.+');
   static final _footnoteCapturePattern = RegExp(r'^\[\^([^\]]+)\]:\s+(.+)$');
   static final _tableSeparatorPattern = RegExp(r'^\s*:?-+:?\s*$');
-  static final _htmlBlockStartPattern =
-      RegExp(r'^<(?:div|p|center|blockquote)\b', caseSensitive: false);
-  static final _htmlHrPattern = RegExp(r'^<hr\s*/?>$', caseSensitive: false);
 
   /// Parses a markdown text into a list of block-level nodes
   List<MarkdownNode> parse(String markdown) {
@@ -132,14 +128,13 @@ class BlockParser {
         node = result.node;
         consumed = result.linesConsumed;
       }
-      // Try standalone HTML hr line
-      if (node == null && _isHtmlHrLine(line)) {
+      final htmlMatch = node == null ? _htmlParser?.probe(line) : null;
+      if (node == null && htmlMatch is HtmlHorizontalRuleMatch) {
         node = const HorizontalRuleNode();
         consumed = 1;
       }
-      // Try HTML block
-      if (node == null && _isHtmlBlockStart(line)) {
-        final result = _parseHtmlBlock(lines, i);
+      if (node == null && htmlMatch is HtmlContainerBlockMatch) {
+        final result = _htmlParser!.parseBlock(lines, i, htmlMatch);
         node = result.node;
         consumed = result.linesConsumed;
       }
@@ -702,8 +697,7 @@ class BlockParser {
           _isHorizontalRule(line) ||
           _isFootnoteDefinition(line) ||
           _isTableStart(lines, i) ||
-          _isHtmlHrLine(line) ||
-          _isHtmlBlockStart(line)) {
+          _htmlParser?.probe(line) != null) {
         break;
       }
 
@@ -896,135 +890,6 @@ class BlockParser {
   bool _isDetailsStart(String line) {
     final trimmed = line.trim().toLowerCase();
     return trimmed == '<details>' || trimmed == '<details open>';
-  }
-
-  /// Checks if a line is a standalone HTML `<hr>` tag
-  bool _isHtmlHrLine(String line) {
-    if (!_enableHtml || !_couldStartHtmlLine(line)) return false;
-    return _htmlHrPattern.hasMatch(line.trim());
-  }
-
-  /// Checks if a line starts a whitelisted HTML block
-  ///
-  /// A line starts an HTML block only when it begins with an opening
-  /// `<div>`, `<p>`, `<center>`, or `<blockquote>` tag (the names are
-  /// fixed by [_htmlBlockStartPattern], so a successful regex match
-  /// already guarantees the tag name and that it is not a closing tag).
-  /// The follow-up [lexHtmlTag] call only rejects malformed tags such
-  /// as an unterminated quote. Mid-line tags stay part of the
-  /// surrounding paragraph and are handled by the inline parser instead.
-  bool _isHtmlBlockStart(String line) {
-    if (!_enableHtml || !_couldStartHtmlLine(line)) return false;
-    final trimmed = line.trim();
-    if (!_htmlBlockStartPattern.hasMatch(trimmed)) return false;
-    return lexHtmlTag(trimmed, 0) != null;
-  }
-
-  /// Cheap gate ahead of [String.trim] for HTML line detection.
-  ///
-  /// A block tag can only begin with `<` after leading whitespace, so a
-  /// line whose first character is neither `<` nor whitespace cannot
-  /// match. Skipping [String.trim] for the common case (plain paragraph
-  /// text) avoids a per-line string allocation on the parse hot path.
-  static bool _couldStartHtmlLine(String line) {
-    if (line.isEmpty) return false;
-    final first = line.codeUnitAt(0);
-    return first <= 0x20 || first == 0x3C; // whitespace or '<'
-  }
-
-  /// Parses a whitelisted HTML block
-  ///
-  /// The block ends on the line where the matching close tag (tracked
-  /// with a same-name nesting counter) brings nesting to zero. Text
-  /// after that terminating close tag on the same line is kept as
-  /// trailing content so nothing is silently dropped. A missing close
-  /// tag consumes all remaining lines, which keeps incremental
-  /// (streaming) re-parses stable.
-  _ParseResult _parseHtmlBlock(List<String> lines, int startIndex) {
-    final firstLine = lines[startIndex].trim();
-    final openTag = lexHtmlTag(firstLine, 0);
-    if (openTag == null) {
-      throw FormatException('Invalid HTML block: ${lines[startIndex]}');
-    }
-    final tagName = openTag.name;
-    final align = _parseHtmlBlockAlignment(openTag);
-
-    if (openTag.isSelfClosing) {
-      return _ParseResult(
-        node: _buildHtmlBlockNode(tagName, const [], align),
-        linesConsumed: 1,
-      );
-    }
-
-    final contentLines = <String>[];
-    var nesting = 1;
-    var lineIndex = startIndex;
-
-    while (lineIndex < lines.length) {
-      final isFirst = lineIndex == startIndex;
-      final lineText = isFirst ? firstLine : lines[lineIndex];
-      final from = isFirst ? openTag.end : 0;
-      final scan = scanHtmlCloseTag(
-        lineText,
-        from,
-        tagName,
-        initialNesting: nesting,
-      );
-      nesting = scan.nesting;
-
-      final close = scan.close;
-      if (close != null) {
-        // Terminating close tag found on this line.
-        final before = lineText.substring(from, close.start);
-        final after = lineText.substring(close.end);
-        if (before.trim().isNotEmpty) contentLines.add(before);
-        if (after.trim().isNotEmpty) contentLines.add(after);
-        lineIndex++;
-        break;
-      }
-
-      final content = lineText.substring(from);
-      if (!isFirst || content.trim().isNotEmpty) {
-        contentLines.add(content);
-      }
-      lineIndex++;
-    }
-
-    final source = contentLines.join('\n');
-    final children = source.trim().isEmpty ? <MarkdownNode>[] : parse(source);
-
-    return _ParseResult(
-      node: _buildHtmlBlockNode(tagName, children, align),
-      linesConsumed: lineIndex - startIndex,
-    );
-  }
-
-  /// Reads the alignment of an HTML block from its open tag.
-  HtmlBlockAlignment? _parseHtmlBlockAlignment(HtmlTag tag) {
-    if (tag.name == 'center') return HtmlBlockAlignment.center;
-    switch (tag.attributes['align']?.toLowerCase()) {
-      case 'left':
-        return HtmlBlockAlignment.left;
-      case 'center':
-        return HtmlBlockAlignment.center;
-      case 'right':
-        return HtmlBlockAlignment.right;
-      default:
-        return null;
-    }
-  }
-
-  /// Builds the AST node for a parsed HTML block.
-  ///
-  /// `<blockquote>` reuses the markdown [BlockquoteNode] so it renders
-  /// through the existing blockquote builder.
-  MarkdownNode _buildHtmlBlockNode(
-    String tag,
-    List<MarkdownNode> children,
-    HtmlBlockAlignment? align,
-  ) {
-    if (tag == 'blockquote') return BlockquoteNode(children);
-    return HtmlBlockNode(tag: tag, children: children, align: align);
   }
 
   /// Parses a details block
