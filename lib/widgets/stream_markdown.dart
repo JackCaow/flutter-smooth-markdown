@@ -361,16 +361,52 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
           _error = error;
         });
       },
+      onDone: () {
+        if (!mounted) return;
+        _throttleTimer?.cancel();
+        setState(() {
+          // Flush any withheld trailing tag now that the stream is complete.
+          _currentText = _buffer.toString();
+          _hasPendingUpdate = false;
+        });
+      },
     );
   }
 
   void _performUpdate() {
     if (!mounted) return;
     setState(() {
-      _currentText = _buffer.toString();
+      // Render up to the last complete tag boundary so a tag split across
+      // chunks (e.g. `<font colo` | `r="red">`) is not flashed as literal
+      // text. The withheld tail stays buffered and renders once its `>`
+      // arrives, or when the stream completes (see [onDone]).
+      _currentText = _safeRenderText(_buffer.toString());
       _lastUpdateTime = DateTime.now();
       _hasPendingUpdate = false;
     });
+  }
+
+  /// Returns the longest prefix of [full] that does not end inside an
+  /// unclosed HTML tag, so a partially-arrived tag is withheld from
+  /// rendering until it is complete.
+  ///
+  /// A literal `<` in prose (as in `a < b` or `<3`) is kept, because the
+  /// character following such a `<` is not an ASCII letter or `/` and so
+  /// cannot be the start of a tag.
+  static String _safeRenderText(String full) {
+    final lt = full.lastIndexOf('<');
+    if (lt < 0) return full;
+    // A '>' after the last '<' means the tag is already closed.
+    if (full.lastIndexOf('>') > lt) return full;
+    // Unclosed '<': withhold only when it starts a tag (a letter or '/').
+    if (lt + 1 < full.length) {
+      final next = full.codeUnitAt(lt + 1);
+      final isTagStart = (next >= 0x41 && next <= 0x5A) || // A-Z
+          (next >= 0x61 && next <= 0x7A) || // a-z
+          next == 0x2F; // '/'
+      if (!isTagStart) return full;
+    }
+    return full.substring(0, lt);
   }
 
   @override

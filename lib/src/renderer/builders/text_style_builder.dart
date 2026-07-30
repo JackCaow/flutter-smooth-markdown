@@ -19,18 +19,11 @@ class BoldBuilder extends MarkdownWidgetBuilder {
     MarkdownRenderContext context,
   ) {
     final boldNode = node as BoldNode;
-    final inlineRenderer = context.inlineRenderer;
-
-    if (inlineRenderer != null) {
-      return inlineRenderer(boldNode.children, styleSheet.boldStyle);
-    }
-
-    // Fallback
-    return Text(_extractText(boldNode.children), style: styleSheet.boldStyle);
-  }
-
-  String _extractText(List<MarkdownNode> nodes) {
-    return nodes.whereType<TextNode>().map((n) => n.content).join();
+    return renderInlineOrFallback(
+      boldNode.children,
+      styleSheet.boldStyle,
+      context,
+    );
   }
 }
 
@@ -49,18 +42,11 @@ class ItalicBuilder extends MarkdownWidgetBuilder {
     MarkdownRenderContext context,
   ) {
     final italicNode = node as ItalicNode;
-    final inlineRenderer = context.inlineRenderer;
-
-    if (inlineRenderer != null) {
-      return inlineRenderer(italicNode.children, styleSheet.italicStyle);
-    }
-
-    // Fallback
-    return Text(_extractText(italicNode.children), style: styleSheet.italicStyle);
-  }
-
-  String _extractText(List<MarkdownNode> nodes) {
-    return nodes.whereType<TextNode>().map((n) => n.content).join();
+    return renderInlineOrFallback(
+      italicNode.children,
+      styleSheet.italicStyle,
+      context,
+    );
   }
 }
 
@@ -79,17 +65,10 @@ class StrikethroughBuilder extends MarkdownWidgetBuilder {
     MarkdownRenderContext context,
   ) {
     final strikeNode = node as StrikethroughNode;
-    final inlineRenderer = context.inlineRenderer;
-
-    if (inlineRenderer != null) {
-      return inlineRenderer(strikeNode.children, styleSheet.strikethroughStyle);
-    }
-
-    // Fallback
-    return Text(_extractText(strikeNode.children), style: styleSheet.strikethroughStyle);
-  }
-
-  String _extractText(List<MarkdownNode> nodes) {
-    return nodes.whereType<TextNode>().map((n) => n.content).join();
+    return renderInlineOrFallback(
+      strikeNode.children,
+      styleSheet.strikethroughStyle,
+      context,
+    );
   }
 }

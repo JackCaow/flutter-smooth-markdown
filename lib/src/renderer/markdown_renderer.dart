@@ -151,7 +151,8 @@ class MarkdownRenderer {
     final renderContext = baseContext.copyWith(
       inlineRenderer: (childNodes, baseStyle) =>
           renderInline(childNodes, baseStyle, baseContext),
-      blockRenderer: (childNodes) => render(childNodes, context: baseContext),
+      blockRenderer: (childNodes, {context}) =>
+          render(childNodes, context: context ?? baseContext),
       styleSheet: styleSheet,
     );
 
@@ -322,6 +323,7 @@ class MarkdownRenderer {
           style: baseStyle,
           children: spans,
         ),
+        textAlign: context.textAlign,
       );
     }
 
@@ -330,6 +332,7 @@ class MarkdownRenderer {
         style: baseStyle,
         children: spans,
       ),
+      textAlign: context.textAlign ?? TextAlign.start,
     );
   }
 

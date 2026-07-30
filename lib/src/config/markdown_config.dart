@@ -41,8 +41,18 @@ import 'package:flutter/widgets.dart';
 /// ## Security Considerations
 ///
 /// **HTML Support**: By default, HTML tags are disabled ([enableHtml] = false)
-/// for security reasons. When enabled, HTML is sanitized to prevent XSS attacks,
-/// but it's recommended to only enable this for trusted content.
+/// for security reasons. When enabled, only a whitelist of tags is rendered:
+///
+/// - Inline: `b/strong`, `i/em`, `u/ins`, `s/del/strike`, `mark`, `sub`,
+///   `sup`, `kbd`, `code`, `br`, `a`, `img`, `font`, `span`
+/// - Block: `div`, `p`, `center`, `blockquote`, `hr` (plus the existing
+///   `details`/`summary` support)
+///
+/// Unknown tags are stripped while their content is kept. Link and image
+/// URLs are restricted to http, https, mailto, tel, and relative paths —
+/// `javascript:`, `data:`, and other schemes are rejected. Styling via
+/// `font`/`span` is limited to color, background color, and font size.
+/// It's still recommended to only enable this for trusted content.
 ///
 /// ```dart
 /// // Only enable for trusted content
@@ -145,10 +155,14 @@ class MarkdownConfig {
     this.imagePlaceholderBuilder,
   });
 
-  /// Whether to allow inline HTML tags
+  /// Whether to allow whitelisted HTML tags
   ///
-  /// For security reasons, this is disabled by default.
-  /// When enabled, HTML will be sanitized to prevent XSS attacks.
+  /// For security reasons, this is disabled by default. When enabled,
+  /// a safe whitelist of inline tags (`b`, `i`, `u`, `s`, `mark`,
+  /// `sub`, `sup`, `kbd`, `code`, `br`, `a`, `img`, `font`, `span`)
+  /// and block tags (`div`, `p`, `center`, `blockquote`, `hr`) is
+  /// rendered. Unknown tags are stripped keeping their content, and
+  /// unsafe URL schemes such as `javascript:` are rejected.
   final bool enableHtml;
 
   /// Whether to enable syntax highlighting for code blocks
@@ -189,7 +203,8 @@ class MarkdownConfig {
   final String syntaxHighlightTheme;
 
   /// Custom error widget builder for failed image loads
-  final Widget Function(BuildContext context, Object error, StackTrace? stackTrace)?
+  final Widget Function(
+          BuildContext context, Object error, StackTrace? stackTrace)?
       imageErrorBuilder;
 
   /// Custom placeholder widget builder for loading images

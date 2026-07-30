@@ -11,6 +11,8 @@ import 'builders/footnote_reference_builder.dart';
 import 'builders/hard_break_builder.dart';
 import 'builders/header_builder.dart';
 import 'builders/horizontal_rule_builder.dart';
+import 'builders/html_block_builder.dart';
+import 'builders/html_inline_builder.dart';
 import 'builders/image_builder.dart';
 import 'builders/inline_code_builder.dart';
 import 'builders/inline_math_builder.dart';
@@ -28,9 +30,38 @@ typedef InlineRenderer = Widget Function(
 );
 
 /// Function type for rendering block-level nodes
+///
+/// The optional [MarkdownRenderContext] lets a caller (for example an HTML
+/// block that applies text alignment) override context for the rendered
+/// children; when omitted the renderer uses its current context.
 typedef BlockRenderer = Widget Function(
-  List<MarkdownNode> nodes,
-);
+  List<MarkdownNode> nodes, {
+  MarkdownRenderContext? context,
+});
+
+/// Extracts plain text from a list of nodes by joining [TextNode] content.
+///
+/// Used as a fallback when no inline/block renderer is available, so the
+/// content is still readable instead of rendering nothing.
+String extractPlainText(List<MarkdownNode> nodes) {
+  return nodes.whereType<TextNode>().map((n) => n.content).join();
+}
+
+/// Renders [children] via the inline renderer when available, otherwise
+/// falls back to a flat [Text] widget built from [extractPlainText].
+///
+/// Shared by inline-style builders (bold, italic, underline, etc.) so the
+/// null-check dispatch lives in one place.
+Widget renderInlineOrFallback(
+  List<MarkdownNode> children,
+  TextStyle? style,
+  MarkdownRenderContext context,
+) {
+  final inlineRenderer = context.inlineRenderer;
+  return inlineRenderer != null
+      ? inlineRenderer(children, style)
+      : Text(extractPlainText(children), style: style);
+}
 
 /// Base class for building widgets from Markdown nodes
 ///
@@ -71,6 +102,7 @@ class MarkdownRenderContext {
     this.blockRenderer,
     this.styleSheet,
     this.selectable = false,
+    this.textAlign,
   });
 
   /// Callback for link taps
@@ -109,6 +141,14 @@ class MarkdownRenderContext {
   /// to avoid nested selection conflicts.
   final bool selectable;
 
+  /// Text alignment applied to inline text rendered within this context.
+  ///
+  /// Used by HTML block builders (`<center>`, `align="right"`) so the
+  /// contained text is aligned at the text level rather than by shrink-
+  /// wrapping the block, which avoids layout reflow during streaming.
+  /// `null` leaves alignment at the default (start/left).
+  final TextAlign? textAlign;
+
   /// Creates a copy with updated fields
   MarkdownRenderContext copyWith({
     void Function(String url)? onTapLink,
@@ -120,6 +160,7 @@ class MarkdownRenderContext {
     BlockRenderer? blockRenderer,
     MarkdownStyleSheet? styleSheet,
     bool? selectable,
+    TextAlign? textAlign,
   }) {
     return MarkdownRenderContext(
       onTapLink: onTapLink ?? this.onTapLink,
@@ -131,6 +172,7 @@ class MarkdownRenderContext {
       blockRenderer: blockRenderer ?? this.blockRenderer,
       styleSheet: styleSheet ?? this.styleSheet,
       selectable: selectable ?? this.selectable,
+      textAlign: textAlign ?? this.textAlign,
     );
   }
 }
@@ -161,6 +203,13 @@ class BuilderRegistry {
       ..register('bold', const BoldBuilder())
       ..register('italic', const ItalicBuilder())
       ..register('strikethrough', const StrikethroughBuilder())
+      ..register('underline', const UnderlineBuilder())
+      ..register('highlight', const HighlightBuilder())
+      ..register('subscript', const SubscriptBuilder())
+      ..register('superscript', const SuperscriptBuilder())
+      ..register('kbd', const KbdBuilder())
+      ..register('styled_span', const StyledSpanBuilder())
+      ..register('html_block', const HtmlBlockBuilder())
       ..register('link', const LinkBuilder())
       ..register('image', const ImageBuilder());
   }
