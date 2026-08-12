@@ -267,4 +267,56 @@ void main() {
       expect(isSafeHtmlUrl('   '), isFalse);
     });
   });
+
+  group('isSafeHtmlImageSrc', () {
+    test('allows http and https urls', () {
+      expect(isSafeHtmlImageSrc('https://example.com'), isTrue);
+      expect(isSafeHtmlImageSrc('http://example.com/a?b=c'), isTrue);
+    });
+
+    test('allows relative and absolute local paths', () {
+      expect(isSafeHtmlImageSrc('assets/img.png'), isTrue);
+      expect(isSafeHtmlImageSrc('/a/b.png'), isTrue);
+      expect(isSafeHtmlImageSrc('icons/logo.svg'), isTrue);
+    });
+
+    test('rejects protocol-relative urls', () {
+      // These would pass isSafeHtmlUrl but cannot be resolved by the
+      // image loaders (no base scheme to inherit), so they must be
+      // rejected here rather than rendering a broken-image fallback.
+      expect(isSafeHtmlImageSrc('//cdn.example.com/x.png'), isFalse);
+      expect(isSafeHtmlImageSrc('////cdn.example.com/x.png'), isFalse);
+    });
+
+    test('rejects mailto and tel schemes', () {
+      expect(isSafeHtmlImageSrc('mailto:a@b.com'), isFalse);
+      expect(isSafeHtmlImageSrc('tel:+12345'), isFalse);
+    });
+
+    test('treats colon after path separator as non-scheme', () {
+      expect(isSafeHtmlImageSrc('a/b:c'), isTrue);
+    });
+
+    test('rejects javascript scheme in image src safety check', () {
+      expect(isSafeHtmlImageSrc('javascript:alert(1)'), isFalse);
+      expect(isSafeHtmlImageSrc('JavaScript:alert(1)'), isFalse);
+    });
+
+    test('rejects javascript scheme hidden by whitespace', () {
+      expect(isSafeHtmlImageSrc('  javascript:alert(1)'), isFalse);
+      expect(isSafeHtmlImageSrc('java\tscript:alert(1)'), isFalse);
+      expect(isSafeHtmlImageSrc('java\nscript:alert(1)'), isFalse);
+    });
+
+    test('rejects data file and vbscript schemes', () {
+      expect(isSafeHtmlImageSrc('data:image/png;base64,AAAA'), isFalse);
+      expect(isSafeHtmlImageSrc('file:///etc/passwd'), isFalse);
+      expect(isSafeHtmlImageSrc('vbscript:x'), isFalse);
+    });
+
+    test('rejects empty url', () {
+      expect(isSafeHtmlImageSrc(''), isFalse);
+      expect(isSafeHtmlImageSrc('   '), isFalse);
+    });
+  });
 }

@@ -227,18 +227,18 @@ double? parseFontSizeAttr(String value) {
   return _legacyFontSizes[scale - 1];
 }
 
-/// Whether a URL from an HTML `href`/`src` attribute is safe to keep.
+/// Whether a URL from an HTML `href` attribute is safe to keep as a link.
 ///
-/// Scheme-less (relative, anchor, and protocol-relative) URLs are
-/// allowed; absolute URLs must use http, https, mailto, or tel.
+/// This is the policy for navigable links: scheme-less (relative, anchor,
+/// and protocol-relative) URLs are allowed, and absolute URLs must use
+/// http, https, mailto, or tel — schemes a launcher can hand off to the
+/// platform. Use [isSafeHtmlImageSrc] for `<img src>` instead, since image
+/// loaders support a narrower set of URLs than link navigation.
+///
 /// ASCII control characters and spaces are stripped before scheme
 /// detection so obfuscations such as `java\tscript:` are caught.
 bool isSafeHtmlUrl(String url) {
-  final buffer = StringBuffer();
-  for (final code in url.codeUnits) {
-    if (code > 0x20) buffer.writeCharCode(code);
-  }
-  final cleaned = buffer.toString();
+  final cleaned = _stripUnsafeUrlChars(url);
   if (cleaned.isEmpty) return false;
 
   for (var i = 0; i < cleaned.length; i++) {
@@ -252,6 +252,46 @@ bool isSafeHtmlUrl(String url) {
     }
   }
   return true; // No scheme at all.
+}
+
+/// Whether a URL from an HTML `src` attribute is safe to load as an image.
+///
+/// Image sources are constrained by what the renderer can actually load:
+/// network images require an absolute `http`/`https` URL and local images
+/// use a relative or absolute path resolved against bundled assets. This
+/// deliberately diverges from [isSafeHtmlUrl]: `mailto:` and `tel:` are
+/// nonsensical for images, and protocol-relative URLs (`//host/...`) have
+/// no base scheme to inherit and cannot be resolved by the image loaders.
+/// Accepting any of those would pass the safety check only to render a
+/// silent broken-image placeholder, so they are rejected here and fall
+/// back to the tag's alt text instead.
+bool isSafeHtmlImageSrc(String url) {
+  final cleaned = _stripUnsafeUrlChars(url);
+  if (cleaned.isEmpty) return false;
+
+  for (var i = 0; i < cleaned.length; i++) {
+    final char = cleaned[i];
+    if (char == '/' || char == '?' || char == '#') break; // No scheme.
+    if (char == ':') {
+      final scheme = cleaned.substring(0, i).toLowerCase();
+      return scheme == 'http' || scheme == 'https';
+    }
+  }
+
+  // Scheme-less: relative or absolute paths are local assets. Reject
+  // protocol-relative URLs (`//host/...`) — no base scheme to resolve.
+  return !cleaned.startsWith('//');
+}
+
+/// Strips ASCII control characters and spaces (anything `<= 0x20`) so
+/// obfuscations such as `java\tscript:` are normalized before scheme
+/// detection in [isSafeHtmlUrl] and [isSafeHtmlImageSrc].
+String _stripUnsafeUrlChars(String url) {
+  final buffer = StringBuffer();
+  for (final code in url.codeUnits) {
+    if (code > 0x20) buffer.writeCharCode(code);
+  }
+  return buffer.toString();
 }
 
 /// Location of a matching HTML closing tag found by [findHtmlCloseTag].

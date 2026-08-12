@@ -26,6 +26,7 @@ class HtmlBlockBuilder extends MarkdownWidgetBuilder {
     MarkdownRenderContext context,
   ) {
     final blockNode = node as HtmlBlockNode;
+    final contextualRenderer = context.contextualBlockRenderer;
     final blockRenderer = context.blockRenderer;
 
     // Alignment is applied as text-level alignment rather than by shrink-
@@ -39,13 +40,17 @@ class HtmlBlockBuilder extends MarkdownWidgetBuilder {
       null || HtmlBlockAlignment.left => null,
     };
 
+    if (contextualRenderer != null) {
+      return contextualRenderer(
+        blockNode.children,
+        context: textAlign == null
+            ? null
+            : context.copyWith(textAlign: textAlign),
+      );
+    }
+
     if (blockRenderer != null) {
-      return textAlign == null
-          ? blockRenderer(blockNode.children)
-          : blockRenderer(
-              blockNode.children,
-              context: context.copyWith(textAlign: textAlign),
-            );
+      return blockRenderer(blockNode.children);
     }
 
     return Text(
