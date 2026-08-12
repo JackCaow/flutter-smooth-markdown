@@ -376,11 +376,20 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
   void _performUpdate() {
     if (!mounted) return;
     setState(() {
-      // Render up to the last complete tag boundary so a tag split across
-      // chunks (e.g. `<font colo` | `r="red">`) is not flashed as literal
-      // text. The withheld tail stays buffered and renders once its `>`
-      // arrives, or when the stream completes (see [onDone]).
-      _currentText = _safeRenderText(_buffer.toString());
+      // Only withhold a partially-arrived HTML tag when HTML rendering is
+      // explicitly enabled. The withholding renders up to the last complete
+      // tag boundary so a tag split across chunks (e.g. `<font colo` |
+      // `r="red">`) is not flashed as literal text; the withheld tail stays
+      // buffered and renders once its `>` arrives, or when the stream
+      // completes (see [onDone]).
+      //
+      // When HTML is disabled (the default), sequences like `<font colo`, a
+      // trailing `<`, or `<` followed by letters are ordinary prose and must
+      // be rendered verbatim — withholding them would swallow streaming text.
+      final enableHtml = widget.config?.enableHtml ?? false;
+      _currentText = enableHtml
+          ? _safeRenderText(_buffer.toString())
+          : _buffer.toString();
       _lastUpdateTime = DateTime.now();
       _hasPendingUpdate = false;
     });
@@ -389,6 +398,11 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
   /// Returns the longest prefix of [full] that does not end inside an
   /// unclosed HTML tag, so a partially-arrived tag is withheld from
   /// rendering until it is complete.
+  ///
+  /// This is only invoked when HTML rendering is enabled (see
+  /// [_performUpdate]); with HTML disabled, the buffer is rendered verbatim
+  /// so prose like `<font colo`, a trailing `<`, or `<` followed by letters
+  /// is never swallowed.
   ///
   /// A literal `<` in prose (as in `a < b` or `<3`) is kept, because the
   /// character following such a `<` is not an ASCII letter or `/` and so
