@@ -1,4 +1,5 @@
 import 'ast/markdown_node.dart';
+import 'html/html_block_parser.dart';
 import 'inline_parser.dart';
 import 'parser_plugin.dart';
 
@@ -12,21 +13,29 @@ import 'parser_plugin.dart';
 /// - Code blocks
 /// - Horizontal rules
 /// - Tables
+/// - Whitelisted HTML blocks (when [BlockParser.new] `enableHtml` is set)
 ///
 /// Supports custom block plugins through [ParserPluginRegistry].
 class BlockParser {
   /// Creates a new block parser
   ///
   /// Optionally accepts a [ParserPluginRegistry] for custom block plugins.
-  BlockParser({ParserPluginRegistry? plugins})
+  /// When [enableHtml] is true, whitelisted HTML blocks (`<div>`, `<p>`,
+  /// `<center>`, `<blockquote>`, standalone `<hr>`) and inline HTML in
+  /// nested content are parsed.
+  BlockParser({ParserPluginRegistry? plugins, bool enableHtml = false})
       : _plugins = plugins,
-        _inlineParser = InlineParser(plugins: plugins);
+        _inlineParser = InlineParser(plugins: plugins, enableHtml: enableHtml) {
+    _htmlParser = enableHtml ? HtmlBlockParser(parseChildren: parse) : null;
+  }
 
   /// The inline parser for parsing cell contents
   final InlineParser _inlineParser;
 
   /// Plugin registry for custom block parsers
   final ParserPluginRegistry? _plugins;
+
+  late final HtmlBlockParser? _htmlParser;
 
   // Pre-compiled RegExp patterns to avoid recompilation on every call
   static final _hrDashPattern = RegExp(r'^-{3,}$');
@@ -116,6 +125,16 @@ class BlockParser {
       // Try details block
       if (node == null && _isDetailsStart(line)) {
         final result = _parseDetails(lines, i);
+        node = result.node;
+        consumed = result.linesConsumed;
+      }
+      final htmlMatch = node == null ? _htmlParser?.probe(line) : null;
+      if (node == null && htmlMatch is HtmlHorizontalRuleMatch) {
+        node = const HorizontalRuleNode();
+        consumed = 1;
+      }
+      if (node == null && htmlMatch is HtmlContainerBlockMatch) {
+        final result = _htmlParser!.parseBlock(lines, i, htmlMatch);
         node = result.node;
         consumed = result.linesConsumed;
       }
@@ -677,7 +696,8 @@ class BlockParser {
           _isListItem(line) ||
           _isHorizontalRule(line) ||
           _isFootnoteDefinition(line) ||
-          _isTableStart(lines, i)) {
+          _isTableStart(lines, i) ||
+          _htmlParser?.probe(line) != null) {
         break;
       }
 
