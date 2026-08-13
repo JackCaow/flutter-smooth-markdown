@@ -181,7 +181,7 @@ class HtmlInlineParser {
   List<MarkdownNode> _buildHtmlImageNodes(HtmlTag tag) {
     final src = tag.attributes['src'] ?? '';
     final alt = tag.attributes['alt'] ?? '';
-    if (src.isEmpty || !isSafeHtmlUrl(src)) {
+    if (src.isEmpty || !isSafeHtmlImageSrc(src)) {
       return alt.isEmpty ? const [] : [TextNode(alt)];
     }
 

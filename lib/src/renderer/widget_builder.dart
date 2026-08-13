@@ -29,12 +29,35 @@ typedef InlineRenderer = Widget Function(
   TextStyle? baseStyle,
 );
 
-/// Function type for rendering block-level nodes
+/// Function type for rendering block-level nodes.
 ///
-/// The optional [MarkdownRenderContext] lets a caller (for example an HTML
-/// block that applies text alignment) override context for the rendered
-/// children; when omitted the renderer uses its current context.
-typedef BlockRenderer = Widget Function(
+/// This is the public callback contract and is intentionally kept
+/// single-argument: a plain `(nodes) => widget` function is assignable here,
+/// so existing callbacks keep working. It deliberately carries no context
+/// parameter so that changes to the context model never become a
+/// source-breaking change for callers that only render children. Use
+/// [ContextualBlockRenderer] (via [MarkdownRenderContext.contextualBlockRenderer])
+/// when a builder needs to override the render context.
+typedef BlockRenderer = Widget Function(List<MarkdownNode> nodes);
+
+/// Context-aware variant of [BlockRenderer].
+///
+/// The renderer's internal closure implements this so that builders can
+/// override the [MarkdownRenderContext] for their rendered children (for
+/// example an HTML block that applies text alignment). That closure backs
+/// both typedefs: it matches [ContextualBlockRenderer] exactly, and because
+/// a function accepting an optional `context` is also assignable to the
+/// single-argument [BlockRenderer] (callers that omit `context` still
+/// work), the same closure can populate
+/// [MarkdownRenderContext.blockRenderer] as well.
+///
+/// This typedef is intentionally additive so the public [BlockRenderer]
+/// stays single-argument and existing `(nodes) => widget` callbacks remain
+/// assignable to it. The subtyping runs one direction only: a plain
+/// single-argument callback is *not* assignable to [ContextualBlockRenderer]
+/// (it could not honor a `context` override), which is why builders that
+/// need the override go through this typedef rather than [BlockRenderer].
+typedef ContextualBlockRenderer = Widget Function(
   List<MarkdownNode> nodes, {
   MarkdownRenderContext? context,
 });
@@ -100,6 +123,7 @@ class MarkdownRenderContext {
     this.listLevel = 0,
     this.inlineRenderer,
     this.blockRenderer,
+    this.contextualBlockRenderer,
     this.styleSheet,
     this.selectable = false,
     this.textAlign,
@@ -126,11 +150,23 @@ class MarkdownRenderContext {
   /// renderer instance, preserving custom builder registrations.
   final InlineRenderer? inlineRenderer;
 
-  /// Block renderer function for rendering block-level child nodes
+  /// Block renderer function for rendering block-level child nodes.
   ///
   /// This allows builders to render block content (like blockquote children)
-  /// using the same renderer instance, preserving custom builder registrations.
+  /// using the same renderer instance, preserving custom builder
+  /// registrations. The contract is a plain single-argument
+  /// `(nodes) => widget` function so existing callbacks remain assignable.
   final BlockRenderer? blockRenderer;
+
+  /// Context-aware block renderer for rendering child blocks with a context
+  /// override.
+  ///
+  /// Set internally by the renderer. Builders that need to override the
+  /// context for their children (for example an HTML block applying text
+  /// alignment) call this with `context`; passing `null` renders with the
+  /// renderer's current context, exactly like [blockRenderer]. When unset,
+  /// fall back to [blockRenderer].
+  final ContextualBlockRenderer? contextualBlockRenderer;
 
   /// The style sheet being used for rendering
   final MarkdownStyleSheet? styleSheet;
@@ -158,6 +194,7 @@ class MarkdownRenderContext {
     int? listLevel,
     InlineRenderer? inlineRenderer,
     BlockRenderer? blockRenderer,
+    ContextualBlockRenderer? contextualBlockRenderer,
     MarkdownStyleSheet? styleSheet,
     bool? selectable,
     TextAlign? textAlign,
@@ -170,6 +207,8 @@ class MarkdownRenderContext {
       listLevel: listLevel ?? this.listLevel,
       inlineRenderer: inlineRenderer ?? this.inlineRenderer,
       blockRenderer: blockRenderer ?? this.blockRenderer,
+      contextualBlockRenderer:
+          contextualBlockRenderer ?? this.contextualBlockRenderer,
       styleSheet: styleSheet ?? this.styleSheet,
       selectable: selectable ?? this.selectable,
       textAlign: textAlign ?? this.textAlign,

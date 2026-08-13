@@ -148,11 +148,22 @@ class MarkdownRenderer {
   }) {
     // Create context with renderer references for nested rendering
     final baseContext = context ?? const MarkdownRenderContext();
+    // A single context-aware closure renders child blocks and (optionally)
+    // overrides the context. It is exposed twice so that builders can use it
+    // without a context (through [BlockRenderer], which keeps single-argument
+    // callbacks assignable) and *with* a context override (through
+    // [ContextualBlockRenderer], e.g. the HTML block applying text alignment).
+    Widget renderChildren(
+      List<MarkdownNode> childNodes, {
+      MarkdownRenderContext? context,
+    }) =>
+        render(childNodes, context: context ?? baseContext);
+
     final renderContext = baseContext.copyWith(
       inlineRenderer: (childNodes, baseStyle) =>
           renderInline(childNodes, baseStyle, baseContext),
-      blockRenderer: (childNodes, {context}) =>
-          render(childNodes, context: context ?? baseContext),
+      blockRenderer: renderChildren,
+      contextualBlockRenderer: renderChildren,
       styleSheet: styleSheet,
     );
 

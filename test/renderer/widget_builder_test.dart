@@ -601,5 +601,41 @@ void main() {
         expect(registry.findBuilder(node), isNull);
       });
     });
+
+    // Regression guards for a source-breaking change: BlockRenderer is a
+    // public, package-exported typedef, so a plain single-argument
+    // `(nodes) => widget` callback must remain assignable to it. An earlier
+    // revision added a named `context` parameter directly to BlockRenderer,
+    // which made existing callbacks unassignable (invalid_assignment). The
+    // context override now lives on the separate, additive
+    // ContextualBlockRenderer typedef instead.
+    group('BlockRenderer typedef contract', () {
+      Widget oldStyleCallback(List<MarkdownNode> nodes) =>
+          Text(extractPlainText(nodes));
+
+      test('single-argument callback stays assignable to BlockRenderer', () {
+        // Supplying the callback through the `blockRenderer` parameter
+        // forces the assignability check at compile time — if a future
+        // change made a plain `(nodes) => widget` unassignable to
+        // BlockRenderer, this would stop compiling.
+        final context = MarkdownRenderContext(blockRenderer: oldStyleCallback);
+        expect(context.blockRenderer, isNotNull);
+        expect(context.blockRenderer!(const [TextNode('hi')]), isA<Widget>());
+      });
+
+      test('context-aware callback is assignable to BlockRenderer', () {
+        // The renderer exposes one closure through both fields, so a
+        // callback that accepts the optional context must still fit the
+        // single-argument BlockRenderer contract. (The reverse — assigning
+        // a plain single-argument callback to ContextualBlockRenderer — is
+        // intentionally NOT valid, since it could not honor a context
+        // override.)
+        Widget contextAware(List<MarkdownNode> nodes,
+                {MarkdownRenderContext? context}) =>
+            Text(extractPlainText(nodes));
+        final context = MarkdownRenderContext(blockRenderer: contextAware);
+        expect(context.blockRenderer!(const [TextNode('hi')]), isA<Widget>());
+      });
+    });
   });
 }

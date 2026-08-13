@@ -41,8 +41,47 @@ HTML tags. Toggle the switch in the app bar to compare.
 
 ## Mixing Markdown and HTML
 
+HTML and Markdown can be nested in either direction. These four cases cover
+each combination of inline vs. block on both sides.
+
+### Inline ↔ inline
+
 **Markdown bold with <u>HTML underline</u> inside**, and
 <b>HTML bold with *markdown italic* inside</b>.
+
+### HTML inline inside Markdown structure
+
+HTML tags work inside markdown headers and list items:
+
+#### A header with a tag: Note <sup>2</sup>
+
+- List item with <b>bold</b>, <i>italic</i>, and <mark>mark</mark>
+- Another item with an <a href="https://flutter.dev">HTML link</a> inside
+
+### Markdown inside HTML styling tags
+
+`<font>` and `<span>` run their children back through the markdown inline
+parser, so styling composes with markdown emphasis and code:
+
+- <font color="red">red with **bold** inside</font>
+- <span style="font-size: 22px;">sized with *italic* and `code` inside</span>
+
+### HTML block wrapping Markdown blocks
+
+`<div>` and `<center>` blocks re-parse their contents as markdown blocks, so
+headings, lists, and paragraphs work inside them (the opening tag must sit
+at the start of its own line):
+
+<div>
+
+### A heading inside `<div>`
+
+- a list item inside `<div>`
+- another item with **bold**
+
+A normal paragraph inside `<div>`, with <i>inline HTML</i> too.
+
+</div>
 
 ## Colors and Sizes
 
@@ -84,6 +123,39 @@ An HTML blockquote with *markdown* inside.
 
 Unknown tags are stripped while keeping their content:
 <video>this text is kept, the video tag is not</video>.
+
+## Image `src` Policy
+
+Image sources are constrained by what the renderer can actually load: only
+`http`/`https` and local paths. Schemes that pass link-safety but cannot be
+loaded as images fall back to the alt text instead of a broken placeholder.
+
+- Network image (loads): <img src="https://picsum.photos/320/120" alt="network" width="320" height="120">
+- Protocol-relative URL (rejected → alt text): <img src="//picsum.photos/120/120" alt="protocol-relative">
+- `mailto:` scheme (rejected → alt text): <img src="mailto:a@b.com" alt="mailto-not-an-image">
+- `tel:` scheme (rejected → alt text): <img src="tel:+12345" alt="tel-not-an-image">
+- Unsafe scheme (rejected → alt text): <img src="javascript:alert(1)" alt="javascript-blocked">
+
+## Streaming Tag Withholding
+
+While streaming, a tag split across chunks (e.g. `<font colo` arriving
+before `r="red">`) is withheld until its closing `>` arrives, so the partial
+tag is never flashed as literal text. Tap the play button and watch this
+line render in one piece:
+
+<font color="purple">purple text arrives tag-complete, never as `<font colo`</font>
+
+This withholding only applies when HTML is enabled. Toggle HTML off and
+stream again: the same line, plus prose like `a < b` and `<3 hearts`, must
+still render verbatim without being swallowed mid-stream.
+
+## Non-Breaking Renderer API
+
+`BlockRenderer` stays a plain single-argument `(nodes) => widget` callback,
+so existing custom block renderers keep working. The optional render-context
+override (used, for example, by HTML blocks to apply text alignment) lives
+on a separate additive `ContextualBlockRenderer` typedef — covered by
+`test/renderer/widget_builder_test.dart`.
 
 ## Still Safe
 
