@@ -404,23 +404,154 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
   /// so prose like `<font colo`, a trailing `<`, or `<` followed by letters
   /// is never swallowed.
   ///
-  /// A literal `<` in prose (as in `a < b` or `<3`) is kept, because the
-  /// character following such a `<` is not an ASCII letter or `/` and so
-  /// cannot be the start of a tag.
+  /// Only a tag that is genuinely unterminated is withheld. A `<` inside a
+  /// Markdown code context — an inline code span such as `` `List<T` `` or a
+  /// fenced code block — is a literal, not a tag, so it must not trigger
+  /// withholding; otherwise the text that follows the code would disappear
+  /// until a `>` arrives (or the stream ends).
+  ///
+  /// A literal `<` in prose (as in `a < b` or `<3`) is likewise kept,
+  /// because the character following such a `<` is not an ASCII letter or
+  /// `/` and so cannot be the start of a tag.
   static String _safeRenderText(String full) {
-    final lt = full.lastIndexOf('<');
-    if (lt < 0) return full;
-    // A '>' after the last '<' means the tag is already closed.
-    if (full.lastIndexOf('>') > lt) return full;
-    // Unclosed '<': withhold only when it starts a tag (a letter or '/').
-    if (lt + 1 < full.length) {
-      final next = full.codeUnitAt(lt + 1);
-      final isTagStart = (next >= 0x41 && next <= 0x5A) || // A-Z
-          (next >= 0x61 && next <= 0x7A) || // a-z
-          next == 0x2F; // '/'
-      if (!isTagStart) return full;
+    final lt = _firstUnclosedTagStart(full);
+    return lt < 0 ? full : full.substring(0, lt);
+  }
+
+  /// Index of the first `<` in [text] that opens an HTML tag still waiting
+  /// for its `>`, or `-1` when every candidate tag is closed.
+  ///
+  /// Code contexts are only examined once a suspicious `<` exists and the
+  /// text actually contains a code marker, which keeps the common streaming
+  /// case on the cheap [`String.indexOf`] path.
+  static int _firstUnclosedTagStart(String text) {
+    final bare = _firstUnclosedTagStartIgnoringCode(text);
+    // Code can only hide candidates, never create them: if the code-blind
+    // scan finds nothing, the code-aware scan cannot find anything either.
+    if (bare < 0) return -1;
+    if (!text.contains('`') && !text.contains('~')) return bare;
+    return _firstUnclosedTagStartOutsideCode(text);
+  }
+
+  /// Scans for the first `<` that may open a tag with no `>` after it,
+  /// ignoring Markdown code contexts.
+  static int _firstUnclosedTagStartIgnoringCode(String text) {
+    // A `<` has a `>` after it exactly when it lies before the final `>`
+    // (or there is no `>` at all), so one lookup answers every candidate.
+    final lastGt = text.lastIndexOf('>');
+    var index = text.indexOf('<');
+    while (index >= 0) {
+      if (index > lastGt && _mayStartTag(text, index)) return index;
+      index = text.indexOf('<', index + 1);
     }
-    return full.substring(0, lt);
+    return -1;
+  }
+
+  /// Scans line by line for the first unterminated tag whose `<` is not
+  /// inside a fenced code block or a closed inline code span.
+  static int _firstUnclosedTagStartOutsideCode(String text) {
+    final lastGt = text.lastIndexOf('>');
+    var lineStart = 0;
+    String? fence;
+    while (lineStart <= text.length) {
+      var lineEnd = text.indexOf('\n', lineStart);
+      if (lineEnd < 0) lineEnd = text.length;
+      final line = text.substring(lineStart, lineEnd);
+
+      if (fence != null) {
+        // Every `<` on a line inside a fenced block is code.
+        if (_closesFence(line, fence)) fence = null;
+      } else {
+        final opener = _openingFence(line);
+        if (opener != null) {
+          fence = opener;
+        } else {
+          final codeSpans = _closedCodeSpans(line);
+          for (var i = 0; i < line.length; i++) {
+            if (line.codeUnitAt(i) != 0x3C) continue; // '<'
+            if (_insideCodeSpans(i, codeSpans)) continue;
+            final index = lineStart + i;
+            if (index > lastGt && _mayStartTag(text, index)) return index;
+          }
+        }
+      }
+
+      if (lineEnd >= text.length) break;
+      lineStart = lineEnd + 1;
+    }
+    return -1;
+  }
+
+  /// Whether the character after the `<` at [index] can begin an HTML tag.
+  ///
+  /// A trailing `<` counts as a potential tag start so it stays withheld
+  /// until the next chunk (or stream completion) resolves it.
+  static bool _mayStartTag(String text, int index) {
+    final next = index + 1;
+    if (next >= text.length) return true;
+    final code = text.codeUnitAt(next);
+    return (code >= 0x41 && code <= 0x5A) || // A-Z
+        (code >= 0x61 && code <= 0x7A) || // a-z
+        code == 0x2F; // '/'
+  }
+
+  /// The fence marker of [line] when it opens a fenced code block, else
+  /// `null`.
+  ///
+  /// Mirrors the block parser: at least three backticks or tildes.
+  static String? _openingFence(String line) {
+    final trimmed = line.trim();
+    if (trimmed.length < 3) return null;
+    final marker = trimmed[0];
+    if (marker != '`' && marker != '~') return null;
+    var length = 0;
+    while (length < trimmed.length && trimmed[length] == marker) {
+      length++;
+    }
+    return length < 3 ? null : trimmed.substring(0, length);
+  }
+
+  /// Whether [line] closes the fenced block opened by [fence].
+  static bool _closesFence(String line, String fence) {
+    final trimmed = line.trim();
+    var length = 0;
+    while (length < trimmed.length && trimmed[length] == fence[0]) {
+      length++;
+    }
+    return length >= fence.length && length == trimmed.length;
+  }
+
+  /// Start/end offset pairs of the closed inline code spans on [line].
+  ///
+  /// Backticks pair up in order and an unmatched backtick stays literal;
+  /// an escaped `` \` `` never opens a span. These are the same rules the
+  /// inline parser applies, so a span counted here is really rendered as
+  /// code.
+  static List<int> _closedCodeSpans(String line) {
+    final spans = <int>[];
+    var open = -1;
+    for (var i = 0; i < line.length; i++) {
+      final code = line.codeUnitAt(i);
+      if (code == 0x5C) {
+        i++; // Skip the escaped character.
+      } else if (code == 0x60) {
+        if (open < 0) {
+          open = i;
+        } else {
+          spans..add(open)..add(i);
+          open = -1;
+        }
+      }
+    }
+    return spans;
+  }
+
+  /// Whether [index] falls strictly inside one of the [spans] pairs.
+  static bool _insideCodeSpans(int index, List<int> spans) {
+    for (var i = 0; i < spans.length; i += 2) {
+      if (index > spans[i] && index < spans[i + 1]) return true;
+    }
+    return false;
   }
 
   @override

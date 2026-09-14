@@ -103,6 +103,35 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(findRichTextContaining('bold'), findsWidgets);
     });
+
+    testWidgets('explicit align overrides an inherited center alignment',
+        (tester) async {
+      await tester.pumpWidget(wrap(const SmoothMarkdown(
+        data: '<center>\n<div align="left">\ninner\n</div>\n</center>',
+        config: MarkdownConfig(enableHtml: true),
+        enableCache: false,
+        useRepaintBoundary: false,
+      )));
+
+      // The nested `align="left"` must win over the enclosing `<center>`
+      // instead of inheriting its text alignment.
+      final inner = tester.widget<RichText>(findRichTextContaining('inner'));
+      expect(inner.textAlign, TextAlign.left);
+    });
+
+    testWidgets('an unset align inherits the enclosing center alignment',
+        (tester) async {
+      await tester.pumpWidget(wrap(const SmoothMarkdown(
+        data: '<center>\n<div>\ninner\n</div>\n</center>',
+        config: MarkdownConfig(enableHtml: true),
+        enableCache: false,
+        useRepaintBoundary: false,
+      )));
+
+      // No declared align: the nested block keeps inheriting the center.
+      final inner = tester.widget<RichText>(findRichTextContaining('inner'));
+      expect(inner.textAlign, TextAlign.center);
+    });
   });
 
   group('StreamMarkdown HTML integration', () {

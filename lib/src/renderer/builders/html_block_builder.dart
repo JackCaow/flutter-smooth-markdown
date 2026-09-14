@@ -34,10 +34,15 @@ class HtmlBlockBuilder extends MarkdownWidgetBuilder {
     // every streaming update (horizontal jitter) and force an expensive
     // intrinsic layout pass; textAlign reflows smoothly and matches browser
     // behavior for `<center>` and `align`.
+    //
+    // `null` means the block declared no alignment and inherits the enclosing
+    // context. An explicit `left` must NOT collapse to `null`: doing so would
+    // let an outer `<center>`/`align` keep centering the nested block.
     final textAlign = switch (blockNode.align) {
       HtmlBlockAlignment.center => TextAlign.center,
       HtmlBlockAlignment.right => TextAlign.right,
-      null || HtmlBlockAlignment.left => null,
+      HtmlBlockAlignment.left => TextAlign.left,
+      null => null,
     };
 
     if (contextualRenderer != null) {

@@ -137,6 +137,14 @@ class BlockParser {
         final result = _htmlParser!.parseBlock(lines, i, htmlMatch);
         node = result.node;
         consumed = result.linesConsumed;
+        final trailing = result.trailingText;
+        if (trailing != null) {
+          // The HTML block ends at its close tag, so text after that tag on
+          // the same line belongs to the outer context. Re-inject it as its
+          // own line and let the next iteration parse it as a sibling block,
+          // instead of letting the block's tag style it.
+          lines.insert(i + consumed, trailing);
+        }
       }
       // Try table
       if (node == null && _isTableStart(lines, i)) {

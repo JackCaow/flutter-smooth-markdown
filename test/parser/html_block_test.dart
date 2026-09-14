@@ -64,12 +64,36 @@ void main() {
         expect(block.children, isNotEmpty);
       });
 
-      test('keeps remainder after terminating close tag inside block', () {
+      test('parses a second block tag after a close tag as a sibling', () {
         final result = parser.parse('<div>a</div><div>b</div>');
-        expect(result, hasLength(1));
-        final json = result[0].toJson().toString();
-        expect(json, contains('a'));
-        expect(json, contains('b'));
+        expect(result, hasLength(2));
+        expect(result[0], isA<HtmlBlockNode>());
+        expect(result[1], isA<HtmlBlockNode>());
+        expect(result[0].toJson().toString(), contains('a'));
+        expect(result[1].toJson().toString(), contains('b'));
+      });
+
+      test('returns text after a center close tag to the outer context', () {
+        final result = parser.parse('<center>inside</center>outside');
+
+        // `outside` must not be swallowed into the centered block; it is a
+        // sibling paragraph the center tag does not style.
+        expect(result, hasLength(2));
+        final block = result[0] as HtmlBlockNode;
+        expect(block.tag, 'center');
+        final inside = block.children.single as ParagraphNode;
+        expect((inside.children.single as TextNode).content, 'inside');
+        final outside = result[1] as ParagraphNode;
+        expect((outside.children.single as TextNode).content, 'outside');
+      });
+
+      test('joins text after a close tag with the following lines', () {
+        final result = parser.parse('<div>x</div>after\nmore');
+
+        expect(result, hasLength(2));
+        expect(result[0], isA<HtmlBlockNode>());
+        final paragraph = result[1] as ParagraphNode;
+        expect((paragraph.children.single as TextNode).content, 'after\nmore');
       });
 
       test('parses empty self-closed div line', () {
@@ -143,6 +167,17 @@ void main() {
       final block = result[0] as HtmlBlockNode;
       final paragraph = block.children.first as ParagraphNode;
       expect(paragraph.children.whereType<BoldNode>(), hasLength(1));
+    });
+
+    test('processes inline markdown in text after an html close tag', () {
+      final parser = MarkdownParser(enableHtml: true);
+      final result = parser.parse('<center>x</center>**bold**');
+
+      // The trailing text is a sibling paragraph, and it is still parsed as
+      // markdown rather than kept literal.
+      expect(result, hasLength(2));
+      final sibling = result[1] as ParagraphNode;
+      expect(sibling.children.whereType<BoldNode>(), hasLength(1));
     });
 
     test('processes inline html inside regular paragraph', () {

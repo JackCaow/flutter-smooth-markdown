@@ -210,6 +210,51 @@ void main() {
       final text = tester.widget<Text>(find.text('centered'));
       expect(text.textAlign, TextAlign.center);
     });
+
+    test('overrides an inherited alignment when align is explicitly left', () {
+      TextAlign? seen;
+      final context = MarkdownRenderContext(
+        textAlign: TextAlign.center,
+        contextualBlockRenderer: (nodes, {context}) {
+          seen = context?.textAlign;
+          return const SizedBox.shrink();
+        },
+      );
+
+      builder.build(
+        const HtmlBlockNode(
+          tag: 'div',
+          children: [],
+          align: HtmlBlockAlignment.left,
+        ),
+        styleSheet,
+        context,
+      );
+
+      // `left` must be a real override, not a `null` that keeps the enclosing
+      // `<center>` alignment.
+      expect(seen, TextAlign.left);
+    });
+
+    test('keeps null alignment for inheritance', () {
+      var passedContext = true;
+      final context = MarkdownRenderContext(
+        textAlign: TextAlign.center,
+        contextualBlockRenderer: (nodes, {context}) {
+          passedContext = context != null;
+          return const SizedBox.shrink();
+        },
+      );
+
+      builder.build(
+        const HtmlBlockNode(tag: 'div', children: []),
+        styleSheet,
+        context,
+      );
+
+      // No declared alignment: no override is passed, so children inherit.
+      expect(passedContext, isFalse);
+    });
   });
 
   group('ImageBuilder dimensions', () {

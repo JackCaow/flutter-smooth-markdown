@@ -37,6 +37,7 @@ class HtmlBlockParseResult {
   const HtmlBlockParseResult({
     required this.node,
     required this.linesConsumed,
+    this.trailingText,
   });
 
   /// Existing Markdown AST node generated for the block.
@@ -44,6 +45,14 @@ class HtmlBlockParseResult {
 
   /// Number of source lines consumed.
   final int linesConsumed;
+
+  /// Text on the closing line that follows the terminating close tag.
+  ///
+  /// The block ends at the close tag, so this text is not part of the block:
+  /// the caller must hand it back to the outer block context, where it is
+  /// parsed as a sibling rather than styled by this block's tag. `null` when
+  /// the block closes at the end of its line.
+  final String? trailingText;
 }
 
 /// Internal parser for whitelisted block HTML.
@@ -96,6 +105,7 @@ class HtmlBlockParser {
     }
 
     final contentLines = <String>[];
+    String? trailingText;
     var nesting = 1;
     var lineIndex = startIndex;
     while (lineIndex < lines.length) {
@@ -115,7 +125,9 @@ class HtmlBlockParser {
         final before = lineText.substring(from, close.start);
         final after = lineText.substring(close.end);
         if (before.trim().isNotEmpty) contentLines.add(before);
-        if (after.trim().isNotEmpty) contentLines.add(after);
+        // Text after the close tag is not part of the block; return it so the
+        // outer parser renders it as a sibling.
+        if (after.trim().isNotEmpty) trailingText = after;
         lineIndex++;
         break;
       }
@@ -131,6 +143,7 @@ class HtmlBlockParser {
     return HtmlBlockParseResult(
       node: _buildBlockNode(tagName, children, align),
       linesConsumed: lineIndex - startIndex,
+      trailingText: trailingText,
     );
   }
 

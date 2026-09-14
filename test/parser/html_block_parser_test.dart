@@ -61,13 +61,26 @@ void main() {
       expect(parsedSources.single, contains('outer'));
     });
 
-    test('keeps content after the terminating close tag', () {
+    test('returns text after the terminating close tag to the caller', () {
       const line = '<div>a</div><div>b</div>';
       final match = parser.probe(line) as HtmlContainerBlockMatch;
 
-      parser.parseBlock(<String>[line], 0, match);
+      final result = parser.parseBlock(<String>[line], 0, match);
 
-      expect(parsedSources.single, 'a\n<div>b</div>');
+      // Only content inside the block becomes children; the rest of the
+      // line is handed back so the outer parser can make it a sibling.
+      expect(parsedSources.single, 'a');
+      expect(result.trailingText, '<div>b</div>');
+    });
+
+    test('has no trailing text when the close tag ends the line', () {
+      const line = '<div>a</div>';
+      final match = parser.probe(line) as HtmlContainerBlockMatch;
+
+      final result = parser.parseBlock(<String>[line], 0, match);
+
+      expect(parsedSources.single, 'a');
+      expect(result.trailingText, isNull);
     });
 
     test('consumes an incomplete block through input end', () {

@@ -317,5 +317,87 @@ void main() {
 
       expect(findRichTextContaining('done'), findsOneWidget);
     });
+
+    testWidgets(
+        'does not withhold text after inline code containing `<` '
+        '(regression: Use `List<T` here.)', (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StreamMarkdown(
+            stream: controller.stream,
+            config: const MarkdownConfig(enableHtml: true),
+          ),
+        ),
+      );
+
+      // The `<` sits inside a closed inline code span, so it is literal code
+      // rather than the start of an unclosed HTML tag. The whole line must
+      // render immediately, and the stream stays open.
+      controller.add('Use `List<T` here.');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(findRichTextContaining('List<T'), findsOneWidget);
+      expect(findRichTextContaining('here.'), findsOneWidget);
+    });
+
+    testWidgets('does not withhold text after a fenced code block with `<`',
+        (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StreamMarkdown(
+            stream: controller.stream,
+            config: const MarkdownConfig(enableHtml: true),
+          ),
+        ),
+      );
+
+      // `<T` has no closing `>`, but it lives inside a fenced code block, so
+      // it must not be treated as an unclosed tag that swallows the code and
+      // the closing fence.
+      controller.add('```dart\nList<T items;\n```');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.textContaining('List<T items;'), findsOneWidget);
+    });
+
+    testWidgets('still withholds an unclosed tag after inline code',
+        (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StreamMarkdown(
+            stream: controller.stream,
+            config: const MarkdownConfig(enableHtml: true),
+          ),
+        ),
+      );
+
+      controller.add('Use `List<T` here. <font colo');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // The code renders, while the genuinely unclosed `<font` tag is still
+      // withheld until its `>` arrives.
+      expect(findRichTextContaining('List<T'), findsOneWidget);
+      expect(findRichTextContaining('here.'), findsOneWidget);
+      expect(findRichTextContaining('font colo'), findsNothing);
+
+      controller.add('r="red">done</font>');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(findRichTextContaining('done'), findsOneWidget);
+      expect(findRichTextContaining('List<T'), findsOneWidget);
+    });
   });
 }
