@@ -85,6 +85,11 @@ import 'package:flutter/material.dart';
 ///
 /// - [SmoothMarkdown], which uses this stylesheet for rendering
 /// - [MarkdownConfig], for configuring parsing behavior
+
+/// Font scale applied to subscript and superscript text, relative to the
+/// surrounding text size.
+const double markdownSubSupFontScale = 0.75;
+
 class MarkdownStyleSheet {
   /// Creates a custom Markdown style sheet.
   ///
@@ -121,6 +126,11 @@ class MarkdownStyleSheet {
     this.boldStyle,
     this.italicStyle,
     this.strikethroughStyle,
+    this.underlineStyle,
+    this.highlightStyle,
+    this.kbdStyle,
+    this.subscriptStyle,
+    this.superscriptStyle,
     this.listBulletStyle,
     this.tableHeaderStyle,
     this.tableCellStyle,
@@ -230,6 +240,24 @@ class MarkdownStyleSheet {
       italicStyle: base.copyWith(fontStyle: FontStyle.italic),
       strikethroughStyle: base.copyWith(
         decoration: TextDecoration.lineThrough,
+      ),
+      underlineStyle: base.copyWith(
+        decoration: TextDecoration.underline,
+      ),
+      highlightStyle: base.copyWith(
+        backgroundColor: const Color(0xFFFFF176),
+        color: Colors.black87,
+      ),
+      kbdStyle: base.copyWith(
+        fontFamily: 'monospace',
+        fontSize: 13,
+        color: Colors.black87,
+      ),
+      subscriptStyle: base.copyWith(
+        fontSize: (base.fontSize ?? 16) * markdownSubSupFontScale,
+      ),
+      superscriptStyle: base.copyWith(
+        fontSize: (base.fontSize ?? 16) * markdownSubSupFontScale,
       ),
       listBulletStyle: base,
       tableHeaderStyle: base.copyWith(fontWeight: FontWeight.bold),
@@ -361,7 +389,8 @@ class MarkdownStyleSheet {
   ///
   /// Perfect for documentation apps, README viewers, or any app that wants
   /// to match GitHub's familiar markdown aesthetic.
-  factory MarkdownStyleSheet.github({Brightness brightness = Brightness.light}) {
+  factory MarkdownStyleSheet.github(
+      {Brightness brightness = Brightness.light}) {
     if (brightness == Brightness.dark) {
       return MarkdownStyleSheet.dark().copyWith(
         textStyle: const TextStyle(fontSize: 16, color: Color(0xFFE6EDF3)),
@@ -422,7 +451,8 @@ class MarkdownStyleSheet {
   /// ```
   ///
   /// Ideal for code-focused apps, developer tools, or editor-style interfaces.
-  factory MarkdownStyleSheet.vscode({Brightness brightness = Brightness.light}) {
+  factory MarkdownStyleSheet.vscode(
+      {Brightness brightness = Brightness.light}) {
     if (brightness == Brightness.dark) {
       return MarkdownStyleSheet.dark().copyWith(
         textStyle: const TextStyle(fontSize: 16, color: Color(0xFFCCCCCC)),
@@ -561,6 +591,22 @@ class MarkdownStyleSheet {
       strikethroughStyle: base.copyWith(
         decoration: TextDecoration.lineThrough,
       ),
+      underlineStyle: base.copyWith(
+        decoration: TextDecoration.underline,
+      ),
+      highlightStyle: base.copyWith(
+        backgroundColor: const Color(0xFF4D4400),
+      ),
+      kbdStyle: base.copyWith(
+        fontFamily: 'monospace',
+        fontSize: 13,
+      ),
+      subscriptStyle: base.copyWith(
+        fontSize: (base.fontSize ?? 16) * markdownSubSupFontScale,
+      ),
+      superscriptStyle: base.copyWith(
+        fontSize: (base.fontSize ?? 16) * markdownSubSupFontScale,
+      ),
       listBulletStyle: base,
       tableHeaderStyle: base.copyWith(
         fontWeight: FontWeight.bold,
@@ -652,6 +698,21 @@ class MarkdownStyleSheet {
   /// Strikethrough text style
   final TextStyle? strikethroughStyle;
 
+  /// Style for underlined text from HTML `<u>`/`<ins>` tags
+  final TextStyle? underlineStyle;
+
+  /// Style for highlighted text from the HTML `<mark>` tag
+  final TextStyle? highlightStyle;
+
+  /// Style for keyboard input from the HTML `<kbd>` tag
+  final TextStyle? kbdStyle;
+
+  /// Style for subscript text from the HTML `<sub>` tag
+  final TextStyle? subscriptStyle;
+
+  /// Style for superscript text from the HTML `<sup>` tag
+  final TextStyle? superscriptStyle;
+
   /// List bullet style
   final TextStyle? listBulletStyle;
 
@@ -717,6 +778,11 @@ class MarkdownStyleSheet {
     TextStyle? boldStyle,
     TextStyle? italicStyle,
     TextStyle? strikethroughStyle,
+    TextStyle? underlineStyle,
+    TextStyle? highlightStyle,
+    TextStyle? kbdStyle,
+    TextStyle? subscriptStyle,
+    TextStyle? superscriptStyle,
     TextStyle? listBulletStyle,
     TextStyle? tableHeaderStyle,
     TextStyle? tableCellStyle,
@@ -750,15 +816,23 @@ class MarkdownStyleSheet {
       boldStyle: boldStyle ?? this.boldStyle,
       italicStyle: italicStyle ?? this.italicStyle,
       strikethroughStyle: strikethroughStyle ?? this.strikethroughStyle,
+      underlineStyle: underlineStyle ?? this.underlineStyle,
+      highlightStyle: highlightStyle ?? this.highlightStyle,
+      kbdStyle: kbdStyle ?? this.kbdStyle,
+      subscriptStyle: subscriptStyle ?? this.subscriptStyle,
+      superscriptStyle: superscriptStyle ?? this.superscriptStyle,
       listBulletStyle: listBulletStyle ?? this.listBulletStyle,
       tableHeaderStyle: tableHeaderStyle ?? this.tableHeaderStyle,
       tableCellStyle: tableCellStyle ?? this.tableCellStyle,
       blockquoteDecoration: blockquoteDecoration ?? this.blockquoteDecoration,
       codeBlockDecoration: codeBlockDecoration ?? this.codeBlockDecoration,
       tableBorder: tableBorder ?? this.tableBorder,
-      tableHeaderDecoration: tableHeaderDecoration ?? this.tableHeaderDecoration,
-      tableOddRowDecoration: tableOddRowDecoration ?? this.tableOddRowDecoration,
-      tableEvenRowDecoration: tableEvenRowDecoration ?? this.tableEvenRowDecoration,
+      tableHeaderDecoration:
+          tableHeaderDecoration ?? this.tableHeaderDecoration,
+      tableOddRowDecoration:
+          tableOddRowDecoration ?? this.tableOddRowDecoration,
+      tableEvenRowDecoration:
+          tableEvenRowDecoration ?? this.tableEvenRowDecoration,
       horizontalRuleColor: horizontalRuleColor ?? this.horizontalRuleColor,
       horizontalRuleThickness:
           horizontalRuleThickness ?? this.horizontalRuleThickness,

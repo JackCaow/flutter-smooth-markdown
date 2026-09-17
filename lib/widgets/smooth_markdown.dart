@@ -17,6 +17,8 @@ import '../src/renderer/builders/enhanced_link_builder.dart';
 import '../src/renderer/builders/footnote_definition_builder.dart';
 import '../src/renderer/builders/footnote_reference_builder.dart';
 import '../src/renderer/builders/horizontal_rule_builder.dart';
+import '../src/renderer/builders/html_block_builder.dart';
+import '../src/renderer/builders/html_inline_builder.dart';
 import '../src/renderer/builders/image_builder.dart';
 import '../src/renderer/builders/inline_code_builder.dart';
 import '../src/renderer/builders/inline_math_builder.dart';
@@ -658,25 +660,32 @@ class SmoothMarkdown extends StatelessWidget {
   /// Plugin builders take precedence.
   final BuilderRegistry? builderRegistry;
 
-  /// Global shared parse cache for all SmoothMarkdown instances
+  /// Global shared parse caches for all SmoothMarkdown instances.
+  ///
+  /// One cache per HTML config keeps results isolated between widgets
+  /// with different `enableHtml` settings without allocating a
+  /// prefixed key string (an O(n) copy of the document) on every build.
   static final _parseCache = MarkdownParseCache(maxSize: 100);
+  static final _htmlParseCache = MarkdownParseCache(maxSize: 100);
 
   @override
   Widget build(BuildContext context) {
-    // Create parser (with plugins if provided)
-    final parser = MarkdownParser(plugins: plugins);
+    // Create parser (with plugins and HTML support if configured)
+    final enableHtml = config?.enableHtml ?? false;
+    final parser = MarkdownParser(plugins: plugins, enableHtml: enableHtml);
 
     // Parse markdown with optional caching
     // Note: When plugins are used, caching is based on data only.
     // If plugin configuration changes, you should disable caching.
+    final cache = enableHtml ? _htmlParseCache : _parseCache;
     final List<MarkdownNode> nodes;
     if (enableCache && plugins == null) {
-      final cached = _parseCache.get(data);
+      final cached = cache.get(data);
       if (cached != null) {
         nodes = cached;
       } else {
         nodes = parser.parse(data);
-        _parseCache.put(data, nodes);
+        cache.put(data, nodes);
       }
     } else {
       nodes = parser.parse(data);
@@ -699,6 +708,13 @@ class SmoothMarkdown extends StatelessWidget {
         ..register('bold', const BoldBuilder())
         ..register('italic', const ItalicBuilder())
         ..register('strikethrough', const StrikethroughBuilder())
+        ..register('underline', const UnderlineBuilder())
+        ..register('highlight', const HighlightBuilder())
+        ..register('subscript', const SubscriptBuilder())
+        ..register('superscript', const SuperscriptBuilder())
+        ..register('kbd', const KbdBuilder())
+        ..register('styled_span', const StyledSpanBuilder())
+        ..register('html_block', const HtmlBlockBuilder())
         ..register('image', const ImageBuilder())
         ..register('table', const TableBuilder())
         ..register('details', const DetailsBuilder())
@@ -776,13 +792,14 @@ class SmoothMarkdown extends StatelessWidget {
   /// ```
   static void clearCache() {
     _parseCache.clear();
+    _htmlParseCache.clear();
   }
 
   /// Returns cache statistics for monitoring and tuning.
   ///
   /// Returns a map containing:
-  /// - `size`: Current number of cached entries
-  /// - `maxSize`: Maximum cache capacity
+  /// - `size`: Current number of cached entries (both configs)
+  /// - `maxSize`: Maximum cache capacity (both configs)
   /// - `utilization`: Cache utilization (0.0 to 1.0)
   ///
   /// Example:
@@ -791,7 +808,17 @@ class SmoothMarkdown extends StatelessWidget {
   /// final stats = SmoothMarkdown.cacheStatistics;
   /// print('Cache usage: ${stats['utilization'] * 100}%');
   /// ```
-  static Map<String, dynamic> get cacheStatistics => _parseCache.statistics;
+  static Map<String, dynamic> get cacheStatistics {
+    final base = _parseCache.statistics;
+    final html = _htmlParseCache.statistics;
+    final size = (base['size'] as int) + (html['size'] as int);
+    final maxSize = (base['maxSize'] as int) + (html['maxSize'] as int);
+    return {
+      'size': size,
+      'maxSize': maxSize,
+      'utilization': maxSize == 0 ? 0.0 : size / maxSize,
+    };
+  }
 
   /// Schedules a post-frame clipboard filter to remove overlay content.
   static void _scheduleClipboardFilter() {

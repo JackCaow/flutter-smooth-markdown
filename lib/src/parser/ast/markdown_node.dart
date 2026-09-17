@@ -479,6 +479,8 @@ class ImageNode extends MarkdownNode {
     required this.url,
     required this.alt,
     this.title,
+    this.width,
+    this.height,
   });
 
   /// The image URL
@@ -490,6 +492,16 @@ class ImageNode extends MarkdownNode {
   /// Optional title attribute
   final String? title;
 
+  /// Optional display width in logical pixels
+  ///
+  /// Set when the image originates from an HTML `<img width="...">` tag.
+  final double? width;
+
+  /// Optional display height in logical pixels
+  ///
+  /// Set when the image originates from an HTML `<img height="...">` tag.
+  final double? height;
+
   @override
   String get type => 'image';
 
@@ -499,14 +511,24 @@ class ImageNode extends MarkdownNode {
         'url': url,
         'alt': alt,
         if (title != null) 'title': title,
+        if (width != null) 'width': width,
+        if (height != null) 'height': height,
       };
 
   @override
-  ImageNode copyWith({String? url, String? alt, String? title}) {
+  ImageNode copyWith({
+    String? url,
+    String? alt,
+    String? title,
+    double? width,
+    double? height,
+  }) {
     return ImageNode(
       url: url ?? this.url,
       alt: alt ?? this.alt,
       title: title ?? this.title,
+      width: width ?? this.width,
+      height: height ?? this.height,
     );
   }
 

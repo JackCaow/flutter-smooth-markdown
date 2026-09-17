@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_smooth_markdown/src/config/markdown_config.dart';
 import 'package:flutter_smooth_markdown/widgets/stream_markdown.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 /// Custom finder that finds RichText widgets containing the specified text
 Finder findRichTextContaining(String text) {
@@ -218,6 +219,185 @@ void main() {
       expect(findRichTextContaining('Header'), findsOneWidget);
       expect(findRichTextContaining('Item 1'), findsOneWidget);
       expect(findRichTextContaining('Item 2'), findsOneWidget);
+    });
+  });
+
+  group('HTML tail withholding', () {
+    testWidgets(
+        'does not swallow partial tag when HTML is disabled (default) '
+        '(regression: `lead <font colo`)', (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          // No config -> enableHtml defaults to false.
+          home: StreamMarkdown(stream: controller.stream),
+        ),
+      );
+
+      controller.add('lead <font colo');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // The partial tag is ordinary prose and must render verbatim rather
+      // than being withheld up to the last `<`.
+      expect(findRichTextContaining('lead'), findsOneWidget);
+      expect(findRichTextContaining('font colo'), findsOneWidget);
+    });
+
+    testWidgets(
+        'does not swallow a trailing single `<` when HTML is disabled',
+        (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StreamMarkdown(stream: controller.stream),
+        ),
+      );
+
+      controller.add('count is 5 <');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // A bare trailing `<` must not be dropped from the rendered text.
+      expect(findRichTextContaining('5 <'), findsOneWidget);
+    });
+
+    testWidgets(
+        'does not swallow `<` followed by letters in prose when HTML is '
+        'disabled', (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StreamMarkdown(stream: controller.stream),
+        ),
+      );
+
+      controller.add('see <bold formatting here');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Even a `<` directly followed by letters renders as literal prose.
+      expect(findRichTextContaining('<bold'), findsOneWidget);
+      expect(findRichTextContaining('formatting'), findsOneWidget);
+    });
+
+    testWidgets('still withholds a partial tag when HTML is enabled',
+        (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StreamMarkdown(
+            stream: controller.stream,
+            config: const MarkdownConfig(enableHtml: true),
+          ),
+        ),
+      );
+
+      controller.add('lead <font colo');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // While the `<font ...` tag is still split across chunks, it is
+      // withheld so the partial tag is not flashed as literal text.
+      expect(findRichTextContaining('font colo'), findsNothing);
+      expect(findRichTextContaining('lead'), findsOneWidget);
+
+      // Complete the tag in the next chunk; now it parses and renders.
+      controller.add('r="red">done</font>');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(findRichTextContaining('done'), findsOneWidget);
+    });
+
+    testWidgets(
+        'does not withhold text after inline code containing `<` '
+        '(regression: Use `List<T` here.)', (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StreamMarkdown(
+            stream: controller.stream,
+            config: const MarkdownConfig(enableHtml: true),
+          ),
+        ),
+      );
+
+      // The `<` sits inside a closed inline code span, so it is literal code
+      // rather than the start of an unclosed HTML tag. The whole line must
+      // render immediately, and the stream stays open.
+      controller.add('Use `List<T` here.');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(findRichTextContaining('List<T'), findsOneWidget);
+      expect(findRichTextContaining('here.'), findsOneWidget);
+    });
+
+    testWidgets('does not withhold text after a fenced code block with `<`',
+        (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StreamMarkdown(
+            stream: controller.stream,
+            config: const MarkdownConfig(enableHtml: true),
+          ),
+        ),
+      );
+
+      // `<T` has no closing `>`, but it lives inside a fenced code block, so
+      // it must not be treated as an unclosed tag that swallows the code and
+      // the closing fence.
+      controller.add('```dart\nList<T items;\n```');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.textContaining('List<T items;'), findsOneWidget);
+    });
+
+    testWidgets('still withholds an unclosed tag after inline code',
+        (tester) async {
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StreamMarkdown(
+            stream: controller.stream,
+            config: const MarkdownConfig(enableHtml: true),
+          ),
+        ),
+      );
+
+      controller.add('Use `List<T` here. <font colo');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // The code renders, while the genuinely unclosed `<font` tag is still
+      // withheld until its `>` arrives.
+      expect(findRichTextContaining('List<T'), findsOneWidget);
+      expect(findRichTextContaining('here.'), findsOneWidget);
+      expect(findRichTextContaining('font colo'), findsNothing);
+
+      controller.add('r="red">done</font>');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(findRichTextContaining('done'), findsOneWidget);
+      expect(findRichTextContaining('List<T'), findsOneWidget);
     });
   });
 }

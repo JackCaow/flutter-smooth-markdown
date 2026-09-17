@@ -17,6 +17,7 @@ export 'src/editor/wikilink.dart';
 export 'src/mermaid/mermaid.dart';
 
 // Export AST nodes
+export 'src/parser/ast/html_nodes.dart';
 export 'src/parser/ast/markdown_node.dart';
 
 // Export parser
@@ -44,6 +45,8 @@ export 'src/renderer/builders/enhanced_blockquote_builder.dart';
 export 'src/renderer/builders/enhanced_code_block_builder.dart';
 export 'src/renderer/builders/enhanced_header_builder.dart';
 export 'src/renderer/builders/enhanced_link_builder.dart';
+export 'src/renderer/builders/html_block_builder.dart';
+export 'src/renderer/builders/html_inline_builder.dart';
 export 'src/renderer/builders/inline_math_builder.dart';
 export 'src/renderer/builders/mermaid_builder.dart';
 export 'src/renderer/builders/thinking_builder.dart';

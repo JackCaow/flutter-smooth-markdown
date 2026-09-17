@@ -6,6 +6,7 @@ import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
 import 'ai_chat_demo.dart';
 import 'chat_list_demo.dart';
 import 'footnote_demo.dart';
+import 'html_demo.dart';
 import 'l10n/app_localizations.dart';
 import 'conversation_list_demo.dart';
 import 'editor_demo.dart';
@@ -1280,6 +1281,36 @@ gantt
                     context,
                     MaterialPageRoute(
                       builder: (context) => FootnoteDemo(
+                        styleSheet: _getStyleSheet(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.code,
+                  color: isDark ? Colors.white70 : null,
+                ),
+                title: Text(
+                  'HTML Tags Demo',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : null,
+                  ),
+                ),
+                subtitle: Text(
+                  'Whitelisted HTML rendering',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white38 : Colors.grey,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => HtmlDemo(
                         styleSheet: _getStyleSheet(),
                       ),
                     ),

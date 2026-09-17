@@ -20,7 +20,7 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 | **Editing** | Formatted/source/preview/split editor, formatting toolbar, slash commands, wikilinks, find |
 | **Markdown** | Headers (with inline formatting), lists, tables, code blocks, blockquotes, links, images |
 | **Math & Charts** | LaTeX formulas, Mermaid diagrams (flowcharts, Gantt, Kanban, Timeline, Radar, XY Chart, pie, sequence) |
-| **Extras** | Footnotes, SVG support, collapsible sections, task lists |
+| **Extras** | Footnotes, SVG support, collapsible sections, task lists, whitelisted HTML tags (opt-in) |
 | **Theming** | Light/dark modes, GitHub/VS Code presets, custom themes |
 | **Plugins** | Mentions, hashtags, emojis, AI chat blocks (thinking, artifacts) |
 
@@ -53,7 +53,7 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 
 ```yaml
 dependencies:
-  flutter_smooth_markdown: ^0.8.0
+  flutter_smooth_markdown: ^0.9.0
 ```
 
 ```bash
@@ -263,6 +263,28 @@ StreamMarkdown(
   styleSheet: MarkdownStyleSheet.dark(),
 )
 ```
+
+### HTML Tags (opt-in)
+
+Render a safe whitelist of HTML tags — inline formatting (`<b>`, `<u>`,
+`<mark>`, `<sub>`, `<sup>`, `<kbd>`, `<br>`, ...), links and sized
+images, colored `<font>`/`<span>` text, and block elements (`<div>`,
+`<p>`, `<center>`, `<blockquote>`, `<hr>`) with `align` support.
+Disabled by default for security; unknown tags are stripped keeping
+their content, and unsafe URL schemes (`javascript:`, `data:`) are
+rejected.
+
+```dart
+SmoothMarkdown(
+  data: 'Press <kbd>Ctrl</kbd>+<kbd>C</kbd>, H<sub>2</sub>O, '
+      '<mark>highlight</mark><br><center>centered</center>',
+  config: const MarkdownConfig(enableHtml: true), // trusted content only
+)
+```
+
+Works with streaming out of the box — unclosed tags auto-close at the
+end of the buffer, so `<b>partial` renders bold mid-stream. See
+`doc/HTML支持.md` for the full tag list and security policy.
 
 ### Enhanced Components
 

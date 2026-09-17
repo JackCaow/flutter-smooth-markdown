@@ -11,6 +11,8 @@ import 'builders/footnote_reference_builder.dart';
 import 'builders/hard_break_builder.dart';
 import 'builders/header_builder.dart';
 import 'builders/horizontal_rule_builder.dart';
+import 'builders/html_block_builder.dart';
+import 'builders/html_inline_builder.dart';
 import 'builders/image_builder.dart';
 import 'builders/inline_code_builder.dart';
 import 'builders/inline_math_builder.dart';
@@ -27,10 +29,62 @@ typedef InlineRenderer = Widget Function(
   TextStyle? baseStyle,
 );
 
-/// Function type for rendering block-level nodes
-typedef BlockRenderer = Widget Function(
-  List<MarkdownNode> nodes,
-);
+/// Function type for rendering block-level nodes.
+///
+/// This is the public callback contract and is intentionally kept
+/// single-argument: a plain `(nodes) => widget` function is assignable here,
+/// so existing callbacks keep working. It deliberately carries no context
+/// parameter so that changes to the context model never become a
+/// source-breaking change for callers that only render children. Use
+/// [ContextualBlockRenderer] (via [MarkdownRenderContext.contextualBlockRenderer])
+/// when a builder needs to override the render context.
+typedef BlockRenderer = Widget Function(List<MarkdownNode> nodes);
+
+/// Context-aware variant of [BlockRenderer].
+///
+/// The renderer's internal closure implements this so that builders can
+/// override the [MarkdownRenderContext] for their rendered children (for
+/// example an HTML block that applies text alignment). That closure backs
+/// both typedefs: it matches [ContextualBlockRenderer] exactly, and because
+/// a function accepting an optional `context` is also assignable to the
+/// single-argument [BlockRenderer] (callers that omit `context` still
+/// work), the same closure can populate
+/// [MarkdownRenderContext.blockRenderer] as well.
+///
+/// This typedef is intentionally additive so the public [BlockRenderer]
+/// stays single-argument and existing `(nodes) => widget` callbacks remain
+/// assignable to it. The subtyping runs one direction only: a plain
+/// single-argument callback is *not* assignable to [ContextualBlockRenderer]
+/// (it could not honor a `context` override), which is why builders that
+/// need the override go through this typedef rather than [BlockRenderer].
+typedef ContextualBlockRenderer = Widget Function(
+  List<MarkdownNode> nodes, {
+  MarkdownRenderContext? context,
+});
+
+/// Extracts plain text from a list of nodes by joining [TextNode] content.
+///
+/// Used as a fallback when no inline/block renderer is available, so the
+/// content is still readable instead of rendering nothing.
+String extractPlainText(List<MarkdownNode> nodes) {
+  return nodes.whereType<TextNode>().map((n) => n.content).join();
+}
+
+/// Renders [children] via the inline renderer when available, otherwise
+/// falls back to a flat [Text] widget built from [extractPlainText].
+///
+/// Shared by inline-style builders (bold, italic, underline, etc.) so the
+/// null-check dispatch lives in one place.
+Widget renderInlineOrFallback(
+  List<MarkdownNode> children,
+  TextStyle? style,
+  MarkdownRenderContext context,
+) {
+  final inlineRenderer = context.inlineRenderer;
+  return inlineRenderer != null
+      ? inlineRenderer(children, style)
+      : Text(extractPlainText(children), style: style);
+}
 
 /// Base class for building widgets from Markdown nodes
 ///
@@ -69,8 +123,10 @@ class MarkdownRenderContext {
     this.listLevel = 0,
     this.inlineRenderer,
     this.blockRenderer,
+    this.contextualBlockRenderer,
     this.styleSheet,
     this.selectable = false,
+    this.textAlign,
   });
 
   /// Callback for link taps
@@ -94,11 +150,23 @@ class MarkdownRenderContext {
   /// renderer instance, preserving custom builder registrations.
   final InlineRenderer? inlineRenderer;
 
-  /// Block renderer function for rendering block-level child nodes
+  /// Block renderer function for rendering block-level child nodes.
   ///
   /// This allows builders to render block content (like blockquote children)
-  /// using the same renderer instance, preserving custom builder registrations.
+  /// using the same renderer instance, preserving custom builder
+  /// registrations. The contract is a plain single-argument
+  /// `(nodes) => widget` function so existing callbacks remain assignable.
   final BlockRenderer? blockRenderer;
+
+  /// Context-aware block renderer for rendering child blocks with a context
+  /// override.
+  ///
+  /// Set internally by the renderer. Builders that need to override the
+  /// context for their children (for example an HTML block applying text
+  /// alignment) call this with `context`; passing `null` renders with the
+  /// renderer's current context, exactly like [blockRenderer]. When unset,
+  /// fall back to [blockRenderer].
+  final ContextualBlockRenderer? contextualBlockRenderer;
 
   /// The style sheet being used for rendering
   final MarkdownStyleSheet? styleSheet;
@@ -109,6 +177,14 @@ class MarkdownRenderContext {
   /// to avoid nested selection conflicts.
   final bool selectable;
 
+  /// Text alignment applied to inline text rendered within this context.
+  ///
+  /// Used by HTML block builders (`<center>`, `align="right"`) so the
+  /// contained text is aligned at the text level rather than by shrink-
+  /// wrapping the block, which avoids layout reflow during streaming.
+  /// `null` leaves alignment at the default (start/left).
+  final TextAlign? textAlign;
+
   /// Creates a copy with updated fields
   MarkdownRenderContext copyWith({
     void Function(String url)? onTapLink,
@@ -118,8 +194,10 @@ class MarkdownRenderContext {
     int? listLevel,
     InlineRenderer? inlineRenderer,
     BlockRenderer? blockRenderer,
+    ContextualBlockRenderer? contextualBlockRenderer,
     MarkdownStyleSheet? styleSheet,
     bool? selectable,
+    TextAlign? textAlign,
   }) {
     return MarkdownRenderContext(
       onTapLink: onTapLink ?? this.onTapLink,
@@ -129,8 +207,11 @@ class MarkdownRenderContext {
       listLevel: listLevel ?? this.listLevel,
       inlineRenderer: inlineRenderer ?? this.inlineRenderer,
       blockRenderer: blockRenderer ?? this.blockRenderer,
+      contextualBlockRenderer:
+          contextualBlockRenderer ?? this.contextualBlockRenderer,
       styleSheet: styleSheet ?? this.styleSheet,
       selectable: selectable ?? this.selectable,
+      textAlign: textAlign ?? this.textAlign,
     );
   }
 }
@@ -161,6 +242,13 @@ class BuilderRegistry {
       ..register('bold', const BoldBuilder())
       ..register('italic', const ItalicBuilder())
       ..register('strikethrough', const StrikethroughBuilder())
+      ..register('underline', const UnderlineBuilder())
+      ..register('highlight', const HighlightBuilder())
+      ..register('subscript', const SubscriptBuilder())
+      ..register('superscript', const SuperscriptBuilder())
+      ..register('kbd', const KbdBuilder())
+      ..register('styled_span', const StyledSpanBuilder())
+      ..register('html_block', const HtmlBlockBuilder())
       ..register('link', const LinkBuilder())
       ..register('image', const ImageBuilder());
   }

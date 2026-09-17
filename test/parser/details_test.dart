@@ -1,5 +1,6 @@
 import 'package:flutter_smooth_markdown/src/parser/ast/markdown_node.dart';
 import 'package:flutter_smooth_markdown/src/parser/block_parser.dart';
+import 'package:flutter_smooth_markdown/src/parser/markdown_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -186,6 +187,31 @@ Content 2
       expect(json['isOpen'], isTrue);
       expect(json['summary'], isA<List<dynamic>>());
       expect(json['children'], isA<List<dynamic>>());
+    });
+  });
+
+  group('Details inline processing', () {
+    test('processes inline markdown inside details content', () {
+      final parser = MarkdownParser();
+      final nodes = parser.parse(
+        '<details>\n<summary>s</summary>\n**bold** body\n</details>',
+      );
+
+      final details = nodes[0] as DetailsNode;
+      final paragraph = details.children.first as ParagraphNode;
+      expect(paragraph.children.whereType<BoldNode>(), hasLength(1));
+    });
+
+    test('processes nested blocks inside details content', () {
+      final parser = MarkdownParser();
+      final nodes = parser.parse(
+        '<details>\n<summary>s</summary>\n> *quoted*\n</details>',
+      );
+
+      final details = nodes[0] as DetailsNode;
+      final quote = details.children.first as BlockquoteNode;
+      final paragraph = quote.children.first as ParagraphNode;
+      expect(paragraph.children.whereType<ItalicNode>(), hasLength(1));
     });
   });
 }

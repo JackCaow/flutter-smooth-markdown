@@ -87,12 +87,20 @@ class ImageBuilder extends MarkdownWidgetBuilder {
     ImageNode imageNode,
     Widget child,
   ) {
+    // Apply explicit dimensions from HTML <img width/height> attributes.
+    var sizedChild = child;
+    if (imageNode.width != null || imageNode.height != null) {
+      sizedChild = SizedBox(
+        width: imageNode.width,
+        height: imageNode.height,
+        child: child,
+      );
+    }
     final semanticChild = Semantics(
       image: true,
-      label: imageNode.alt.isNotEmpty
-          ? imageNode.alt
-          : imageNode.title ?? 'Image',
-      child: child,
+      label:
+          imageNode.alt.isNotEmpty ? imageNode.alt : imageNode.title ?? 'Image',
+      child: sizedChild,
     );
     final onTap = context.onTapImage;
     if (onTap == null) return semanticChild;
