@@ -129,7 +129,8 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   void _parseDiagram(double availableWidth) {
     // Get responsive config
     if (widget.enableResponsive) {
-      final responsiveConfig = widget.responsiveConfig ?? const MermaidResponsiveConfig();
+      final responsiveConfig =
+          widget.responsiveConfig ?? const MermaidResponsiveConfig();
       _deviceConfig = responsiveConfig.getConfigForWidth(availableWidth);
 
       // Apply responsive settings to style
@@ -156,7 +157,8 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
           _style,
           Size(widget.width ?? availableWidth, widget.height ?? 600),
         );
-      } else if (diagram.type == DiagramType.ganttChart && result.ganttChartData != null) {
+      } else if (diagram.type == DiagramType.ganttChart &&
+          result.ganttChartData != null) {
         // Use Gantt chart layout with responsive config
         final ganttLayout = GanttChartLayout(deviceConfig: _deviceConfig);
         size = ganttLayout.computeLayout(
@@ -164,7 +166,8 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
           _style,
           Size(widget.width ?? availableWidth, widget.height ?? 600),
         );
-      } else if (diagram.type == DiagramType.timeline && result.timelineChartData != null) {
+      } else if (diagram.type == DiagramType.timeline &&
+          result.timelineChartData != null) {
         // Use Timeline chart layout with responsive config
         final timelineLayout = TimelineChartLayout(deviceConfig: _deviceConfig);
         size = timelineLayout.computeLayout(
@@ -172,7 +175,8 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
           _style,
           Size(widget.width ?? availableWidth, widget.height ?? 600),
         );
-      } else if (diagram.type == DiagramType.kanban && result.kanbanChartData != null) {
+      } else if (diagram.type == DiagramType.kanban &&
+          result.kanbanChartData != null) {
         // Use Kanban chart layout with responsive config
         final kanbanLayout = KanbanChartLayout(deviceConfig: _deviceConfig);
         size = kanbanLayout.computeLayout(
@@ -180,7 +184,8 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
           _style,
           Size(widget.width ?? availableWidth, widget.height ?? 600),
         );
-      } else if (diagram.type == DiagramType.radar && result.radarChartData != null) {
+      } else if (diagram.type == DiagramType.radar &&
+          result.radarChartData != null) {
         // Use Radar chart layout with responsive config
         final radarLayout = RadarChartLayout(deviceConfig: _deviceConfig);
         size = radarLayout.computeLayout(
@@ -188,7 +193,8 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
           _style,
           Size(widget.width ?? availableWidth, widget.height ?? 600),
         );
-      } else if (diagram.type == DiagramType.xyChart && result.xyChartData != null) {
+      } else if (diagram.type == DiagramType.xyChart &&
+          result.xyChartData != null) {
         // Use XY chart layout with responsive config
         final xyLayout = XYChartLayout(deviceConfig: _deviceConfig);
         size = xyLayout.computeLayout(
@@ -223,7 +229,8 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
     }
   }
 
-  MermaidStyle _applyResponsiveStyle(MermaidStyle style, MermaidDeviceConfig config) {
+  MermaidStyle _applyResponsiveStyle(
+      MermaidStyle style, MermaidDeviceConfig config) {
     return style.copyWith(
       padding: config.padding,
       nodeSpacingX: config.nodeSpacingX,
@@ -237,6 +244,9 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   LayoutEngine _getLayoutEngine(DiagramType type) {
     switch (type) {
       case DiagramType.flowchart:
+      case DiagramType.stateDiagram:
+      case DiagramType.classDiagram:
+      case DiagramType.erDiagram:
         return DagreLayout(deviceConfig: _deviceConfig);
       case DiagramType.sequence:
         return SequenceLayout(deviceConfig: _deviceConfig);
@@ -350,16 +360,13 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
 
         final painter = _getPainter(_diagram!);
 
-        // Calculate display size with responsive constraints
-        final maxWidth = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : _computedSize.width;
-
+        // Keep the full canvas width. Clamping the child before placing it in
+        // a horizontal scroll view made wide diagrams permanently unreachable.
         final displayWidth = widget.width != null
             ? (_computedSize.width > widget.width!
                 ? _computedSize.width
                 : widget.width!)
-            : _computedSize.width.clamp(0.0, maxWidth);
+            : _computedSize.width;
 
         final displayHeight = widget.height != null
             ? (_computedSize.height > widget.height!
@@ -378,19 +385,21 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
           ),
         );
 
-        // Enable horizontal scrolling on mobile if diagram is wider than screen
-        if (_deviceConfig?.deviceType == DeviceType.mobile &&
-            _computedSize.width > availableWidth) {
+        diagramWidget = GestureDetector(
+          onTapDown: widget.onNodeTap != null ? _handleTap : null,
+          child: diagramWidget,
+        );
+
+        // Scroll constrained inline canvases on any device. Interactive viewers
+        // provide unbounded width and handle their own panning.
+        if (constraints.maxWidth.isFinite && displayWidth > availableWidth) {
           diagramWidget = SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: diagramWidget,
           );
         }
 
-        return GestureDetector(
-          onTapDown: widget.onNodeTap != null ? _handleTap : null,
-          child: diagramWidget,
-        );
+        return diagramWidget;
       },
     );
   }
@@ -548,7 +557,8 @@ class _InteractiveMermaidDiagramState extends State<InteractiveMermaidDiagram> {
 
     // Use the smaller scale to ensure the entire diagram fits
     // But don't scale up beyond 1.0 (100%)
-    final scale = (scaleX < scaleY ? scaleX : scaleY).clamp(widget.minScale, 1.0);
+    final scale =
+        (scaleX < scaleY ? scaleX : scaleY).clamp(widget.minScale, 1.0);
 
     // Calculate the scaled diagram size
     final scaledWidth = diagramSize.width * scale;
@@ -581,12 +591,10 @@ class _InteractiveMermaidDiagramState extends State<InteractiveMermaidDiagram> {
     return LayoutBuilder(
       builder: (context, constraints) {
         // 使用实际可用空间来计算布局
-        final availableWidth = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : 800.0;
-        final availableHeight = constraints.maxHeight.isFinite
-            ? constraints.maxHeight
-            : 600.0;
+        final availableWidth =
+            constraints.maxWidth.isFinite ? constraints.maxWidth : 800.0;
+        final availableHeight =
+            constraints.maxHeight.isFinite ? constraints.maxHeight : 600.0;
 
         final viewportSize = Size(availableWidth, availableHeight);
 
@@ -762,6 +770,9 @@ class _CenteringMermaidDiagramState extends State<_CenteringMermaidDiagram> {
   LayoutEngine _getLayoutEngine(DiagramType type) {
     switch (type) {
       case DiagramType.flowchart:
+      case DiagramType.stateDiagram:
+      case DiagramType.classDiagram:
+      case DiagramType.erDiagram:
         return DagreLayout(deviceConfig: _deviceConfig);
       case DiagramType.sequence:
         return SequenceLayout(deviceConfig: _deviceConfig);

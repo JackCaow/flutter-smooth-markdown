@@ -101,6 +101,7 @@ class MermaidStyle {
       ),
       defaultEdgeStyle: EdgeStyle(
         strokeColor: 0xFF9E9E9E,
+        labelColor: 0xFFE0E0E0,
       ),
       themeMode: MermaidThemeMode.dark,
     );

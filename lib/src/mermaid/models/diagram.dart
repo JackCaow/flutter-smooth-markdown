@@ -31,6 +31,9 @@ enum DiagramType {
   /// State diagram
   stateDiagram,
 
+  /// Entity relationship diagram
+  erDiagram,
+
   /// Pie chart diagram
   pieChart,
 

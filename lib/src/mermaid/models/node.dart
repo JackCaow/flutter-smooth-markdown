@@ -43,6 +43,12 @@ enum NodeShape {
 
   /// Double circle (for state diagrams)
   doubleCircle,
+
+  /// Filled initial-state marker.
+  stateStart,
+
+  /// Final-state marker (filled circle inside a ring).
+  stateEnd,
 }
 
 /// Represents a node in a Mermaid diagram
@@ -56,6 +62,7 @@ class MermaidNode {
     this.className,
     this.link,
     this.tooltip,
+    this.compartments = const [],
   });
 
   /// Unique identifier for this node
@@ -63,6 +70,9 @@ class MermaidNode {
 
   /// Display label
   final String label;
+
+  /// Rows below the heading, grouped into UML/ER compartments.
+  final List<List<String>> compartments;
 
   /// Shape of the node
   final NodeShape shape;
@@ -107,6 +117,7 @@ class MermaidNode {
     String? className,
     String? link,
     String? tooltip,
+    List<List<String>>? compartments,
   }) {
     return MermaidNode(
       id: id ?? this.id,
@@ -116,6 +127,7 @@ class MermaidNode {
       className: className ?? this.className,
       link: link ?? this.link,
       tooltip: tooltip ?? this.tooltip,
+      compartments: compartments ?? this.compartments,
     );
   }
 

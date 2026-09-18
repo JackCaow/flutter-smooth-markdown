@@ -50,7 +50,16 @@ class FlowchartPainter extends MermaidPainter {
     final subgraphBounds = <String, Rect>{};
 
     // Calculate bounds for each subgraph
-    for (final sg in diagram.subgraphs) {
+    final ordered = List<Subgraph>.of(diagram.subgraphs)
+      ..sort((a, b) {
+        final size = b.nodeIds.length.compareTo(a.nodeIds.length);
+        return size != 0
+            ? size
+            : diagram.subgraphs
+                .indexOf(b)
+                .compareTo(diagram.subgraphs.indexOf(a));
+      });
+    for (final sg in ordered) {
       final bounds = _calculateSubgraphBounds(sg);
       if (bounds != null) {
         subgraphBounds[sg.id] = bounds;
@@ -67,12 +76,21 @@ class FlowchartPainter extends MermaidPainter {
     MermaidEdge edge,
     Map<String, Rect> subgraphBounds,
   ) {
-    final fromBounds = subgraphBounds[edge.from];
-    final toBounds = subgraphBounds[edge.to];
+    Rect? bounds(String id) {
+      final node = diagram.getNode(id);
+      return subgraphBounds[id] ??
+          (node == null
+              ? null
+              : Rect.fromLTWH(node.x, node.y, node.width, node.height));
+    }
+
+    final fromBounds = bounds(edge.from);
+    final toBounds = bounds(edge.to);
 
     if (fromBounds == null || toBounds == null) return;
 
     final paint = createEdgePaint(edge);
+    if (edge.lineType == LineType.thick) paint.strokeWidth *= 2;
 
     // Calculate connection points based on relative positions
     Offset fromPoint;
@@ -171,6 +189,31 @@ class FlowchartPainter extends MermaidPainter {
 
     if (minX == double.infinity) return null;
 
+    // Nested cluster borders and titles must also fit inside their parent.
+    for (final child in diagram.subgraphs) {
+      if (child == sg ||
+          !sg.nodeIds.toSet().containsAll(child.nodeIds) ||
+          (sg.nodeIds.length == child.nodeIds.length &&
+              diagram.subgraphs.indexOf(sg) < diagram.subgraphs.indexOf(child)))
+        continue;
+      final bounds = _calculateSubgraphBounds(child);
+      if (bounds == null) continue;
+      minX = math.min(minX, bounds.left);
+      minY = math.min(minY, bounds.top);
+      maxX = math.max(maxX, bounds.right);
+      maxY = math.max(maxY, bounds.bottom);
+    }
+    final title = TextPainter(
+        text: TextSpan(
+            text: sg.label,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        textDirection: TextDirection.ltr)
+      ..layout();
+    final extra = math.max(0.0, title.width - (maxX - minX)) / 2;
+    minX -= extra;
+    maxX += extra;
+    title.dispose();
+
     // Add padding around nodes
     const padding = 20.0;
     const titleHeight = 30.0;
@@ -189,7 +232,8 @@ class FlowchartPainter extends MermaidPainter {
 
     // Background fill
     final fillPaint = Paint()
-      ..color = Color(sgStyle?.backgroundColor ?? 0xFFF5F5F5)
+      ..color = Color(sgStyle?.backgroundColor ??
+          (style.themeMode == MermaidThemeMode.dark ? 0xFF292929 : 0xFFF5F5F5))
       ..style = PaintingStyle.fill;
 
     // Border
@@ -209,7 +253,8 @@ class FlowchartPainter extends MermaidPainter {
 
     // Draw title/label
     final textStyle = TextStyle(
-      color: Color(style.defaultNodeStyle.textColor ?? MermaidColors.defaultTextColor),
+      color: Color(
+          style.defaultNodeStyle.textColor ?? MermaidColors.defaultTextColor),
       fontSize: 14.0,
       fontWeight: FontWeight.w600,
     );
@@ -250,6 +295,14 @@ class FlowchartPainter extends MermaidPainter {
 
     // Draw shape based on type
     switch (node.shape) {
+      case NodeShape.stateStart:
+      case NodeShape.stateEnd:
+        final ink = Paint()..color = strokePaint.color;
+        canvas.drawCircle(
+            center, node.shape == NodeShape.stateEnd ? 7 : 10, ink);
+        if (node.shape == NodeShape.stateEnd)
+          canvas.drawCircle(center, 11, strokePaint);
+        return;
       case NodeShape.rectangle:
         final rrect = RRect.fromRectAndRadius(
           rect,
@@ -400,7 +453,33 @@ class FlowchartPainter extends MermaidPainter {
       fontSize: nodeStyle.fontSize,
       fontWeight: nodeStyle.fontWeight,
     );
-    drawText(canvas, node.label, center, textStyle);
+    if (node.compartments.isEmpty) {
+      drawText(canvas, node.label, center, textStyle);
+    } else {
+      final lineHeight = nodeStyle.fontSize * 1.4;
+      var y = rect.top + 8;
+      final headerHeight = lineHeight * node.label.split('\n').length;
+      drawText(canvas, node.label, Offset(center.dx, y + headerHeight / 2),
+          textStyle.copyWith(fontWeight: FontWeight.bold));
+      y += headerHeight;
+      for (final rows in node.compartments) {
+        y += 6;
+        canvas.drawLine(
+            Offset(rect.left, y), Offset(rect.right, y), strokePaint);
+        y += 6;
+        for (final row in rows) {
+          final text = TextPainter(
+              text: TextSpan(text: row, style: textStyle),
+              textDirection: TextDirection.ltr)
+            ..layout();
+          text.paint(canvas,
+              Offset(rect.left + 14, y + (lineHeight - text.height) / 2));
+          text.dispose();
+          y += lineHeight;
+        }
+        if (rows.isEmpty) y += lineHeight;
+      }
+    }
   }
 
   void _drawCylinder(
@@ -460,6 +539,43 @@ class FlowchartPainter extends MermaidPainter {
     if (fromNode == null || toNode == null) return;
 
     final paint = createEdgePaint(edge);
+    if (edge.lineType == LineType.thick) paint.strokeWidth *= 2;
+
+    if (edge.from == edge.to) {
+      final start = _isHorizontal
+          ? Offset(fromNode.x + fromNode.width * .3, fromNode.y)
+          : Offset(
+              fromNode.x + fromNode.width, fromNode.y + fromNode.height * .3);
+      final end = _isHorizontal
+          ? Offset(fromNode.x + fromNode.width * .7, fromNode.y)
+          : Offset(
+              fromNode.x + fromNode.width, fromNode.y + fromNode.height * .7);
+      final path = Path()..moveTo(start.dx, start.dy);
+      if (_isHorizontal) {
+        path.cubicTo(start.dx - 25, start.dy - 45, end.dx + 25, end.dy - 45,
+            end.dx, end.dy);
+      } else {
+        path.cubicTo(start.dx + 45, start.dy - 25, end.dx + 45, end.dy + 25,
+            end.dx, end.dy);
+      }
+      if (edge.lineType == LineType.dotted) {
+        _drawDashedPath(canvas, path, paint);
+      } else {
+        canvas.drawPath(path, paint);
+      }
+      final metric = path.computeMetrics().single;
+      final endTangent = metric.getTangentForOffset(metric.length)!;
+      final startTangent = metric.getTangentForOffset(0)!;
+      final angle = math.atan2(endTangent.vector.dy, endTangent.vector.dx);
+      final sourceAngle =
+          math.atan2(-startTangent.vector.dy, -startTangent.vector.dx);
+      drawArrowHead(canvas, end, angle, edge.arrowType, paint);
+      _drawMarkers(canvas, edge, start, end, sourceAngle, angle, paint);
+      _drawEdgeLabel(canvas, edge, start, end,
+          anchor: metric.getTangentForOffset(metric.length / 2)!.position,
+          outward: _isHorizontal ? const Offset(0, -1) : const Offset(1, 0));
+      return;
+    }
 
     // Get node centers
     final fromCenter = Offset(
@@ -478,10 +594,11 @@ class FlowchartPainter extends MermaidPainter {
     final isBackEdge = _isBackEdge(fromNode, toNode);
 
     // Draw edge with appropriate curve
-    if (isBackEdge) {
+    if (isBackEdge || (toNode.rank - fromNode.rank).abs() > 1) {
       _drawBackEdge(canvas, fromNode, toNode, fromPoint, toPoint, edge, paint);
     } else {
-      _drawForwardEdge(canvas, fromPoint, toPoint, edge, paint, fromCenter, toCenter);
+      _drawForwardEdge(
+          canvas, fromPoint, toPoint, edge, paint, fromCenter, toCenter);
     }
   }
 
@@ -504,7 +621,8 @@ class FlowchartPainter extends MermaidPainter {
   }
 
   /// Get connection points for edge
-  (Offset, Offset) _getConnectionPoints(MermaidNode fromNode, MermaidNode toNode) {
+  (Offset, Offset) _getConnectionPoints(
+      MermaidNode fromNode, MermaidNode toNode) {
     final fromCenter = Offset(
       fromNode.x + fromNode.width / 2,
       fromNode.y + fromNode.height / 2,
@@ -600,6 +718,8 @@ class FlowchartPainter extends MermaidPainter {
 
     // Draw label
     _drawEdgeLabel(canvas, edge, from, to);
+    final angle = math.atan2(dy, dx);
+    _drawMarkers(canvas, edge, from, to, angle + math.pi, angle, paint);
   }
 
   /// Draw back edge (loops back) with curved path around nodes
@@ -620,7 +740,8 @@ class FlowchartPainter extends MermaidPainter {
       // Vertical layout (TD/BT)
       // Find the Y range between the two nodes
       final minY = math.min(fromNode.y, toNode.y);
-      final maxY = math.max(fromNode.y + fromNode.height, toNode.y + toNode.height);
+      final maxY =
+          math.max(fromNode.y + fromNode.height, toNode.y + toNode.height);
 
       // Find nodes that are in the vertical range between from and to
       // to determine if we should go left or right
@@ -672,14 +793,20 @@ class FlowchartPainter extends MermaidPainter {
       final midY = (startY + endY) / 2;
 
       path.cubicTo(
-        routeX, startY,
-        routeX, midY,
-        routeX, midY,
+        routeX,
+        startY,
+        routeX,
+        midY,
+        routeX,
+        midY,
       );
       path.cubicTo(
-        routeX, midY,
-        routeX, endY,
-        endX, endY,
+        routeX,
+        midY,
+        routeX,
+        endY,
+        endX,
+        endY,
       );
 
       // Draw the path
@@ -695,10 +822,15 @@ class FlowchartPainter extends MermaidPainter {
         final arrowAngle = goRight ? math.pi : 0.0;
         drawArrowHead(canvas, arrowPoint, arrowAngle, edge.arrowType, paint);
       }
+      _drawMarkers(canvas, edge, Offset(startX, startY), Offset(endX, endY),
+          goRight ? math.pi : 0, goRight ? math.pi : 0, paint);
+      _drawEdgeLabel(canvas, edge, from, to,
+          anchor: Offset(routeX, midY), outward: Offset(goRight ? 1 : -1, 0));
     } else {
       // Horizontal layout (LR/RL)
       final minX = math.min(fromNode.x, toNode.x);
-      final maxX = math.max(fromNode.x + fromNode.width, toNode.x + toNode.width);
+      final maxX =
+          math.max(fromNode.x + fromNode.width, toNode.x + toNode.width);
 
       // Find nodes that are in the X range between from and to
       double topMostY = double.infinity;
@@ -743,14 +875,20 @@ class FlowchartPainter extends MermaidPainter {
       final midX = (startX + endX) / 2;
 
       path.cubicTo(
-        startX, routeY,
-        midX, routeY,
-        midX, routeY,
+        startX,
+        routeY,
+        midX,
+        routeY,
+        midX,
+        routeY,
       );
       path.cubicTo(
-        midX, routeY,
-        endX, routeY,
-        endX, endY,
+        midX,
+        routeY,
+        endX,
+        routeY,
+        endX,
+        endY,
       );
 
       // Draw the path
@@ -766,10 +904,86 @@ class FlowchartPainter extends MermaidPainter {
         final arrowAngle = goTop ? math.pi / 2 : -math.pi / 2;
         drawArrowHead(canvas, arrowPoint, arrowAngle, edge.arrowType, paint);
       }
+      _drawMarkers(
+          canvas,
+          edge,
+          Offset(startX, startY),
+          Offset(endX, endY),
+          goTop ? math.pi / 2 : -math.pi / 2,
+          goTop ? math.pi / 2 : -math.pi / 2,
+          paint);
+      _drawEdgeLabel(canvas, edge, from, to,
+          anchor: Offset(midX, routeY), outward: Offset(0, goTop ? -1 : 1));
+    }
+  }
+
+  void _drawMarkers(Canvas canvas, MermaidEdge edge, Offset from, Offset to,
+      double sourceAngle, double targetAngle, Paint paint) {
+    void draw(EdgeMarker? marker, Offset point, double angle) {
+      if (marker == null) return;
+      canvas.save();
+      canvas.translate(point.dx, point.dy);
+      canvas.rotate(angle);
+      final fill = Paint()..color = Color(style.backgroundColor);
+      if (marker == EdgeMarker.inheritance ||
+          marker == EdgeMarker.aggregation ||
+          marker == EdgeMarker.composition) {
+        final path = Path()
+          ..moveTo(0, 0)
+          ..lineTo(-12, -7);
+        if (marker != EdgeMarker.inheritance) path.lineTo(-24, 0);
+        path
+          ..lineTo(-12, 7)
+          ..close();
+        if (marker == EdgeMarker.composition) fill.color = paint.color;
+        canvas.drawPath(path, fill);
+        canvas.drawPath(path, paint);
+      } else {
+        final many =
+            marker == EdgeMarker.oneOrMore || marker == EdgeMarker.zeroOrMore;
+        final optional =
+            marker == EdgeMarker.zeroOrOne || marker == EdgeMarker.zeroOrMore;
+        if (many) {
+          canvas.drawPath(
+              Path()
+                ..moveTo(-14, 0)
+                ..lineTo(-2, -7)
+                ..moveTo(-14, 0)
+                ..lineTo(-2, 7),
+              paint);
+        } else {
+          canvas.drawLine(const Offset(-6, -7), const Offset(-6, 7), paint);
+        }
+        if (optional) {
+          canvas.drawCircle(const Offset(-21, 0), 4, fill);
+          canvas.drawCircle(const Offset(-21, 0), 4, paint);
+        } else {
+          canvas.drawLine(const Offset(-18, -7), const Offset(-18, 7), paint);
+        }
+      }
+      canvas.restore();
     }
 
-    // Draw label at midpoint of the curve
-    _drawEdgeLabel(canvas, edge, from, to);
+    draw(edge.sourceMarker, from, sourceAngle);
+    draw(edge.targetMarker, to, targetAngle);
+    void label(String? value, Offset point, double angle) {
+      if (value == null || value.isEmpty) return;
+      final along = Offset(math.cos(angle), math.sin(angle));
+      final normal = Offset(-along.dy, along.dx);
+      drawText(
+          canvas,
+          value,
+          point - along * 30 + normal * 14,
+          TextStyle(
+              fontSize: style.defaultEdgeStyle.labelFontSize,
+              color: Color(style.defaultEdgeStyle.labelColor ??
+                  style.defaultNodeStyle.textColor ??
+                  MermaidColors.defaultTextColor)),
+          backgroundColor: Color(style.backgroundColor));
+    }
+
+    label(edge.sourceLabel, from, sourceAngle);
+    label(edge.targetLabel, to, targetAngle);
   }
 
   void _drawDashedPath(Canvas canvas, Path path, Paint paint) {
@@ -781,14 +995,16 @@ class FlowchartPainter extends MermaidPainter {
       var distance = 0.0;
       while (distance < metric.length) {
         final segmentLength = math.min(dashLength, metric.length - distance);
-        final extractedPath = metric.extractPath(distance, distance + segmentLength);
+        final extractedPath =
+            metric.extractPath(distance, distance + segmentLength);
         canvas.drawPath(extractedPath, paint);
         distance += dashLength + gapLength;
       }
     }
   }
 
-  void _drawEdgeLabel(Canvas canvas, MermaidEdge edge, Offset from, Offset to) {
+  void _drawEdgeLabel(Canvas canvas, MermaidEdge edge, Offset from, Offset to,
+      {Offset? anchor, Offset? outward}) {
     if (edge.label == null || edge.label!.isEmpty) return;
 
     // Position label at the midpoint, slightly offset
@@ -798,20 +1014,40 @@ class FlowchartPainter extends MermaidPainter {
     );
 
     // Offset label to avoid overlapping with the line
-    final labelOffset = _isHorizontal
-        ? const Offset(0, -12)
-        : const Offset(12, 0);
+    var labelOffset =
+        _isHorizontal ? const Offset(0, -12) : const Offset(12, 0);
 
     final edgeStyle = edge.style ?? style.defaultEdgeStyle;
     final textStyle = TextStyle(
-      color: Color(edgeStyle.labelColor ?? MermaidColors.defaultTextColor),
+      color: Color(edgeStyle.labelColor ??
+          style.defaultNodeStyle.textColor ??
+          MermaidColors.defaultTextColor),
       fontSize: edgeStyle.labelFontSize,
     );
+    final text = TextPainter(
+        text: TextSpan(text: edge.label, style: textStyle),
+        textDirection: TextDirection.ltr)
+      ..layout();
+    if (outward != null) {
+      labelOffset = Offset(outward.dx * (text.width / 2 + 8),
+          outward.dy * (text.height / 2 + 8));
+    } else if (edge.sourceMarker != null || edge.targetMarker != null) {
+      // Keep relationship text wholly beside the connector and its symbols.
+      final delta = to - from;
+      final normal = delta.distance == 0
+          ? const Offset(1, 0)
+          : Offset(delta.dy, -delta.dx) / delta.distance;
+      final distance = normal.dx.abs() * text.width / 2 +
+          normal.dy.abs() * text.height / 2 +
+          12;
+      labelOffset = normal * distance;
+    }
+    text.dispose();
 
     drawText(
       canvas,
       edge.label!,
-      midPoint + labelOffset,
+      (anchor ?? midPoint) + labelOffset,
       textStyle,
       backgroundColor: Color(
         edgeStyle.labelBackgroundColor ?? style.backgroundColor,
