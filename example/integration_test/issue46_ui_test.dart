@@ -13,6 +13,11 @@ void main() {
     'dark-subgraph': (uiDarkSubgraph, MermaidStyle.dark()),
     'er-labels': (uiEr, const MermaidStyle()),
     'self-state': (uiSelfState, const MermaidStyle()),
+    for (final direction in ['TB', 'BT', 'LR', 'RL'])
+      'self-siblings-$direction': (
+        uiSelfSiblings.replaceFirst('\n', '\ndirection $direction\n'),
+        const MermaidStyle()
+      ),
   };
   for (final sample in samples.entries) {
     testWidgets(sample.key, (tester) async {

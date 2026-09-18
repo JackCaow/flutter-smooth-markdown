@@ -27,3 +27,13 @@ Idle --> Idle: RETRY
 Idle --> Done: FINISH
 Done --> [*]
 ''';
+
+const uiSelfSiblings = '''stateDiagram-v2
+[*] --> Idle
+[*] --> Waiting
+Idle --> Idle: RETRY
+Waiting --> Waiting: WAIT
+Idle --> Done
+Waiting --> Done
+Done --> [*]
+''';

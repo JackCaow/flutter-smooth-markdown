@@ -563,13 +563,16 @@ class FlowchartPainter extends MermaidPainter {
       } else {
         canvas.drawPath(path, paint);
       }
-      final angle = _isHorizontal ? math.pi / 2 : math.pi;
+      final metric = path.computeMetrics().single;
+      final endTangent = metric.getTangentForOffset(metric.length)!;
+      final startTangent = metric.getTangentForOffset(0)!;
+      final angle = math.atan2(endTangent.vector.dy, endTangent.vector.dx);
+      final sourceAngle =
+          math.atan2(-startTangent.vector.dy, -startTangent.vector.dx);
       drawArrowHead(canvas, end, angle, edge.arrowType, paint);
-      _drawMarkers(canvas, edge, start, end, angle, angle, paint);
+      _drawMarkers(canvas, edge, start, end, sourceAngle, angle, paint);
       _drawEdgeLabel(canvas, edge, start, end,
-          anchor: _isHorizontal
-              ? Offset((start.dx + end.dx) / 2, start.dy - 45)
-              : Offset(start.dx + 45, (start.dy + end.dy) / 2),
+          anchor: metric.getTangentForOffset(metric.length / 2)!.position,
           outward: _isHorizontal ? const Offset(0, -1) : const Offset(1, 0));
       return;
     }

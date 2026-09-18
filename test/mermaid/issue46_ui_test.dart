@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
@@ -11,6 +12,14 @@ class RecordingPainter extends FlowchartPainter {
   RecordingPainter({required super.diagram, required super.style});
   final labels = <String, Rect>{};
   final colors = <String, Color?>{};
+  final arrowAngles = <Offset, double>{};
+
+  @override
+  void drawArrowHead(Canvas canvas, Offset position, double angle,
+      ArrowType type, Paint paint) {
+    arrowAngles[position] = angle;
+    super.drawArrowHead(canvas, position, angle, type, paint);
+  }
 
   @override
   void drawText(
@@ -34,8 +43,12 @@ class RecordingPainter extends FlowchartPainter {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   for (final direction in ['TB', 'BT', 'LR', 'RL']) {
-    for (final fixture
-        in {'long': uiLongState, 'self': uiSelfState, 'er': uiEr}.entries) {
+    for (final fixture in {
+      'long': uiLongState,
+      'self': uiSelfState,
+      'siblings': uiSelfSiblings,
+      'er': uiEr
+    }.entries) {
       test('${fixture.key} labels fit and avoid nodes ($direction)', () {
         final code =
             fixture.value.replaceFirst('\n', '\ndirection $direction\n');
@@ -47,6 +60,16 @@ void main() {
         final recorder = ui.PictureRecorder();
         painter.paint(Canvas(recorder), size);
         recorder.endRecording().dispose();
+        for (final edge in graph.edges.where((edge) => edge.from == edge.to)) {
+          final node = graph.getNode(edge.from)!;
+          final horizontal = direction == 'LR' || direction == 'RL';
+          final end = horizontal
+              ? Offset(node.x + node.width * .7, node.y)
+              : Offset(node.x + node.width, node.y + node.height * .7);
+          final expected =
+              horizontal ? math.atan2(45, -25) : math.atan2(-25, -45);
+          expect(painter.arrowAngles[end], closeTo(expected, .01));
+        }
         for (final edge in graph.edges.where((edge) => edge.label != null)) {
           final rect = painter.labels[edge.label]!;
           expect((Offset.zero & size).contains(rect.topLeft), isTrue,
@@ -98,6 +121,7 @@ void main() {
     'dark-subgraph': (uiDarkSubgraph, MermaidStyle.dark()),
     'er-labels': (uiEr, const MermaidStyle()),
     'self-state': (uiSelfState, const MermaidStyle()),
+    'self-siblings': (uiSelfSiblings, const MermaidStyle()),
   };
   for (final sample in samples.entries) {
     testWidgets('${sample.key} reviewed visual regression', (tester) async {

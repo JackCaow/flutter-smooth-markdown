@@ -518,8 +518,19 @@ class DagreLayout extends LayoutEngine {
           : fontSize * 1.4 * edge.label!.split('\n').length;
       rankSep = math.max(rankSep, mainSize + 24);
     }
-    final nodeSep =
+    var nodeSep =
         (isHorizontal ? style.nodeSpacingY : style.nodeSpacingX) * 1.0;
+    // Self-loops occupy the cross-axis lane beside a node. Reserve their
+    // label bounds between siblings as well as around the outer canvas.
+    for (final edge
+        in context.diagram.edges.where((edge) => edge.from == edge.to)) {
+      final fontSize = (edge.style ?? style.defaultEdgeStyle).labelFontSize;
+      final label = edge.label ?? '';
+      final crossSize = isHorizontal
+          ? fontSize * 1.4 * label.split('\n').length
+          : _measureTextWidth(label, fontSize);
+      nodeSep = math.max(nodeSep, crossSize + 60);
+    }
 
     // Calculate max width for each layer (for centering)
     final layerMaxSizes = <double>[];
