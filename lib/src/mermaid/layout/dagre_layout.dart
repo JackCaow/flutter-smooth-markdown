@@ -1,8 +1,9 @@
 import 'dart:math' as math;
-import 'dart:ui';
+import 'package:flutter/painting.dart';
 
 import '../config/responsive_config.dart';
 import '../models/diagram.dart';
+import '../models/edge.dart';
 import '../models/node.dart';
 import '../models/style.dart';
 import 'layout_engine.dart';
@@ -46,7 +47,22 @@ class DagreLayout extends LayoutEngine {
     _orderNodes(context);
 
     // Step 5: Assign coordinates
-    return _assignCoordinates(context);
+    final size = _assignCoordinates(context);
+    // Cycles are routed 40px outside the nodes; leave room for those curves
+    // and self transitions rather than clipping them at the canvas edge.
+    if (context.backEdges.isNotEmpty ||
+        diagram.edges.any((edge) =>
+            ((diagram.getNode(edge.to)?.rank ?? 0) -
+                    (diagram.getNode(edge.from)?.rank ?? 0))
+                .abs() >
+            1)) {
+      for (final node in diagram.nodes) {
+        node.x += 40;
+        node.y += 40;
+      }
+      return Size(size.width + 80, size.height + 80);
+    }
+    return size;
   }
 
   /// Computes layout for diagrams with subgraphs
@@ -55,100 +71,79 @@ class DagreLayout extends LayoutEngine {
     MermaidStyle style,
     Size availableSize,
   ) {
-    final isHorizontal = diagram.direction == DiagramDirection.leftToRight ||
-        diagram.direction == DiagramDirection.rightToLeft;
-
-    // Build a mapping of node IDs to their subgraph
-    final nodeToSubgraph = <String, Subgraph>{};
-    for (final sg in diagram.subgraphs) {
-      for (final nodeId in sg.nodeIds) {
-        nodeToSubgraph[nodeId] = sg;
+    // Lay out each outermost cluster, then rank clusters AND standalone nodes
+    // together. Keeping proxy sizes avoids crushing a cluster into one node.
+    final groups = diagram.subgraphs;
+    bool contains(Subgraph parent, Subgraph child) =>
+        parent.nodeIds.toSet().containsAll(child.nodeIds) &&
+        (parent.nodeIds.length > child.nodeIds.length ||
+            groups.indexOf(parent) > groups.indexOf(child));
+    final roots = groups
+        .where((g) => !groups.any((other) => other != g && contains(other, g)))
+        .toList();
+    final owners = <String, String>{};
+    final proxies = <MermaidNode>[];
+    final members = <String, List<MermaidNode>>{};
+    for (final group in roots) {
+      final nodes =
+          diagram.nodes.where((n) => group.nodeIds.contains(n.id)).toList();
+      if (nodes.isEmpty) continue;
+      final children =
+          groups.where((g) => g != group && contains(group, g)).toList();
+      final ids = {...group.nodeIds, ...children.map((g) => g.id)};
+      final inner = diagram.copyWith(
+          nodes: nodes,
+          subgraphs: children,
+          edges: diagram.edges
+              .where((e) => ids.contains(e.from) && ids.contains(e.to))
+              .toList());
+      // 20px border padding and 30px title match the subgraph painter.
+      final innerSize =
+          computeLayout(inner, style.copyWith(padding: 20), availableSize);
+      final proxy = MermaidNode(id: '\$cluster:${group.id}', label: group.label)
+        ..width =
+            math.max(innerSize.width, _measureTextWidth(group.label, 14) + 40)
+        ..height = innerSize.height + 30;
+      final titleOffset = (proxy.width - innerSize.width) / 2;
+      for (final node in nodes) {
+        node.x += titleOffset;
+        node.y += 30;
+        owners[node.id] = proxy.id;
       }
+      owners[group.id] = proxy.id;
+      for (final child in children) {
+        owners[child.id] = proxy.id;
+      }
+      members[proxy.id] = nodes;
+      proxies.add(proxy);
     }
-
-    // Measure all nodes first
-    for (final node in diagram.nodes) {
+    for (final node in diagram.nodes.where((n) => !owners.containsKey(n.id))) {
       final size = measureNodeWithShape(node, style);
       node.width = size.width;
       node.height = size.height;
+      proxies.add(node);
     }
-
-    // Group nodes by subgraph
-    final subgraphNodes = <String, List<MermaidNode>>{};
-    final standaloneNodes = <MermaidNode>[];
-
-    for (final node in diagram.nodes) {
-      final sg = nodeToSubgraph[node.id];
-      if (sg != null) {
-        subgraphNodes[sg.id] ??= [];
-        subgraphNodes[sg.id]!.add(node);
-      } else {
-        standaloneNodes.add(node);
+    final outerEdges = <MermaidEdge>[];
+    for (final edge in diagram.edges) {
+      final from = owners[edge.from] ?? edge.from;
+      final to = owners[edge.to] ?? edge.to;
+      if (from != to) outerEdges.add(edge.copyWith(from: from, to: to));
+    }
+    final context = _LayoutContext(
+        diagram
+            .copyWith(nodes: proxies, edges: outerEdges, subgraphs: const []),
+        style);
+    _buildGraph(context);
+    _assignRanks(context);
+    _orderNodes(context);
+    final size = _assignCoordinates(context);
+    for (final proxy in proxies) {
+      for (final node in members[proxy.id] ?? <MermaidNode>[]) {
+        node.x += proxy.x;
+        node.y += proxy.y;
       }
     }
-
-    // Calculate layout for each subgraph
-    final subgraphBounds = <String, Rect>{};
-    final padding = style.padding;
-    final subgraphPadding = 40.0; // Internal padding for subgraph
-    final subgraphTitleHeight = 30.0;
-    final subgraphSpacing = style.nodeSpacingX;
-
-    double currentX = padding;
-    double maxHeight = 0;
-
-    // Layout subgraphs horizontally (for TD direction) or vertically (for LR)
-    for (final sg in diagram.subgraphs) {
-      final nodes = subgraphNodes[sg.id] ?? [];
-      if (nodes.isEmpty) continue;
-
-      // Layout nodes within subgraph
-      double sgWidth = 0;
-      double sgHeight = subgraphTitleHeight;
-      double nodeY = subgraphTitleHeight + subgraphPadding / 2;
-      double nodeX = subgraphPadding / 2;
-
-      // Simple horizontal layout within each subgraph
-      for (var i = 0; i < nodes.length; i++) {
-        final node = nodes[i];
-
-        if (isHorizontal) {
-          // Vertical arrangement for LR direction
-          node.x = currentX + subgraphPadding / 2;
-          node.y = nodeY;
-          nodeY += node.height + style.nodeSpacingY * 0.5;
-          sgWidth = math.max(sgWidth, node.width + subgraphPadding);
-          sgHeight = nodeY + subgraphPadding / 2;
-        } else {
-          // Horizontal arrangement for TD direction
-          node.x = currentX + nodeX;
-          node.y = padding + nodeY;
-          nodeX += node.width + style.nodeSpacingX * 0.5;
-          sgWidth = nodeX + subgraphPadding / 2;
-          sgHeight = math.max(sgHeight, subgraphTitleHeight + node.height + subgraphPadding);
-        }
-      }
-
-      // Store subgraph bounds
-      subgraphBounds[sg.id] = Rect.fromLTWH(
-        currentX,
-        padding,
-        sgWidth,
-        sgHeight,
-      );
-
-      currentX += sgWidth + subgraphSpacing;
-      maxHeight = math.max(maxHeight, sgHeight);
-    }
-
-    // Handle edges between subgraphs
-    // For "Frontend --> Backend" style edges, we need to draw from subgraph to subgraph
-    // This is handled in the painter
-
-    final totalWidth = currentX - subgraphSpacing + padding;
-    final totalHeight = maxHeight + padding * 2;
-
-    return Size(totalWidth, totalHeight);
+    return size;
   }
 
   void _measureNodes(_LayoutContext context) {
@@ -165,8 +160,27 @@ class DagreLayout extends LayoutEngine {
     final fontSize = nodeStyle.fontSize;
 
     // Calculate text dimensions
-    final textWidth = _measureTextWidth(node.label, fontSize);
-    final textHeight = fontSize * 1.4;
+    if (node.shape == NodeShape.stateStart ||
+        node.shape == NodeShape.stateEnd) {
+      return const Size(24, 24);
+    }
+    final lines = [
+      ...node.label.split('\n'),
+      ...node.compartments.expand((p) => p)
+    ];
+    final textWidth = lines
+        .map((line) => _measureTextWidth(line, fontSize,
+            fontWeight: node.compartments.isNotEmpty &&
+                    node.label.split('\n').contains(line)
+                ? FontWeight.bold
+                : nodeStyle.fontWeight))
+        .reduce(math.max);
+    final textHeight = fontSize *
+            1.4 *
+            (node.label.split('\n').length +
+                node.compartments.fold<int>(
+                    0, (count, rows) => count + math.max(1, rows.length))) +
+        node.compartments.length * 12;
 
     // Shape-specific sizing
     switch (node.shape) {
@@ -211,15 +225,16 @@ class DagreLayout extends LayoutEngine {
     }
   }
 
-  double _measureTextWidth(String text, double fontSize) {
-    double width = 0;
-    for (final char in text.runes) {
-      if (char > 0x4E00 && char < 0x9FFF) {
-        width += fontSize * 1.0; // CJK character
-      } else {
-        width += fontSize * 0.6; // Latin character
-      }
-    }
+  double _measureTextWidth(String text, double fontSize,
+      {FontWeight? fontWeight}) {
+    final painter = TextPainter(
+        text: TextSpan(
+            text: text,
+            style: TextStyle(fontSize: fontSize, fontWeight: fontWeight)),
+        textDirection: TextDirection.ltr)
+      ..layout();
+    final width = painter.width;
+    painter.dispose();
     return width;
   }
 
@@ -232,6 +247,8 @@ class DagreLayout extends LayoutEngine {
 
     // Build edges, handling back-edges (cycles)
     for (final edge in context.diagram.edges) {
+      if (!context.nodeMap.containsKey(edge.from) ||
+          !context.nodeMap.containsKey(edge.to)) continue;
       context.successors[edge.from]?.add(edge.to);
       context.predecessors[edge.to]?.add(edge.from);
     }
@@ -292,31 +309,19 @@ class DagreLayout extends LayoutEngine {
       return (backEdges[from] ?? {}).contains(to);
     }
 
-    // Second pass: Calculate ranks based on direct predecessor only
-    // Each node's rank = predecessor's rank + 1, ignoring back-edges
-    // For nodes with multiple non-back-edge predecessors, use the first one encountered
-
+    // Topological longest-path ranks: a join must follow ALL predecessors,
+    // including a longer branch that is visited after a shorter branch.
     final queue = <String>[];
-
-    // Initialize with roots
-    for (final root in context.roots) {
-      ranks[root] = 0;
-      queue.add(root);
-    }
-
-    // Also add any node with zero non-back-edge predecessors
+    final remaining = <String, int>{};
     for (final node in context.diagram.nodes) {
-      if (!ranks.containsKey(node.id)) {
-        final preds = context.predecessors[node.id] ?? [];
-        final nonBackPreds = preds.where((predId) => !isBackEdge(predId, node.id)).toList();
-        if (nonBackPreds.isEmpty) {
-          ranks[node.id] = 0;
-          queue.add(node.id);
-        }
+      remaining[node.id] = (context.predecessors[node.id] ?? [])
+          .where((pred) => !isBackEdge(pred, node.id))
+          .length;
+      ranks[node.id] = 0;
+      if (remaining[node.id] == 0) {
+        queue.add(node.id);
       }
     }
-
-    // BFS to assign ranks - siblings from same parent get same rank
     while (queue.isNotEmpty) {
       final nodeId = queue.removeAt(0);
       final currentRank = ranks[nodeId]!;
@@ -329,17 +334,16 @@ class DagreLayout extends LayoutEngine {
       for (final succId in successors) {
         final newRank = currentRank + 1;
 
-        // Only set rank if not already set
-        // This ensures nodes keep the rank from their first parent
-        if (!ranks.containsKey(succId)) {
-          ranks[succId] = newRank;
+        ranks[succId] = math.max(ranks[succId] ?? 0, newRank);
+        remaining[succId] = remaining[succId]! - 1;
+        if (remaining[succId] == 0) {
           queue.add(succId);
         }
       }
     }
 
     // Handle any unranked nodes
-    var maxRank = ranks.values.isEmpty ? 0 : ranks.values.reduce(math.max);
+    final maxRank = ranks.values.isEmpty ? 0 : ranks.values.reduce(math.max);
     for (final node in context.diagram.nodes) {
       if (!ranks.containsKey(node.id)) {
         ranks[node.id] = maxRank + 1;
@@ -464,7 +468,8 @@ class DagreLayout extends LayoutEngine {
         barycenters[node] = node.order.toDouble();
       } else {
         // Average position of connected nodes
-        barycenters[node] = positions.reduce((a, b) => a + b) / positions.length;
+        barycenters[node] =
+            positions.reduce((a, b) => a + b) / positions.length;
       }
     }
 
@@ -484,8 +489,10 @@ class DagreLayout extends LayoutEngine {
 
     final style = context.style;
     // Increase spacing for better readability
-    final rankSep = (isHorizontal ? style.nodeSpacingX : style.nodeSpacingY) * 1.2;
-    final nodeSep = (isHorizontal ? style.nodeSpacingY : style.nodeSpacingX) * 1.0;
+    final rankSep =
+        (isHorizontal ? style.nodeSpacingX : style.nodeSpacingY) * 1.2;
+    final nodeSep =
+        (isHorizontal ? style.nodeSpacingY : style.nodeSpacingX) * 1.0;
 
     // Calculate max width for each layer (for centering)
     final layerMaxSizes = <double>[];
@@ -549,8 +556,11 @@ class DagreLayout extends LayoutEngine {
       }
 
       // Move to next layer
-      final maxMain = layer.isEmpty ? 0.0 : layer.map((n) =>
-          isHorizontal ? n.width : n.height).reduce(math.max);
+      final maxMain = layer.isEmpty
+          ? 0.0
+          : layer
+              .map((n) => isHorizontal ? n.width : n.height)
+              .reduce(math.max);
       mainOffset += maxMain + rankSep;
     }
 

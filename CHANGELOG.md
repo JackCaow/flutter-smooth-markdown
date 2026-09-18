@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Basic native Mermaid state, class and ER diagram rendering, including state
+  terminals, class member compartments, UML relationships and ER cardinalities.
+  See [syntax coverage](docs/mermaid-structured-diagrams.md) for limitations.
+
+### Fixed
+- Mermaid subgraphs no longer leave external nodes at the origin; clusters and
+  standalone nodes are ranked together in all four directions.
+- Graph joins follow their longest incoming branch, and self transitions are
+  rendered as loops instead of zero-length edges.
+
 ## [0.9.0] - 2026-07-17
 
 ### Added

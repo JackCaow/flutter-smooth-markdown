@@ -28,6 +28,17 @@ enum LineType {
   thick,
 }
 
+/// UML relationship and ER cardinality endpoint symbols.
+enum EdgeMarker {
+  inheritance,
+  aggregation,
+  composition,
+  exactlyOne,
+  zeroOrOne,
+  oneOrMore,
+  zeroOrMore,
+}
+
 /// Represents an edge/connection between nodes
 class MermaidEdge {
   /// Creates a new edge
@@ -41,6 +52,10 @@ class MermaidEdge {
     this.animated = false,
     this.bidirectional = false,
     this.isSubgraphEdge = false,
+    this.sourceMarker,
+    this.targetMarker,
+    this.sourceLabel,
+    this.targetLabel,
   });
 
   /// Source node ID
@@ -70,6 +85,14 @@ class MermaidEdge {
   /// Whether this edge connects subgraphs (not individual nodes)
   final bool isSubgraphEdge;
 
+  /// Optional typed symbols at each end of the relationship.
+  final EdgeMarker? sourceMarker;
+  final EdgeMarker? targetMarker;
+
+  /// Multiplicity labels placed next to their respective endpoints.
+  final String? sourceLabel;
+  final String? targetLabel;
+
   /// Creates a copy with modified properties
   MermaidEdge copyWith({
     String? from,
@@ -81,6 +104,10 @@ class MermaidEdge {
     bool? animated,
     bool? bidirectional,
     bool? isSubgraphEdge,
+    EdgeMarker? sourceMarker,
+    EdgeMarker? targetMarker,
+    String? sourceLabel,
+    String? targetLabel,
   }) {
     return MermaidEdge(
       from: from ?? this.from,
@@ -92,6 +119,10 @@ class MermaidEdge {
       animated: animated ?? this.animated,
       bidirectional: bidirectional ?? this.bidirectional,
       isSubgraphEdge: isSubgraphEdge ?? this.isSubgraphEdge,
+      sourceMarker: sourceMarker ?? this.sourceMarker,
+      targetMarker: targetMarker ?? this.targetMarker,
+      sourceLabel: sourceLabel ?? this.sourceLabel,
+      targetLabel: targetLabel ?? this.targetLabel,
     );
   }
 

@@ -12,6 +12,9 @@
 /// - Timeline
 /// - Class diagram (basic)
 /// - State diagram (basic)
+/// - Entity relationship diagram (basic)
+///
+/// See docs/mermaid-structured-diagrams.md for syntax coverage and limitations.
 ///
 /// Example usage:
 /// ```dart

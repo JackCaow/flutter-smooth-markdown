@@ -11,6 +11,7 @@ import 'kanban_parser.dart';
 import 'pie_chart_parser.dart';
 import 'radar_parser.dart';
 import 'sequence_parser.dart';
+import 'structured_graph_parser.dart';
 import 'timeline_parser.dart';
 import 'xy_chart_parser.dart';
 
@@ -164,8 +165,9 @@ class MermaidParser {
         return null;
       case DiagramType.classDiagram:
       case DiagramType.stateDiagram:
-        // TODO: Implement class and state diagram parsers
-        return null;
+      case DiagramType.erDiagram:
+        final diagram = StructuredGraphParser(type).parse(cleanedLines);
+        return diagram == null ? null : MermaidParseResult(diagram: diagram);
       case DiagramType.unknown:
         return null;
     }
@@ -225,6 +227,7 @@ class MermaidParser {
       return DiagramType.stateDiagram;
     }
 
+    if (firstLine.startsWith('erdiagram')) return DiagramType.erDiagram;
     return DiagramType.unknown;
   }
 
