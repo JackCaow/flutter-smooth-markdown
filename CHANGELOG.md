@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-18
+
 ### Added
 - Basic native Mermaid state, class and ER diagram rendering, including state
   terminals, class member compartments, UML relationships and ER cardinalities.
@@ -553,7 +555,8 @@ None - All optimizations are opt-in or enabled by default without breaking exist
 - 87+ unit tests with comprehensive coverage
 - Flutter lints enabled for code quality
 
-[Unreleased]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.9.0...v0.10.0
 [0.8.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.7.4...v0.8.0
 [0.7.4]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.7.2...v0.7.3
