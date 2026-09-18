@@ -65,6 +65,12 @@ class and ER diagrams. Tests cover parsing/relationship semantics, non-overlap,
 all four layout directions, nested clusters, and inline/interactive/Markdown
 widget paths. Device tests exercise the actual Flutter renderer and panning.
 
+UI regressions additionally assert label bounds, node/marker avoidance in all
+four directions, and dark-label contrast. Five reviewed visual baselines cover
+long transitions, self loops, ER labels, and dark states/nested subgraphs. Run
+`example/integration_test/issue46_ui_test.dart` with the same driver and screenshot
+flag above to capture those five scenarios on a device.
+
 Syntax references: [state diagrams](https://mermaid.js.org/syntax/stateDiagram.html),
 [class diagrams](https://mermaid.js.org/syntax/classDiagram.html),
 [ER diagrams](https://mermaid.js.org/syntax/entityRelationshipDiagram.html).

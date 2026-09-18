@@ -48,19 +48,37 @@ class DagreLayout extends LayoutEngine {
 
     // Step 5: Assign coordinates
     final size = _assignCoordinates(context);
+    return _reserveEdgeSpace(diagram, style, size);
+  }
+
+  Size _reserveEdgeSpace(
+      MermaidDiagramData diagram, MermaidStyle style, Size size) {
     // Cycles are routed 40px outside the nodes; leave room for those curves
     // and self transitions rather than clipping them at the canvas edge.
-    if (context.backEdges.isNotEmpty ||
+    if (diagram.edges.any((edge) =>
+            edge.from == edge.to ||
+            ((edge.sourceMarker != null || edge.targetMarker != null) &&
+                edge.label != null &&
+                edge.label!.isNotEmpty)) ||
         diagram.edges.any((edge) =>
-            ((diagram.getNode(edge.to)?.rank ?? 0) -
-                    (diagram.getNode(edge.from)?.rank ?? 0))
-                .abs() >
+            (diagram.getNode(edge.to)?.rank ?? 0) -
+                (diagram.getNode(edge.from)?.rank ?? 0) !=
             1)) {
-      for (final node in diagram.nodes) {
-        node.x += 40;
-        node.y += 40;
+      var marginX = 40.0;
+      var marginY = 40.0;
+      for (final edge in diagram.edges) {
+        if (edge.label == null || edge.label!.isEmpty) continue;
+        final fontSize = (edge.style ?? style.defaultEdgeStyle).labelFontSize;
+        marginX =
+            math.max(marginX, _measureTextWidth(edge.label!, fontSize) + 60);
+        marginY = math.max(
+            marginY, fontSize * 1.4 * edge.label!.split('\n').length + 60);
       }
-      return Size(size.width + 80, size.height + 80);
+      for (final node in diagram.nodes) {
+        node.x += marginX;
+        node.y += marginY;
+      }
+      return Size(size.width + marginX * 2, size.height + marginY * 2);
     }
     return size;
   }
@@ -143,7 +161,7 @@ class DagreLayout extends LayoutEngine {
         node.y += proxy.y;
       }
     }
-    return size;
+    return _reserveEdgeSpace(diagram, style, size);
   }
 
   void _measureNodes(_LayoutContext context) {
@@ -489,8 +507,17 @@ class DagreLayout extends LayoutEngine {
 
     final style = context.style;
     // Increase spacing for better readability
-    final rankSep =
+    var rankSep =
         (isHorizontal ? style.nodeSpacingX : style.nodeSpacingY) * 1.2;
+    for (final edge in context.diagram.edges) {
+      if (edge.from == edge.to || edge.label == null || edge.label!.isEmpty)
+        continue;
+      final fontSize = (edge.style ?? style.defaultEdgeStyle).labelFontSize;
+      final mainSize = isHorizontal
+          ? _measureTextWidth(edge.label!, fontSize)
+          : fontSize * 1.4 * edge.label!.split('\n').length;
+      rankSep = math.max(rankSep, mainSize + 24);
+    }
     final nodeSep =
         (isHorizontal ? style.nodeSpacingY : style.nodeSpacingX) * 1.0;
 

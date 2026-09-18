@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   See [syntax coverage](docs/mermaid-structured-diagrams.md) for limitations.
 
 ### Fixed
+- Mermaid routed-edge labels now follow their curves; self-loop and ER labels
+  reserve space instead of overlapping nodes, cardinality markers or the canvas
+  boundary. Dark-theme edge labels and subgraph titles remain readable.
 - Mermaid subgraphs no longer leave external nodes at the origin; clusters and
   standalone nodes are ranked together in all four directions.
 - Graph joins follow their longest incoming branch, and self transitions are
