@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
 import 'package:http/http.dart' as http;
+
+/// Supplied only to local development builds via --dart-define-from-file.
+const String deepSeekDevApiKey = String.fromEnvironment('DEEPSEEK_API_KEY');
 
 /// Builds the optional DeepSeek request used by this example app.
 http.Request buildDeepSeekChatRequest({
@@ -74,7 +76,7 @@ class _AIChatDemoState extends State<AIChatDemo> {
   @override
   void initState() {
     super.initState();
-    _apiKey = dotenv.isInitialized ? (dotenv.env['DEEPSEEK_API_KEY'] ?? '') : '';
+    _apiKey = deepSeekDevApiKey;
     _initPlugins();
   }
 

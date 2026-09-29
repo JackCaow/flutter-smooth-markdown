@@ -23,6 +23,17 @@ cd example
 flutter run -d chrome
 ```
 
+### 使用本地 DeepSeek Key 开发 AI Chat
+
+先确保 Key 已保存在 macOS Keychain 的 `smooth-markdown-deepseek-dev` 条目中，然后启动调试版（可把 `macos` 换成其他设备）：
+
+```bash
+cd example
+./run_with_deepseek.sh -d macos
+```
+
+脚本从 Keychain 读取 Key，生成运行期间使用的临时 JSON 文件，并通过 Flutter 的 `--dart-define-from-file` 注入；临时文件被 Git 忽略，并在应用退出后删除。普通 `flutter run` 未注入 Key 时，AI Chat 自动使用模拟响应。调试产物会包含该 Key，请勿分发。也可以在 AI Chat 的设置中临时输入 Key，该输入只保留在当前运行的应用内存中。
+
 ### Markdown Editor Preview
 
 ```bash

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
 
@@ -15,17 +14,7 @@ import 'mermaid_demo.dart';
 import 'plugin_demo.dart';
 import 'streaming_demo.dart';
 
-Future<void> main() async {
-  // 加载 .env 文件（不存在时静默忽略，如 CI 环境）
-  try {
-    await dotenv.load(fileName: '.env');
-  } catch (_) {
-    // .env may not exist in CI; non-critical for demo apps.
-  }
-
-  // 加载 .env 文件
-  // TODO: uncomment when .env is available in CI
-  // await dotenv.load(fileName: '.env');
+void main() {
   runApp(const MyApp());
 }
 
