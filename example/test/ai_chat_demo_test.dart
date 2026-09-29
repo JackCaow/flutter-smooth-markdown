@@ -60,8 +60,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('DeepSeek API Key'), findsOneWidget);
     expect(find.text('DeepSeek Flash'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'DeepSeek API Key'), 'test-key');
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
+    expect(find.text('deepseek-flash (思考)'), findsOneWidget);
 
     await tester.tap(find.byTooltip('快捷提示词'));
     await tester.pumpAndSettle();

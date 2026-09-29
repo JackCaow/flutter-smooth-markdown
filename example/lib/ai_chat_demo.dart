@@ -766,7 +766,7 @@ UserCard(
                   obscureText: true,
                   controller: TextEditingController(text: _apiKey),
                   onChanged: (value) {
-                    _apiKey = value;
+                    setState(() => _apiKey = value);
                   },
                 ),
                 const SizedBox(height: 16),
