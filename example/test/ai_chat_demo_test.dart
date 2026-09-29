@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_smooth_markdown_example/ai_chat_demo.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -51,7 +50,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AI Chat'), findsOneWidget);
-    expect(find.text('模拟模式'), findsOneWidget);
+    expect(
+      find.text(deepSeekDevApiKey.isEmpty ? '模拟模式' : 'deepseek-flash (思考)'),
+      findsOneWidget,
+    );
     expect(find.text('发送消息，或点击右上角快捷提示词'), findsOneWidget);
     expect(find.byTooltip('快捷提示词'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -60,7 +62,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('DeepSeek API Key'), findsOneWidget);
     expect(find.text('DeepSeek Flash'), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextField, 'DeepSeek API Key'), 'test-key');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'DeepSeek API Key'),
+      'test-key',
+    );
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
     expect(find.text('deepseek-flash (思考)'), findsOneWidget);
@@ -68,14 +73,5 @@ void main() {
     await tester.tap(find.byTooltip('快捷提示词'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Thinking'), findsOneWidget);
-  });
-
-  testWidgets('configured DeepSeek key selects the real API by default', (
-    tester,
-  ) async {
-    dotenv.testLoad(fileInput: 'DEEPSEEK_API_KEY=test-key');
-    await tester.pumpWidget(const MaterialApp(home: AIChatDemo()));
-
-    expect(find.text('deepseek-flash (思考)'), findsOneWidget);
   });
 }

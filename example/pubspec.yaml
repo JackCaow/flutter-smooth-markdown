@@ -14,7 +14,6 @@ dependencies:
   flutter_smooth_markdown:
     path: ../
   http: ^1.2.0
-  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   integration_test:
