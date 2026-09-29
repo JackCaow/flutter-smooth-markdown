@@ -1357,7 +1357,7 @@ gantt
                   ),
                 ),
                 subtitle: Text(
-                  'Qwen API + Thinking/Artifact/Tool',
+                  'DeepSeek API + Thinking/Artifact/Tool',
                   style: TextStyle(
                     fontSize: 11,
                     color: isDark ? Colors.white38 : Colors.grey,
@@ -1494,81 +1494,6 @@ gantt
         ),
         body: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF161B22)
-                    : Theme.of(context).colorScheme.primaryContainer,
-                border: Border(
-                  bottom: BorderSide(
-                    color:
-                        isDark ? const Color(0xFF30363D) : Colors.grey.shade300,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _getIconForExample(_selectedIndex),
-                    color: isDark
-                        ? Colors.white
-                        : Theme.of(context).colorScheme.onPrimaryContainer,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      example.title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: isDark
-                                ? Colors.white
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
-                          ),
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF21262D)
-                          : Colors.white.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _selectedTheme.brightness == Brightness.dark
-                              ? Icons.dark_mode
-                              : Icons.light_mode,
-                          size: 16,
-                          color: isDark
-                              ? Colors.white70
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onPrimaryContainer,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _selectedTheme.getLabel(context),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? Colors.white70
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
             Expanded(
               child: Container(
                 color: isDark ? const Color(0xFF0D1117) : Colors.white,

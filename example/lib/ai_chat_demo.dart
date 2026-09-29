@@ -6,10 +6,45 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
 import 'package:http/http.dart' as http;
 
-/// AI Chat Demo with Qwen model integration
+/// Builds the optional DeepSeek request used by this example app.
+http.Request buildDeepSeekChatRequest({
+  required String prompt,
+  required String apiKey,
+  required String model,
+  required bool enableThinking,
+}) {
+  final request = http.Request(
+    'POST',
+    Uri.parse('https://api.deepseek.com/chat/completions'),
+  );
+  request.headers.addAll({
+    'Authorization': 'Bearer $apiKey',
+    'Content-Type': 'application/json',
+  });
+  request.body = jsonEncode({
+    'model': model,
+    'messages': [
+      {
+        'role': 'system',
+        'content': '''你是一个 AI 助手。在回答时，请适当使用以下格式：
+
+1. 使用 <artifact identifier="id" type="code" language="lang" title="title">...</artifact> 包裹代码制品
+2. 使用标准 Markdown 格式
+
+请确保回答内容丰富、格式清晰。''',
+      },
+      {'role': 'user', 'content': prompt},
+    ],
+    'stream': true,
+    'thinking': {'type': enableThinking ? 'enabled' : 'disabled'},
+  });
+  return request;
+}
+
+/// AI Chat Demo with optional DeepSeek API integration
 ///
 /// Features:
-/// - Real API calls to Qwen model
+/// - Optional real API calls to DeepSeek models
 /// - Quick prompts to test all AI plugins (thinking, artifact, tool_call)
 /// - Streaming response support
 /// - Custom parser plugins for AI chat scenarios
@@ -28,10 +63,10 @@ class _AIChatDemoState extends State<AIChatDemo> {
 
   bool _isStreaming = false;
   bool _isDarkMode = false;
-  bool _useRealAPI = true;
+  bool _useRealAPI = false;
   bool _enableThinking = true; // 开启思考模式
   late String _apiKey;
-  String _selectedModel = 'qwen3-235b-a22b'; // Qwen3 Max 模型
+  String _selectedModel = 'deepseek-flash';
 
   // Parser with AI chat plugins
   late final ParserPluginRegistry _pluginRegistry;
@@ -39,9 +74,8 @@ class _AIChatDemoState extends State<AIChatDemo> {
   @override
   void initState() {
     super.initState();
-    _apiKey = dotenv.env['QWEN_API_KEY'] ?? '';
+    _apiKey = dotenv.isInitialized ? (dotenv.env['DEEPSEEK_API_KEY'] ?? '') : '';
     _initPlugins();
-    _loadWelcomeMessage();
   }
 
   void _initPlugins() {
@@ -53,11 +87,11 @@ class _AIChatDemoState extends State<AIChatDemo> {
 
   void _loadWelcomeMessage() {
     _messages.add(ChatMessage(
-      id: 'welcome',
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
       content: '''
-# 🤖 AI Chat Demo
+# 🤖 AI Chat
 
-欢迎使用 AI 聊天演示！本演示集成了 **Qwen 模型** 并支持以下 AI 特性解析：
+本页面可连接 **DeepSeek**，也可用模拟响应测试以下 AI 特性解析：
 
 ## 支持的 AI 格式
 
@@ -65,13 +99,11 @@ class _AIChatDemoState extends State<AIChatDemo> {
 2. **Artifact Block** - 代码/文档制品
 3. **Tool Call Block** - 工具调用
 
-## 快速测试
-
-点击下方的 **快捷提示词** 按钮来测试各种功能！
+点击右上角的 **快捷提示词** 菜单来测试各种功能。
 
 ---
 
-💡 **提示**: 点击右上角设置图标配置 API Key 来使用真实 Qwen API
+💡 **提示**: 默认使用模拟响应。点击右上角设置图标配置 DeepSeek API Key 并开启真实 API。
 ''',
       isUser: false,
       timestamp: DateTime.now(),
@@ -520,7 +552,7 @@ UserCard(
     );
 
     if (_useRealAPI && _apiKey.isNotEmpty) {
-      _callQwenAPI(text);
+      _callDeepSeekAPI(text);
     } else {
       _simulateStreamResponse(matchingPrompt.mockResponse);
     }
@@ -541,7 +573,7 @@ UserCard(
 这是一个模拟回复。要获得真实的 AI 回复，请：
 
 1. 点击右上角设置图标 ⚙️
-2. 输入您的 Qwen API Key
+2. 输入您的 DeepSeek API Key
 3. 开启 "使用真实 API" 开关
 
 ---
@@ -550,7 +582,7 @@ UserCard(
 ''';
   }
 
-  Future<void> _callQwenAPI(String prompt) async {
+  Future<void> _callDeepSeekAPI(String prompt) async {
     final streamController = StreamController<String>();
 
     setState(() {
@@ -568,89 +600,54 @@ UserCard(
     _scrollToBottom();
 
     try {
-      // 使用流式 API 端点
-      final request = http.Request(
-        'POST',
-        Uri.parse('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'),
+      final request = buildDeepSeekChatRequest(
+        prompt: prompt,
+        apiKey: _apiKey,
+        model: _selectedModel,
+        enableThinking: _enableThinking,
       );
-
-      request.headers.addAll({
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-      });
-
-      final requestBody = <String, dynamic>{
-        'model': _selectedModel,
-        'messages': [
-          {
-            'role': 'system',
-            'content': '''你是一个 AI 助手。在回答时，请适当使用以下格式：
-
-1. 使用 <artifact identifier="id" type="code" language="lang" title="title">...</artifact> 包裹代码制品
-2. 使用标准 Markdown 格式
-
-请确保回答内容丰富、格式清晰。''',
-          },
-          {'role': 'user', 'content': prompt},
-        ],
-        'stream': true,
-      };
-
-      // Qwen3 模型启用思考模式
-      if (_enableThinking && _selectedModel.startsWith('qwen3')) {
-        requestBody['enable_thinking'] = true;
-        requestBody['thinking_budget'] = 10000; // 思考 token 预算
-      }
-
-      request.body = jsonEncode(requestBody);
 
       final response = await http.Client().send(request);
 
       if (response.statusCode == 200) {
-        final StringBuffer fullContent = StringBuffer();
-        final StringBuffer thinkingContent = StringBuffer();
         bool isInThinking = false;
 
-        await for (final chunk in response.stream.transform(utf8.decoder)) {
-          // 处理 SSE 格式数据
-          final lines = chunk.split('\n');
-          for (final line in lines) {
-            if (line.startsWith('data: ')) {
-              final data = line.substring(6);
-              if (data == '[DONE]') continue;
+        await for (final line in response.stream
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
+          if (line.startsWith('data: ')) {
+            final data = line.substring(6);
+            if (data == '[DONE]') continue;
 
-              try {
-                final json = jsonDecode(data);
-                final choices = json['choices'] as List?;
-                if (choices != null && choices.isNotEmpty) {
-                  final delta = choices[0]['delta'];
+            try {
+              final json = jsonDecode(data);
+              final choices = json['choices'] as List?;
+              if (choices != null && choices.isNotEmpty) {
+                final delta = choices[0]['delta'];
 
-                  // 处理思考内容 (reasoning_content)
-                  final reasoningContent = delta['reasoning_content'] as String?;
-                  if (reasoningContent != null && reasoningContent.isNotEmpty) {
-                    if (!isInThinking) {
-                      isInThinking = true;
-                      streamController.add('<thinking>\n');
-                    }
-                    thinkingContent.write(reasoningContent);
-                    streamController.add(reasoningContent);
+                // 处理思考内容 (reasoning_content)
+                final reasoningContent = delta['reasoning_content'] as String?;
+                if (reasoningContent != null && reasoningContent.isNotEmpty) {
+                  if (!isInThinking) {
+                    isInThinking = true;
+                    streamController.add('<thinking>\n');
                   }
-
-                  // 处理正常内容
-                  final content = delta['content'] as String?;
-                  if (content != null && content.isNotEmpty) {
-                    // 如果之前在思考模式，先关闭 thinking 标签
-                    if (isInThinking) {
-                      isInThinking = false;
-                      streamController.add('\n</thinking>\n\n');
-                    }
-                    fullContent.write(content);
-                    streamController.add(content);
-                  }
+                  streamController.add(reasoningContent);
                 }
-              } catch (e) {
-                // 忽略解析错误
+
+                // 处理正常内容
+                final content = delta['content'] as String?;
+                if (content != null && content.isNotEmpty) {
+                  // 如果之前在思考模式，先关闭 thinking 标签
+                  if (isInThinking) {
+                    isInThinking = false;
+                    streamController.add('\n</thinking>\n\n');
+                  }
+                  streamController.add(content);
+                }
               }
+            } catch (e) {
+              // 忽略解析错误
             }
           }
         }
@@ -737,12 +734,10 @@ UserCard(
     });
   }
 
-  // 可用的模型列表
+  // DeepSeek Chat Completions API 支持的模型。
   static const List<Map<String, String>> _availableModels = [
-    {'id': 'qwen3-235b-a22b', 'name': 'Qwen3 Max (思考模式)'},
-    {'id': 'qwen-max', 'name': 'Qwen Max'},
-    {'id': 'qwen-plus', 'name': 'Qwen Plus'},
-    {'id': 'qwen-turbo', 'name': 'Qwen Turbo'},
+    {'id': 'deepseek-flash', 'name': 'DeepSeek Flash'},
+    {'id': 'deepseek-v4-pro', 'name': 'DeepSeek V4 Pro'},
   ];
 
   void _showSettings() {
@@ -764,7 +759,7 @@ UserCard(
               children: [
                 TextField(
                   decoration: const InputDecoration(
-                    labelText: 'Qwen API Key',
+                    labelText: 'DeepSeek API Key',
                     hintText: 'sk-...',
                     border: OutlineInputBorder(),
                   ),
@@ -780,6 +775,7 @@ UserCard(
                 const Text('选择模型', style: TextStyle(fontWeight: FontWeight.w500)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _selectedModel,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
@@ -805,25 +801,14 @@ UserCard(
                 // 思考模式开关
                 SwitchListTile(
                   title: const Text('启用思考模式'),
-                  subtitle: Text(
-                    _selectedModel.startsWith('qwen3')
-                        ? '显示 AI 的推理过程'
-                        : '仅 Qwen3 系列模型支持',
-                    style: TextStyle(
-                      color: _selectedModel.startsWith('qwen3')
-                          ? null
-                          : Colors.orange,
-                    ),
-                  ),
+                  subtitle: const Text('显示 AI 的推理过程'),
                   value: _enableThinking,
-                  onChanged: _selectedModel.startsWith('qwen3')
-                      ? (value) {
-                          setDialogState(() {
-                            _enableThinking = value;
-                          });
-                          setState(() {});
-                        }
-                      : null,
+                  onChanged: (value) {
+                    setDialogState(() {
+                      _enableThinking = value;
+                    });
+                    setState(() {});
+                  },
                   contentPadding: EdgeInsets.zero,
                 ),
 
@@ -854,12 +839,19 @@ UserCard(
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '模拟模式可测试所有 AI 格式解析功能',
+                          '默认使用模拟响应，可通过快捷提示词测试 Thinking、Artifact 和 Tool Call。输入 DeepSeek API Key 并开启真实 API 可获取在线回复。',
                           style: TextStyle(fontSize: 12),
                         ),
                       ),
                     ],
                   ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    setState(_loadWelcomeMessage);
+                  },
+                  child: const Text('查看格式说明'),
                 ),
               ],
             ),
@@ -890,47 +882,47 @@ UserCard(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context),
           ),
-          title: Row(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+              const Text(
+                'AI Chat',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'AI Chat Demo',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    _isStreaming
-                        ? '正在输入...'
-                        : (_useRealAPI
-                            ? (_enableThinking && _selectedModel.startsWith('qwen3')
-                                ? '$_selectedModel (思考)'
-                                : _selectedModel)
-                            : '模拟模式'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: _isStreaming
-                          ? Colors.blue
-                          : (_useRealAPI ? Colors.green : Colors.orange),
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                ],
+              Text(
+                _isStreaming
+                    ? '正在输入...'
+                    : (_useRealAPI && _apiKey.isNotEmpty
+                        ? (_enableThinking
+                            ? '$_selectedModel (思考)'
+                            : _selectedModel)
+                        : '模拟模式'),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _isStreaming
+                      ? Colors.blue
+                      : (_useRealAPI && _apiKey.isNotEmpty
+                          ? Colors.green
+                          : Colors.orange),
+                  fontWeight: FontWeight.normal,
+                ),
               ),
             ],
           ),
           actions: [
+            PopupMenuButton<int>(
+              icon: const Icon(Icons.bolt),
+              tooltip: '快捷提示词',
+              enabled: !_isStreaming,
+              onSelected: (index) => _sendMessage(_quickPrompts[index].prompt),
+              itemBuilder: (context) => List.generate(_quickPrompts.length, (index) {
+                final prompt = _quickPrompts[index];
+                return PopupMenuItem(
+                  value: index,
+                  child: Text('${prompt.label} · ${prompt.description}'),
+                );
+              }),
+            ),
             IconButton(
               icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
               onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
@@ -945,44 +937,11 @@ UserCard(
         ),
         body: Column(
           children: [
-            // Quick prompts bar
-            Container(
-              height: 50,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark ? const Color(0xFF3A3A3C) : Colors.grey.shade200,
-                  ),
-                ),
-              ),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                itemCount: _quickPrompts.length,
-                itemBuilder: (context, index) {
-                  final prompt = _quickPrompts[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      avatar: Text(prompt.label.split(' ').first),
-                      label: Text(
-                        prompt.label.split(' ').skip(1).join(' '),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      onPressed: _isStreaming
-                          ? null
-                          : () => _sendMessage(prompt.prompt),
-                      tooltip: prompt.description,
-                    ),
-                  );
-                },
-              ),
-            ),
-
             // Messages list
             Expanded(
-              child: ListView.builder(
+              child: _messages.isEmpty
+                  ? const Center(child: Text('发送消息，或点击右上角快捷提示词'))
+                  : ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 itemCount: _messages.length,
