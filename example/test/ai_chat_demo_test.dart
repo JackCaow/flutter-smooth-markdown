@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_smooth_markdown_example/ai_chat_demo.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -65,5 +66,14 @@ void main() {
     await tester.tap(find.byTooltip('快捷提示词'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Thinking'), findsOneWidget);
+  });
+
+  testWidgets('configured DeepSeek key selects the real API by default', (
+    tester,
+  ) async {
+    dotenv.testLoad(fileInput: 'DEEPSEEK_API_KEY=test-key');
+    await tester.pumpWidget(const MaterialApp(home: AIChatDemo()));
+
+    expect(find.text('deepseek-flash (思考)'), findsOneWidget);
   });
 }

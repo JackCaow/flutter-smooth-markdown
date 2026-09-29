@@ -63,7 +63,7 @@ class _AIChatDemoState extends State<AIChatDemo> {
 
   bool _isStreaming = false;
   bool _isDarkMode = false;
-  bool _useRealAPI = false;
+  bool _useRealAPI = true;
   bool _enableThinking = true; // 开启思考模式
   late String _apiKey;
   String _selectedModel = 'deepseek-flash';
@@ -103,7 +103,7 @@ class _AIChatDemoState extends State<AIChatDemo> {
 
 ---
 
-💡 **提示**: 默认使用模拟响应。点击右上角设置图标配置 DeepSeek API Key 并开启真实 API。
+💡 **提示**: 未配置 DeepSeek API Key 时使用模拟响应。点击右上角设置图标可配置 Key 和切换模式。
 ''',
       isUser: false,
       timestamp: DateTime.now(),
@@ -578,7 +578,7 @@ UserCard(
 
 ---
 
-您也可以尝试下方的 **快捷提示词** 来测试各种 AI 格式解析功能！
+您也可以尝试右上角的 **快捷提示词** 菜单来测试各种 AI 格式解析功能！
 ''';
   }
 
@@ -839,7 +839,7 @@ UserCard(
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '默认使用模拟响应，可通过快捷提示词测试 Thinking、Artifact 和 Tool Call。输入 DeepSeek API Key 并开启真实 API 可获取在线回复。',
+                          '未配置 Key 时使用模拟响应，可通过快捷提示词测试 Thinking、Artifact 和 Tool Call。输入 DeepSeek API Key 并开启真实 API 可获取在线回复。',
                           style: TextStyle(fontSize: 12),
                         ),
                       ),
