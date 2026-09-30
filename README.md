@@ -49,6 +49,8 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 
 ## Quick Start
 
+Building a native app? See the [iOS and Android API map](docs/native-api-map.md) for equivalent entry points and current differences.
+
 ### Installation
 
 ```yaml
