@@ -12,14 +12,15 @@ Flutter is the behavior reference for the [iOS Swift package](https://github.com
 | Native text selection | `selectable` | `selectable` | `selectable` |
 | Custom parsed nodes | `plugins`, `builderRegistry` | `plugins`, `builderRegistry` | `plugins`, `builderRegistry` |
 
-The document and stream readers default to standard components (`useEnhancedComponents: false`), HTML off, and selection off. The editors default to enhanced preview components. All three readers expose link and image tap callbacks; callback names and URL types differ by platform. Flutter passes a link URL string through `onTapLink`; Android uses `onLinkClick` with a string, while iOS has a native `URL` callback named `onLinkTap`. Image callbacks can provide source, alt text and title in all three libraries. Reader caching is on by default; streaming bypasses the document cache.
+The document and stream readers default to standard components (`useEnhancedComponents: false`), HTML off, and selection off. The editors default to enhanced preview components. All three readers expose link and image tap callbacks. Flutter passes a link URL string through `onTapLink`; iOS accepts the same string callback and retains its native `onLinkTap(URL)` callback, while Android uses `onLinkClick` with a string. Flutter and iOS accept `onTapImage(source, alt, title)`; Android exposes the same payload through `onImageClickWithMetadata`. Reader caching is on by default; streaming bypasses the document cache.
 
 ## Differences to handle explicitly
 
 - Flutter groups parser switches in `MarkdownConfig`. Native libraries currently expose selected switches directly rather than a matching configuration object.
 - Flutter's `MarkdownConfig.enableLatex` defaults to `false`. The current native readers render supported math by default. Set the Flutter option explicitly when comparing the same document; a future native config change should include a migration path.
 - Flutter's editor starts in Formatted mode. Native `MarkdownEditorController` instances start in Source mode; set `controller.mode = .formatted` on iOS or `controller.mode = MarkdownEditorMode.FORMATTED` on Android before presenting the editor when matching Flutter's first screen.
-- Flutter's `onTapLink` uses a string. The native callback type may be a platform URL type; convert at the application boundary if sharing business logic.
+- iOS retains its older URL-based tap callback alongside the string alias. If both are supplied, both run; avoid registering the same action twice.
+- iOS and Android streaming readers expose an `onComplete` callback for finite sources. A hot Android `StateFlow` does not normally complete, so it will not call `onComplete`.
 - A custom builder or plugin can create a separate native selection surface. Do not assume selection spans every custom renderer on every platform.
 - The Android module is currently consumed from source; a published Maven coordinate is not available yet. The iOS package has no version tag yet, so shipped apps should pin a commit.
 
