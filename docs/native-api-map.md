@@ -18,6 +18,7 @@ The document and stream readers default to standard components (`useEnhancedComp
 
 - Flutter groups parser switches in `MarkdownConfig`. Native libraries currently expose selected switches directly rather than a matching configuration object.
 - Flutter's `MarkdownConfig.enableLatex` defaults to `false`. The current native readers render supported math by default. Set the Flutter option explicitly when comparing the same document; a future native config change should include a migration path.
+- Flutter's editor starts in Formatted mode. Native `MarkdownEditorController` instances start in Source mode; set `controller.mode = .formatted` on iOS or `controller.mode = MarkdownEditorMode.FORMATTED` on Android before presenting the editor when matching Flutter's first screen.
 - Flutter's `onTapLink` uses a string. The native callback type may be a platform URL type; convert at the application boundary if sharing business logic.
 - A custom builder or plugin can create a separate native selection surface. Do not assume selection spans every custom renderer on every platform.
 - The Android module is currently consumed from source; a published Maven coordinate is not available yet. The iOS package has no version tag yet, so shipped apps should pin a commit.
