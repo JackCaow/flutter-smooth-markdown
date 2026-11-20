@@ -47,4 +47,58 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('reader outline and search controls reveal remote content', (
+    tester,
+  ) async {
+    final messenger = tester.binding.defaultBinaryMessenger;
+    final sections = List.generate(100, (i) => '# Chapter $i\n\nSee term $i.');
+    messenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async => call.method == 'Clipboard.getData'
+          ? {'text': sections.join('\n\n')}
+          : null,
+    );
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await tester.pumpWidget(
+      const MaterialApp(home: LargeDocumentReader(title: 'Reader')),
+    );
+    await tester.tap(find.byTooltip('Open from clipboard'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Table of contents'));
+    await tester.pumpAndSettle();
+    final outline = find.byType(MarkdownOutlineView);
+    expect(outline, findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.descendant(of: outline, matching: find.text('Chapter 90')),
+      500,
+      scrollable: find.descendant(
+        of: outline,
+        matching: find.byType(Scrollable),
+      ),
+    );
+    final target = find.descendant(
+      of: outline,
+      matching: find.text('Chapter 90'),
+    );
+    await tester.pumpAndSettle();
+    await Scrollable.ensureVisible(tester.element(target), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(target.hitTestable());
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Chapter 90', findRichText: true).hitTestable(),
+      findsWidgets,
+    );
+    await tester.tap(find.byTooltip('Find in document'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'term 12.');
+    await tester.pumpAndSettle();
+    expect(find.text('1 / 1'), findsOneWidget);
+    expect(
+      find.text('See term 12.', findRichText: true).hitTestable(),
+      findsWidgets,
+    );
+  });
 }

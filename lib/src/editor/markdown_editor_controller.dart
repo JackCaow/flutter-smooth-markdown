@@ -598,24 +598,85 @@ class MarkdownEditorController extends ChangeNotifier {
     }
   }
 
-  /// Finds all text ranges matching [query].
-  List<TextRange> findMatches(
-    String query, {
-    bool caseSensitive = false,
-  }) {
-    if (query.isEmpty) return const [];
+  /// Finds literal matches in the Markdown source, capped for the search UI.
+  List<TextRange> findMatches(String query, {bool caseSensitive = false}) {
+    return _sourceMatches(query, caseSensitive: caseSensitive)
+        .take(500)
+        .map((m) => TextRange(start: m.start, end: m.end))
+        .toList(growable: false);
+  }
 
-    final haystack = caseSensitive ? text : text.toLowerCase();
-    final needle = caseSensitive ? query : query.toLowerCase();
-    final matches = <TextRange>[];
-    var index = haystack.indexOf(needle);
+  Iterable<Match> _sourceMatches(String query, {required bool caseSensitive}) {
+    if (query.isEmpty) return const <Match>[];
+    return RegExp(RegExp.escape(query),
+            caseSensitive: caseSensitive, unicode: true)
+        .allMatches(text);
+  }
 
-    while (index != -1 && matches.length < 500) {
-      matches.add(TextRange(start: index, end: index + needle.length));
-      index = haystack.indexOf(needle, index + needle.length);
+  /// Replaces the selected or next literal match, wrapping at the document end.
+  /// Returns the range of the inserted text, or null if there was no match.
+  TextRange? replaceNextMatch(String query, String replacement,
+      {bool caseSensitive = false}) {
+    final start = selection.isValid ? selection.start : 0;
+    Match? first;
+    Match? next;
+    for (final match in _sourceMatches(query, caseSensitive: caseSensitive)) {
+      first ??= match;
+      if (match.start >= start) {
+        next = match;
+        break;
+      }
     }
+    final match = next ?? first;
+    if (match == null) return null;
+    runTransaction(() => replaceRange(
+          TextRange(start: match.start, end: match.end),
+          replacement,
+        ));
+    return TextRange(start: match.start, end: match.start + replacement.length);
+  }
 
-    return matches;
+  /// Replaces every literal match in one undo step and preserves the selection.
+  /// Replacement text is inserted verbatim and is never searched again.
+  int replaceAllMatches(String query, String replacement,
+      {bool caseSensitive = false}) {
+    final original = textController.value;
+    final result = StringBuffer();
+    var end = 0;
+    var count = 0;
+    var base = original.selection.baseOffset;
+    var extent = original.selection.extentOffset;
+    for (final match in _sourceMatches(query, caseSensitive: caseSensitive)) {
+      result
+        ..write(original.text.substring(end, match.start))
+        ..write(replacement);
+      // A caret inside a replaced range follows the replacement. Both ends
+      // are mapped independently to preserve backward selections.
+      int adjustment(int offset) => offset <= match.start
+          ? 0
+          : replacement.length -
+              (offset.clamp(match.start, match.end) - match.start);
+      base += adjustment(original.selection.baseOffset);
+      extent += adjustment(original.selection.extentOffset);
+      end = match.end;
+      count++;
+    }
+    if (count == 0) return 0;
+    result.write(original.text.substring(end));
+    final updated = result.toString();
+    if (updated != original.text) {
+      runTransaction(() {
+        textController.value = _editingValueForSourceMutation(
+          original,
+          text: updated,
+          selection: original.selection.copyWith(
+            baseOffset: base,
+            extentOffset: extent,
+          ),
+        );
+      });
+    }
+    return count;
   }
 
   /// Selects the next match for [query] and returns it.

@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../../widgets/markdown_citations.dart';
 import '../config/style_sheet.dart';
 import '../config/syntax_theme.dart';
 import '../parser/ast/markdown_node.dart';
@@ -249,6 +250,7 @@ class BuilderRegistry {
       ..register('hard_break', const HardBreakBuilder())
       ..register('inline_math', const InlineMathBuilder())
       ..register('block_math', const BlockMathBuilder())
+      ..register('citation', const MarkdownCitationBuilder())
       ..register('footnote_reference', const FootnoteReferenceBuilder())
       ..register('footnote_definition', const FootnoteDefinitionBuilder())
       ..register('details', const DetailsBuilder())

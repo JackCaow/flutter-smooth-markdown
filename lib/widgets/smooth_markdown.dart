@@ -2,15 +2,28 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show compute, listEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../src/config/markdown_config.dart';
 import '../src/config/style_sheet.dart';
+import '../src/editor/wikilink.dart';
+import '../src/parser/ast/html_nodes.dart';
 import '../src/parser/ast/markdown_node.dart';
 import '../src/parser/markdown_parser.dart';
 import '../src/parser/parse_cache.dart';
 import '../src/parser/parser_compatibility.dart' show backendForSourceLength;
 import '../src/parser/parser_plugin.dart';
+import '../src/parser/plugins/admonition_plugin.dart';
+import '../src/parser/plugins/artifact_plugin.dart';
+import '../src/parser/plugins/citation_plugin.dart';
+import '../src/parser/plugins/emoji_plugin.dart';
+import '../src/parser/plugins/hashtag_plugin.dart';
+import '../src/parser/plugins/mention_plugin.dart';
+import '../src/parser/plugins/mermaid_plugin.dart';
+import '../src/parser/plugins/thinking_plugin.dart';
+import '../src/parser/plugins/tool_call_plugin.dart';
 import '../src/renderer/builders/artifact_builder.dart';
 import '../src/renderer/builders/block_math_builder.dart';
 import '../src/renderer/builders/details_builder.dart';
@@ -36,9 +49,12 @@ import '../src/renderer/builders/tool_call_builder.dart';
 import '../src/renderer/markdown_renderer.dart';
 import '../src/renderer/widget_builder.dart';
 import '../src/rust/stream_eligibility.dart';
+import 'markdown_citations.dart';
 import 'smooth_selection_region.dart';
 
 part 'static_markdown_sliver.dart';
+part 'markdown_reader_navigation.dart';
+part 'markdown_reader_layout.dart';
 
 /// A widget that renders Markdown content with high performance and customizable styling.
 ///
@@ -223,6 +239,7 @@ class SmoothMarkdown extends StatelessWidget {
     this.selectable = false,
     this.contextMenuBuilder,
     this.selectionController,
+    this.readerController,
     this.selectableRegionKey,
     this.plugins,
     this.builderRegistry,
@@ -249,12 +266,17 @@ class SmoothMarkdown extends StatelessWidget {
     this.selectable = false,
     this.contextMenuBuilder,
     this.selectionController,
+    this.readerController,
     this.selectableRegionKey,
     this.plugins,
     this.builderRegistry,
   }) : _sliver = true;
 
   final bool _sliver;
+
+  /// Enables heading links, document outline and full-text search. Attach a
+  /// controller to one static document at a time; the caller owns its lifetime.
+  final MarkdownReaderController? readerController;
 
   /// The Markdown text to render.
   ///
@@ -754,7 +776,9 @@ class SmoothMarkdown extends StatelessWidget {
     BuildContext context,
     List<MarkdownNode> nodes, {
     Map<MarkdownNode, Widget>? blockCache,
-  }) => _renderNodes(context, nodes, blockCache: blockCache);
+  }) => readerController == null
+      ? _renderNodes(context, nodes, blockCache: blockCache)
+      : _NavigableDocument(document: this, nodes: nodes, sliver: false);
 
   /// Renders a retained stream AST in a CustomScrollView. Selection uses the
   /// complete box tree so offscreen text retains existing selection semantics.
@@ -762,11 +786,19 @@ class SmoothMarkdown extends StatelessWidget {
     BuildContext context,
     List<MarkdownNode> nodes, {
     Map<MarkdownNode, Widget>? blockCache,
+    bool complete = true,
   }) =>
       selectable ||
           Scrollable.maybeOf(context)?.axisDirection == AxisDirection.up
       ? SliverToBoxAdapter(
           child: renderNodes(context, nodes, blockCache: blockCache),
+        )
+      : readerController != null
+      ? _NavigableDocument(
+          document: this,
+          nodes: nodes,
+          sliver: true,
+          complete: complete,
         )
       : _renderNodes(context, nodes, blockCache: blockCache, sliver: true);
 
@@ -775,6 +807,7 @@ class SmoothMarkdown extends StatelessWidget {
     List<MarkdownNode> nodes, {
     Map<MarkdownNode, Widget>? blockCache,
     bool sliver = false,
+    Widget Function(IndexedWidgetBuilder, int, double)? blockLayout,
   }) {
     // Create custom registry if enhanced components are enabled
     BuilderRegistry? customRegistry;
@@ -788,6 +821,7 @@ class SmoothMarkdown extends StatelessWidget {
         ..register('inline_code', const InlineCodeBuilder())
         ..register('inline_math', const InlineMathBuilder())
         ..register('block_math', const BlockMathBuilder())
+        ..register('citation', const MarkdownCitationBuilder())
         ..register('footnote_reference', const FootnoteReferenceBuilder())
         ..register('footnote_definition', const FootnoteDefinitionBuilder())
         ..register('bold', const BoldBuilder())
@@ -830,7 +864,9 @@ class SmoothMarkdown extends StatelessWidget {
     }
 
     final renderContext = MarkdownRenderContext(
-      onTapLink: onTapLink,
+      onTapLink: readerController == null
+          ? onTapLink
+          : (url) => readerController!._openLink(url, onTapLink),
       onTapImage: onTapImage,
       imageBuilder: imageBuilder,
       codeBuilder: codeBuilder,
@@ -843,6 +879,7 @@ class SmoothMarkdown extends StatelessWidget {
       nodes,
       context: renderContext,
       blockCache: blockCache,
+      blockLayout: blockLayout,
       sliver: sliver,
       addRepaintBoundaries: useRepaintBoundary,
     );

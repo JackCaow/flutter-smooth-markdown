@@ -43,7 +43,7 @@ class _EditorDemoPageState extends State<EditorDemoPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Toolbar, slash commands, wikilinks, Mermaid preview, math editing, search, focus mode, and copy/export menu.',
+              'Paste formatted text or a screenshot into your note. Open Find and replace to update repeated terms.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),

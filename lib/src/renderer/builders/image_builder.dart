@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -29,6 +31,10 @@ class ImageBuilder extends MarkdownWidgetBuilder {
         imageNode,
         context.imageBuilder!(imageNode.url, imageNode.alt, imageNode.title),
       );
+    }
+
+    if (_embeddedBitmap.hasMatch(imageNode.url)) {
+      return _wrapTap(context, imageNode, _EmbeddedBitmap(url: imageNode.url));
     }
 
     // Check if it's an SVG
@@ -112,5 +118,43 @@ class ImageBuilder extends MarkdownWidgetBuilder {
         child: semanticChild,
       ),
     );
+  }
+}
+
+final _embeddedBitmap =
+    RegExp(r'^data:image/(?:png|jpeg|gif|webp);base64,', caseSensitive: false);
+
+class _EmbeddedBitmap extends StatefulWidget {
+  const _EmbeddedBitmap({required this.url});
+  final String url;
+
+  @override
+  State<_EmbeddedBitmap> createState() => _EmbeddedBitmapState();
+}
+
+class _EmbeddedBitmapState extends State<_EmbeddedBitmap> {
+  late Uint8List? _bytes = _decode();
+
+  Uint8List? _decode() {
+    try {
+      return UriData.parse(widget.url).contentAsBytes();
+    } on FormatException {
+      return null;
+    }
+  }
+
+  @override
+  void didUpdateWidget(_EmbeddedBitmap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) _bytes = _decode();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = _bytes;
+    if (bytes == null || bytes.isEmpty) return const Icon(Icons.broken_image);
+    return Image.memory(bytes,
+        errorBuilder: (context, error, stack) =>
+            const Icon(Icons.broken_image));
   }
 }

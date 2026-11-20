@@ -14,6 +14,30 @@
 
 A high-performance Flutter markdown renderer with syntax highlighting, LaTeX math, tables, footnotes, SVG images, Mermaid diagrams, and real-time streaming support.
 
+## In development
+
+| Use case | API | Try it in the example |
+| --- | --- | --- |
+| Navigate a long document | Attach a `MarkdownReaderController` to `SmoothMarkdown` or `SmoothMarkdown.sliver`. `MarkdownOutlineView` shows the active heading. `MarkdownReaderSearchBar` highlights matches and can jump to a block outside the viewport. | Open **Long document reader**, then use the outline or search button. |
+| Read an answer while it streams | Give the surrounding list a `MarkdownChatScrollController`. New content follows the bottom until the reader scrolls away. Listen to `following` to show a button that calls `jumpToLatest()`. | Open **AI Q&A**, scroll up during playback, then jump to the latest text. |
+| Open the source for a claim | Register `MarkdownCitationPlugin` and supply a `MarkdownCitationScope` with numbered sources and an `onSourceTap` callback. A marker such as `[1]` becomes interactive when its source arrives. | Tap **[1]** in the offline AI answer. |
+| Review a large patch | Use `MarkdownDiffView.sliver(patch: patch, layout: MarkdownDiffLayout.sideBySide)` in a vertical `CustomScrollView`. The viewer highlights the whole patch once and builds the visible rows and nearby scroll cache. Setting `selectable: true` builds all rows for whole-patch selection. | In **Code & Diff**, select **Diff**, switch layouts and open the 4,000-line patch. |
+| Edit copied content | The editor can replace the next or all literal matches, with undo. Paste HTML to keep common Markdown formatting, or paste a bitmap. Supply `onPasteImage` to store the image and return its URL or path. The default embeds a data URI. | Open **Markdown editor**, use the find controls, or paste into an editing field. |
+
+Keep the reader controller in widget state and dispose it with the reader. The same controller can drive a custom outline or search UI.
+
+```dart
+final reader = MarkdownReaderController();
+// Inside a CustomScrollView's slivers:
+SmoothMarkdown.sliver(data: markdown, readerController: reader);
+
+await reader.jumpToAnchor('#getting-started');
+reader.search('timeout');
+await reader.jumpToMatch(0);
+```
+
+The editor's system clipboard adapter requires Android API 23 or later and the NDK for native Android builds. Its first native build may download Rust dependencies. In browsers, the paste shortcut can read the formats supplied by the paste event. A toolbar paste can require clipboard permission.
+
 ## Upgrading from 0.10.0 to 0.11.0
 
 | Use case | 0.10.0 | What changes in 0.11.0 |

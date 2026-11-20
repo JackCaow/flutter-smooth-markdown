@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../src/config/syntax_theme.dart';
+import '../src/renderer/code_row.dart';
 import '../src/rust/markdown_core.dart';
 
 /// Source viewer using whole-file semantic highlighting from the shared core.
@@ -67,8 +68,9 @@ class _MarkdownCodeViewState extends State<MarkdownCodeView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.code != widget.code ||
         oldWidget.language != widget.language ||
-        oldWidget.tabWidth != widget.tabWidth)
+        oldWidget.tabWidth != widget.tabWidth) {
       _update();
+    }
   }
 
   @override
@@ -109,35 +111,11 @@ class CodeRowsView extends StatelessWidget {
   final TextStyle? textStyle;
   @override
   Widget build(BuildContext context) {
-    final theme =
-        syntaxTheme ??
-        MarkdownSyntaxTheme.fromBrightness(Theme.of(context).brightness);
-    final style = DefaultTextStyle.of(context).style
-        .merge(
-          const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
-        )
-        .merge(textStyle);
-    final largest = rows.fold<int>(
-      1,
-      (value, row) => [
-        value,
-        row.oldLineNumber ?? 0,
-        row.newLineNumber ?? 0,
-      ].reduce((a, b) => a > b ? a : b),
-    );
-    final gutterWidth =
-        largest.toString().length * (style.fontSize ?? 13) * 0.7 + 16;
-    Widget gutter(int? number) => SelectionContainer.disabled(
-      child: ExcludeSemantics(
-        child: SizedBox(
-          width: gutterWidth,
-          child: Text(
-            number?.toString() ?? '',
-            textAlign: TextAlign.right,
-            style: style.merge(theme.lineNumberStyle),
-          ),
-        ),
-      ),
+    final lineStyle = CodeRowStyle.of(
+      context,
+      largestLineNumber: CodeRowStyle.maxLineNumber(rows),
+      syntaxTheme: syntaxTheme,
+      textStyle: textStyle,
     );
     final content = LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
@@ -151,52 +129,12 @@ class CodeRowsView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final row in rows)
-                  ColoredBox(
-                    color: switch (row.kind) {
-                      MarkdownDiffKind.added => theme.addedBackground,
-                      MarkdownDiffKind.removed => theme.removedBackground,
-                      MarkdownDiffKind.hunk => theme.hunkBackground,
-                      _ => Colors.transparent,
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (showLineNumbers && diff)
-                            gutter(row.oldLineNumber),
-                          if (showLineNumbers) gutter(row.newLineNumber),
-                          if (showLineNumbers) const SizedBox(width: 12),
-                          if (diff)
-                            SelectionContainer.disabled(
-                              child: ExcludeSemantics(
-                                child: Text(switch (row.kind) {
-                                  MarkdownDiffKind.added => '+ ',
-                                  MarkdownDiffKind.removed => '- ',
-                                  _ => '  ',
-                                }, style: style),
-                              ),
-                            ),
-                          Flexible(
-                            child: Text.rich(
-                              highlightedCodeSpan(
-                                row.line.text.isEmpty ? ' ' : row.line.text,
-                                row.line.tokens,
-                                theme,
-                                style: style,
-                                changedStart: row.changedStart,
-                                changedLength: row.changedLength,
-                                changeColor:
-                                    row.kind == MarkdownDiffKind.removed
-                                    ? theme.removedChangeBackground
-                                    : theme.addedChangeBackground,
-                              ),
-                              softWrap: false,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  lineStyle.buildRow(
+                    row,
+                    gutter: showLineNumbers
+                        ? (diff ? CodeGutter.both : CodeGutter.modified)
+                        : CodeGutter.none,
+                    showMarker: diff,
                   ),
               ],
             ),

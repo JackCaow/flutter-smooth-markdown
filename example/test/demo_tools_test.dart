@@ -45,6 +45,22 @@ void main() {
         contains('+        format!("Welcome, {}! 👋", self.name)'),
       );
       expect(diff.showLineNumbers, isFalse);
+      await tester.tap(find.byTooltip('Show side-by-side diff'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Show 4,000-line patch'));
+      await tester.pumpAndSettle();
+      final large = tester.widget<MarkdownDiffView>(
+        find.byType(MarkdownDiffView),
+      );
+      expect(large.layout, MarkdownDiffLayout.sideBySide);
+      expect(large.patch, contains(" const route4000 = '/api/4000';"));
+      expect(find.textContaining('route1 =', findRichText: true), findsWidgets);
+      expect(
+        find.textContaining('route4000 =', findRichText: true),
+        findsNothing,
+      );
+      await tester.tap(find.byTooltip('Show small patch'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Markdown'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('View source'));

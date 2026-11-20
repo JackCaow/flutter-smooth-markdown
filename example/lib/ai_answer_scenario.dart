@@ -22,7 +22,7 @@ const _chinese = <_Exchange>[
     chunks: [
       '**先看 UI 线程。** ',
       '60 Hz 屏幕每帧约有 16.7 ms。样本里的 UI P95 达到 24 ms，',
-      'Raster P95 为 4 ms。先打开一帧慢帧，看时间花在哪个阶段。\n\n',
+      'Raster P95 为 4 ms。先打开一帧慢帧，看时间花在哪个阶段。[1]\n\n',
       '### 在时间线上找重复工作\n\n',
       '1. 静止页面，只追加一小段 Markdown。观察解析和组件构建事件。\n',
       '2. 停止追加，滚动同一段内容。查看慢帧里的布局事件。\n',
@@ -40,7 +40,7 @@ const _chinese = <_Exchange>[
       '| --- | --- |\n',
       '| 静止时追加文本 | 追加期间的 UI P95 |\n',
       '| 停止追加后滚动 | 滚动慢帧数和 Raster P95 |\n\n',
-      '先预热一次，再分别记录多轮。这个示例的 UI 基线是 **24 ms**。',
+      '先预热一次，再分别记录多轮。这个示例的 UI 基线是 **24 ms**。[1]',
       '比较改动前后同一指标，同时核对最终的文本、代码块和表格。\n\n',
       '> 保留帧时间线。遇到偶发慢帧时，还能回到对应的那次操作。',
     ],
@@ -53,7 +53,7 @@ const _english = <_Exchange>[
     chunks: [
       '**Start with the UI thread.** ',
       'A 60 Hz display allows about 16.7 ms per frame. In the sample, UI P95 is 24 ms ',
-      'and raster P95 is 4 ms. Open one slow frame to see which phase took the time.\n\n',
+      'and raster P95 is 4 ms. Open one slow frame to see which phase took the time. [1]\n\n',
       '### Look for repeated work\n\n',
       '1. Hold the page still and append a little Markdown. Watch the parsing and build events.\n',
       '2. Stop appending and scroll through the same passage. Check layout work in slow frames.\n',
@@ -71,7 +71,7 @@ const _english = <_Exchange>[
       '| --- | --- |\n',
       '| Append while stationary | UI P95 during appends |\n',
       '| Scroll with appends stopped | Slow frames and raster P95 |\n\n',
-      'Warm up once, then collect several runs. This sample has a UI baseline of **24 ms**. ',
+      'Warm up once, then collect several runs. This sample has a UI baseline of **24 ms**. [1] ',
       'Compare the same metric before and after. Check the final text, code blocks and tables as well.\n\n',
       '> Save the timeline so you can trace an occasional slow frame back to the gesture that triggered it.',
     ],
@@ -81,7 +81,9 @@ const _english = <_Exchange>[
 enum _Playback { playing, paused, finished }
 
 class _AiAnswerScenarioState extends State<AiAnswerScenario> {
-  final _scroll = ScrollController();
+  final _scroll = MarkdownChatScrollController();
+  final _plugins = ParserPluginRegistry()
+    ..register(const MarkdownCitationPlugin());
   StreamController<String>? _response;
   Timer? _clock;
   bool? _zh;
@@ -110,7 +112,7 @@ class _AiAnswerScenarioState extends State<AiAnswerScenario> {
     _response = StreamController<String>();
     _response!.add(_chunks[_next++]);
     _resume();
-    if (_scroll.hasClients) _scroll.jumpTo(0);
+    _scroll.jumpToLatest();
   }
 
   void _resume() {
@@ -232,77 +234,112 @@ class _AiAnswerScenarioState extends State<AiAnswerScenario> {
         foregroundColor: ink,
         title: Text(zh ? 'AI 问答' : 'AI Q&A'),
       ),
-      body: SafeArea(
-        bottom: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: CustomScrollView(
-              controller: _scroll,
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _FrameProfile(zh: zh),
-                        const SizedBox(height: 22),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: tint,
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(17),
-                                topRight: Radius.circular(17),
-                                bottomLeft: Radius.circular(17),
-                                bottomRight: Radius.circular(3),
+      floatingActionButton: ValueListenableBuilder<bool>(
+        valueListenable: _scroll.following,
+        builder: (context, following, _) => following
+            ? const SizedBox.shrink()
+            : FloatingActionButton.small(
+                tooltip: zh ? '回到最新' : 'Jump to latest',
+                onPressed: _scroll.jumpToLatest,
+                child: const Icon(Icons.vertical_align_bottom),
+              ),
+      ),
+      body: MarkdownCitationScope(
+        sources: {
+          1: MarkdownSource(
+            title: zh ? '长文档滚动采样' : 'Long-document scroll profile',
+            excerpt: zh
+                ? '60 Hz 示例采样。UI P95 为 24 ms，Raster P95 为 4 ms。'
+                : '60 Hz sample. UI P95 was 24 ms and Raster P95 was 4 ms.',
+          ),
+        },
+        onSourceTap: (source) => showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          builder: (context) => SafeArea(
+            child: ListTile(
+              title: Text(source.title),
+              subtitle: Text(source.excerpt!),
+            ),
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: CustomScrollView(
+                controller: _scroll,
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _FrameProfile(zh: zh),
+                          const SizedBox(height: 22),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: tint,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(17),
+                                  topRight: Radius.circular(17),
+                                  bottomLeft: Radius.circular(17),
+                                  bottomRight: Radius.circular(3),
+                                ),
                               ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 15,
-                                vertical: 11,
-                              ),
-                              child: Text(
-                                _exchanges[_question].question,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  color: ink,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 15,
+                                  vertical: 11,
+                                ),
+                                child: Text(
+                                  _exchanges[_question].question,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: ink,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 22),
-                        Row(
-                          children: [
-                            Icon(Icons.forum_outlined, size: 18, color: accent),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                zh ? '本地示例回答' : 'Offline sample answer',
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  color: accent,
+                          const SizedBox(height: 22),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.forum_outlined,
+                                size: 18,
+                                color: accent,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  zh ? '本地示例回答' : 'Offline sample answer',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: accent,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-                  sliver: StreamMarkdown.sliver(
-                    key: ObjectKey(_response),
-                    stream: _response!.stream,
-                    styleSheet: MarkdownStyleSheet.fromTheme(theme),
-                    useEnhancedComponents: true,
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+                    sliver: StreamMarkdown.sliver(
+                      key: ObjectKey(_response),
+                      stream: _response!.stream,
+                      plugins: _plugins,
+                      styleSheet: MarkdownStyleSheet.fromTheme(theme),
+                      useEnhancedComponents: true,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

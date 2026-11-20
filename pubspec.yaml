@@ -33,6 +33,10 @@ dependencies:
   flutter_highlight: ^0.7.0
   highlight: ^0.7.0
 
+  # Rich HTML and image paste in the Markdown editor
+  super_clipboard: ^0.9.1
+  html: ^0.15.6
+
   # Image handling
   cached_network_image: ^3.3.0
 
@@ -52,6 +56,9 @@ dev_dependencies:
   # Mocking for tests
   mockito: ^5.4.0
   build_runner: ^2.4.0
+
+  # Browser paste event fixtures
+  web: ^1.1.1
 
   # Integration testing
   integration_test:

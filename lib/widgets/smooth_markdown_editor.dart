@@ -12,6 +12,8 @@ import '../src/config/style_sheet.dart';
 import '../src/editor/document/markdown_document.dart';
 import '../src/editor/document/markdown_document_codec.dart';
 import '../src/editor/document/markdown_document_editor.dart';
+import '../src/editor/editor_clipboard_field.dart';
+import '../src/editor/markdown_editor_clipboard.dart';
 import '../src/editor/markdown_editor_controller.dart';
 import '../src/editor/markdown_editor_export.dart';
 import '../src/editor/wikilink.dart';
@@ -758,6 +760,8 @@ class SmoothMarkdownEditor extends StatefulWidget {
     this.onTapLink,
     this.onTapImage,
     this.onPickImage,
+    this.onPasteImage,
+    this.readClipboard,
     this.onImagePickEvent,
     this.imageBuilder,
     this.codeBuilder,
@@ -845,6 +849,13 @@ class SmoothMarkdownEditor extends StatefulWidget {
   /// This lets host apps provide Scratch-style local file picking and asset
   /// copying. If omitted, the editor falls back to the built-in URL dialog.
   final MarkdownEditorImagePickerCallback? onPickImage;
+
+  /// Store a pasted bitmap and return its Markdown destination, or null to cancel.
+  /// With no callback, the editor embeds the bitmap as a portable data URI.
+  final MarkdownPasteImageCallback? onPasteImage;
+
+  /// Override the system pasteboard for applications with their own clipboard.
+  final Future<MarkdownClipboardContent?> Function()? readClipboard;
 
   /// Called when image picking, upload, insertion, cancellation, or failure
   /// state changes.
@@ -1002,6 +1013,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   bool _ownsController = false;
   bool _ownsFocusNode = false;
   bool _searchOpen = false;
+  bool _replaceOpen = false;
+  bool _replaceMatchCase = false;
+  final _replacementController = TextEditingController();
   late bool _focusMode;
   List<TextRange> _searchMatches = const [];
   var _currentSearchMatchIndex = 0;
@@ -1125,6 +1139,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     _tableCellFocusNode
       ..onKeyEvent = null
       ..dispose();
+    _replacementController.dispose();
     _searchFocusNode
       ..onKeyEvent = null
       ..dispose();
@@ -1355,7 +1370,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       occupiedHeight += _toolbarHeight;
     }
     if (_searchOpen) {
-      occupiedHeight += _searchBarHeight;
+      occupiedHeight += _searchBarHeight + (_replaceOpen ? 48 : 0);
     }
 
     final availableHeight = constraints.maxHeight - occupiedHeight;
@@ -1928,54 +1943,110 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   Widget _buildSearchBar(BuildContext context) {
     final editorTheme = _effectiveEditorTheme(context);
+    final hasMatches = _searchMatches.isNotEmpty;
+    final editable = widget.enabled && _mode != MarkdownEditorMode.preview;
+    Widget button(String label, IconData icon, VoidCallback? action,
+            {bool selected = false}) =>
+        IconButton(
+          tooltip: label,
+          onPressed: action,
+          isSelected: selected,
+          visualDensity: VisualDensity.compact,
+          iconSize: 20,
+          icon: Icon(icon),
+        );
     return Material(
       color: editorTheme.searchBarColor ??
           Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.35),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 220,
-              child: TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Find in note...',
-                  border: OutlineInputBorder(),
-                ),
-                onSubmitted: (_) => _selectNextSearchMatch(),
+        padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            if (editable)
+              button('Find and replace', Icons.find_replace,
+                  () => _setReplaceOpen(!_replaceOpen),
+                  selected: _replaceOpen),
+            Expanded(
+                child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              autofocus: true,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: _replaceOpen
+                    ? 'Find in Markdown source...'
+                    : 'Find in note...',
+                border: const OutlineInputBorder(),
               ),
-            ),
-            const SizedBox(width: 8),
+              onSubmitted: (_) => _selectNextSearchMatch(),
+            )),
+            const SizedBox(width: 4),
             Text(
-              _searchMatches.isEmpty
-                  ? 'Not found'
-                  : '${_currentSearchMatchIndex + 1}/${_searchMatches.length}',
-            ),
-            IconButton(
-              tooltip: 'Previous match',
-              icon: const Icon(Icons.keyboard_arrow_up),
-              onPressed:
-                  _searchMatches.isEmpty ? null : _selectPreviousSearchMatch,
-            ),
-            IconButton(
-              tooltip: 'Next match',
-              icon: const Icon(Icons.keyboard_arrow_down),
-              onPressed: _searchMatches.isEmpty ? null : _selectNextSearchMatch,
-            ),
-            IconButton(
-              tooltip: 'Close find',
-              icon: const Icon(Icons.close),
-              onPressed: _closeSearch,
-            ),
+                hasMatches
+                    ? '${_currentSearchMatchIndex + 1}/${_searchMatches.length}'
+                    : 'Not found',
+                style: Theme.of(context).textTheme.labelSmall),
+            button('Previous match', Icons.keyboard_arrow_up,
+                hasMatches ? _selectPreviousSearchMatch : null),
+            button('Next match', Icons.keyboard_arrow_down,
+                hasMatches ? _selectNextSearchMatch : null),
+            button('Close find', Icons.close, _closeSearch),
+          ]),
+          if (_replaceOpen && editable) ...[
+            const SizedBox(height: 4),
+            Row(children: [
+              Expanded(
+                  child: TextField(
+                controller: _replacementController,
+                decoration: const InputDecoration(
+                    isDense: true,
+                    hintText: 'Replace with...',
+                    border: OutlineInputBorder()),
+                onSubmitted: (_) {
+                  if (hasMatches) _replaceSearchMatch();
+                },
+              )),
+              button('Match case', Icons.text_fields, () {
+                setState(() => _replaceMatchCase = !_replaceMatchCase);
+                _refreshSearchMatches();
+              }, selected: _replaceMatchCase),
+              button('Replace match', Icons.find_replace,
+                  hasMatches ? _replaceSearchMatch : null),
+              button(
+                  'Replace all',
+                  Icons.published_with_changes,
+                  hasMatches
+                      ? () {
+                          _controller.replaceAllMatches(_searchController.text,
+                              _replacementController.text,
+                              caseSensitive: _replaceMatchCase);
+                        }
+                      : null),
+            ]),
           ],
-        ),
+        ]),
       ),
     );
+  }
+
+  void _setReplaceOpen(bool open) {
+    setState(() {
+      _searchOpen = true;
+      _replaceOpen = open;
+      _currentSearchMatchIndex = 0;
+    });
+    _refreshSearchMatches();
+  }
+
+  void _replaceSearchMatch() {
+    final match = _searchMatches[_currentSearchMatchIndex];
+    final replacement = _replacementController.text;
+    _controller
+        .runTransaction(() => _controller.replaceRange(match, replacement));
+    if (_searchMatches.isEmpty) return;
+    final next = _searchMatches
+        .indexWhere((range) => range.start >= match.start + replacement.length);
+    setState(() => _currentSearchMatchIndex = next < 0 ? 0 : next);
   }
 
   Widget _buildSlashCommands(
@@ -2152,7 +2223,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   Widget _buildEmptyFormattedEditor(BuildContext context) {
-    return TextField(
+    return _clipboardField(TextField(
+      contextMenuBuilder: EditorClipboardField.contextMenu,
       key: _sourceKey,
       controller: _controller.textController,
       focusNode: _focusNode,
@@ -2167,7 +2239,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         border: InputBorder.none,
         hintText: widget.placeholder ?? 'Start writing...',
       ),
-    );
+    ));
   }
 
   Widget _buildFormattedDraggableSegment(
@@ -2414,24 +2486,27 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     BuildContext context,
     _MarkdownBlockSegment segment,
   ) {
-    return TextField(
-      key: ValueKey(
-        'smooth_markdown_editor_formatted_active_${segment.range.start}',
-      ),
-      controller: _formattedBlockController,
-      focusNode: _formattedBlockFocusNode,
-      enabled: widget.enabled,
-      autofocus: true,
-      minLines: 1,
-      maxLines: null,
-      style: _formattedEditingTextStyle(context, segment.block),
-      keyboardType: TextInputType.multiline,
-      decoration: const InputDecoration(
-        border: OutlineInputBorder(),
-        isDense: true,
-        contentPadding: EdgeInsets.all(12),
-      ),
-    );
+    return _clipboardField(
+        TextField(
+          contextMenuBuilder: EditorClipboardField.contextMenu,
+          key: ValueKey(
+            'smooth_markdown_editor_formatted_active_${segment.range.start}',
+          ),
+          controller: _formattedBlockController,
+          focusNode: _formattedBlockFocusNode,
+          enabled: widget.enabled,
+          autofocus: true,
+          minLines: 1,
+          maxLines: null,
+          style: _formattedEditingTextStyle(context, segment.block),
+          keyboardType: TextInputType.multiline,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            isDense: true,
+            contentPadding: EdgeInsets.all(12),
+          ),
+        ),
+        insertRichMarkdown: _pasteIntoFormattedBlock);
   }
 
   Widget _buildFormattedListSegment(
@@ -3128,40 +3203,43 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             constraints: const BoxConstraints(minWidth: 96),
             child: Padding(
               padding: const EdgeInsets.all(6),
-              child: TextField(
-                key: ValueKey(
-                  'smooth_markdown_editor_table_cell_active_${table.id}_${keyPrefix}_$columnIndex',
-                ),
-                controller: _tableCellController,
-                focusNode: _tableCellFocusNode,
-                enabled: widget.enabled,
-                autofocus: true,
-                minLines: 1,
-                maxLines: null,
-                textAlign: textAlign,
-                style: textStyle,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: editorTheme.tableActiveBorderColor ??
-                          theme.colorScheme.primary.withOpacity(0.45),
+              child: _clipboardField(
+                  TextField(
+                    contextMenuBuilder: EditorClipboardField.contextMenu,
+                    key: ValueKey(
+                      'smooth_markdown_editor_table_cell_active_${table.id}_${keyPrefix}_$columnIndex',
+                    ),
+                    controller: _tableCellController,
+                    focusNode: _tableCellFocusNode,
+                    enabled: widget.enabled,
+                    autofocus: true,
+                    minLines: 1,
+                    maxLines: null,
+                    textAlign: textAlign,
+                    style: textStyle,
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: editorTheme.tableActiveBorderColor ??
+                              theme.colorScheme.primary.withOpacity(0.45),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: editorTheme.tableActiveBorderColor ??
+                              theme.colorScheme.primary,
+                          width: 1.5,
+                        ),
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
                     ),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: editorTheme.tableActiveBorderColor ??
-                          theme.colorScheme.primary,
-                      width: 1.5,
-                    ),
-                  ),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                ),
-              ),
+                  insertRichMarkdown: _pasteIntoTableCell),
             ),
           ),
         ),
@@ -5571,6 +5649,17 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     );
   }
 
+  Widget _clipboardField(
+    TextField field, {
+    bool Function(TextSelection, String)? insertRichMarkdown,
+  }) =>
+      EditorClipboardField(
+        insertRichMarkdown: insertRichMarkdown,
+        readClipboard: widget.readClipboard,
+        onPasteImage: widget.onPasteImage,
+        child: field,
+      );
+
   Widget _buildSourcePane(BuildContext context) {
     final theme = Theme.of(context);
     final editorTheme = _effectiveEditorTheme(context);
@@ -5579,7 +5668,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       decoration: widget.sourceDecoration ??
           editorTheme.sourceDecoration ??
           BoxDecoration(color: theme.colorScheme.surface),
-      child: TextField(
+      child: _clipboardField(TextField(
+        contextMenuBuilder: EditorClipboardField.contextMenu,
         key: _sourceKey,
         controller: _controller.textController,
         focusNode: _focusNode,
@@ -5597,7 +5687,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           hintText: widget.placeholder,
           contentPadding: editorTheme.sourcePadding ?? const EdgeInsets.all(16),
         ),
-      ),
+      )),
     );
   }
 
@@ -6773,18 +6863,74 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     return true;
   }
 
+  bool _pasteIntoFormattedBlock(TextSelection selection, String markdown) {
+    final range = _activeFormattedRange;
+    final blockId = _activeFormattedBlockId;
+    if (!_activeFormattedPlainText || range == null || blockId == null) {
+      return false;
+    }
+    final block = _controller.document.blockById(blockId);
+    if (block == null ||
+        block is MarkdownCodeBlock ||
+        block is MarkdownMermaidBlock) {
+      return false;
+    }
+    return _controller.runTransaction(() => _applyFormattedMarkdownPaste(
+          range,
+          block,
+          markdown,
+          explicitPaste:
+              _PlainTextDiff(range: selection, replacement: markdown),
+        ));
+  }
+
+  bool _pasteIntoTableCell(TextSelection selection, String markdown) {
+    final cell = _activeTableCell;
+    if (cell == null) return false;
+    final parsed =
+        MarkdownDocumentCodec(plugins: widget.plugins).parse(markdown);
+    final inlines = <MarkdownInlineNode>[];
+    for (final block in parsed.blocks) {
+      if (inlines.isNotEmpty) inlines.add(const MarkdownText(' '));
+      inlines.addAll(switch (block) {
+        MarkdownParagraphBlock() => _normalizeInlinePasteNodes(block.children),
+        MarkdownHeadingBlock() => _normalizeInlinePasteNodes(block.children),
+        MarkdownImageBlock() => [
+            MarkdownImage(url: block.url, alt: block.alt, title: block.title)
+          ],
+        _ => [MarkdownText(block.plainText.replaceAll('\n', ' '))],
+      });
+    }
+    if (inlines.isEmpty) return false;
+    final replaced = _controller.runTransaction(
+        () => _controller.documentEditor.replaceTableCellRangeWithInlineNodes(
+              blockId: cell.tableId,
+              rowIndex: cell.rowIndex,
+              columnIndex: cell.columnIndex,
+              header: cell.header,
+              range: selection,
+              replacement: inlines,
+            ));
+    if (replaced) {
+      _syncActiveTableCell(
+          selectionOffset: selection.start + _inlinePlainText(inlines).length);
+    }
+    return replaced;
+  }
+
   bool _applyFormattedMarkdownPaste(
     TextRange range,
     MarkdownBlock? block,
-    String replacement,
-  ) {
+    String replacement, {
+    _PlainTextDiff? explicitPaste,
+  }) {
     if (block == null) {
       return false;
     }
 
-    final diff = _plainTextDiff(block.plainText, replacement);
+    final diff = explicitPaste ?? _plainTextDiff(block.plainText, replacement);
     final pastedMarkdown = diff.replacement;
-    if (!_looksLikePastedMarkdown(pastedMarkdown)) {
+    if (explicitPaste == null && !_looksLikePastedMarkdown(pastedMarkdown)) {
       return false;
     }
 
@@ -6795,7 +6941,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     }
 
     final isSingleLine = !pastedMarkdown.trimRight().contains('\n');
-    if (isSingleLine && _looksLikeFormattedInputRuleTrigger(pastedMarkdown)) {
+    if (explicitPaste == null &&
+        isSingleLine &&
+        _looksLikeFormattedInputRuleTrigger(pastedMarkdown)) {
       return false;
     }
 
@@ -6803,8 +6951,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       return _applyFormattedInlineMarkdownPaste(
         range,
         block,
-        replacement,
         diff,
+        explicitPaste: explicitPaste != null,
       );
     }
 
@@ -6836,13 +6984,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   }
 
   bool _applyFormattedInlineMarkdownPaste(
-    TextRange range,
-    MarkdownBlock block,
-    String replacement,
-    _PlainTextDiff diff,
-  ) {
+      TextRange range, MarkdownBlock block, _PlainTextDiff diff,
+      {required bool explicitPaste}) {
     if (!_usesPlainTextEditing(block)) return false;
-    if (!_textBlockHasOnlyPlainText(block)) return false;
+    if (!explicitPaste && !_textBlockHasOnlyPlainText(block)) return false;
 
     final parsed = MarkdownDocumentCodec(plugins: widget.plugins).parse(
       diff.replacement,
@@ -6858,7 +7003,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     final normalizedChildren =
         children == null ? null : _normalizeInlinePasteNodes(children);
     if (normalizedChildren == null || normalizedChildren.isEmpty) return false;
-    if (normalizedChildren.length == 1 &&
+    if (!explicitPaste &&
+        normalizedChildren.length == 1 &&
         normalizedChildren.single is MarkdownText &&
         normalizedChildren.single.plainText == diff.replacement) {
       return false;
@@ -7699,6 +7845,17 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       if (_copyActiveFormattedSelectionAsMarkdown()) {
         return KeyEventResult.handled;
       }
+    }
+    final replaceShortcut = (!alt && key == LogicalKeyboardKey.keyH) ||
+        (alt &&
+            HardwareKeyboard.instance.isMetaPressed &&
+            key == LogicalKeyboardKey.keyF);
+    if (!shift &&
+        replaceShortcut &&
+        widget.enabled &&
+        _mode != MarkdownEditorMode.preview) {
+      _setReplaceOpen(true);
+      return KeyEventResult.handled;
     }
     if (!shift && !alt && key == LogicalKeyboardKey.keyF) {
       _openSearch();
@@ -10348,6 +10505,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   void _closeSearch() {
     setState(() {
       _searchOpen = false;
+      _replaceOpen = false;
       _searchMatches = const [];
       _currentSearchMatchIndex = 0;
       _lastSearchQuery = '';
@@ -10470,8 +10628,9 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
 
   List<TextRange> _findSearchMatches(String query) {
     if (query.isEmpty) return const [];
-    if (_mode == MarkdownEditorMode.source) {
-      return _controller.findMatches(query);
+    if (_replaceOpen || _mode == MarkdownEditorMode.source) {
+      return _controller.findMatches(query,
+          caseSensitive: _replaceOpen && _replaceMatchCase);
     }
 
     final matches = <TextRange>[];
@@ -11436,6 +11595,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         'text',
         _SearchHighlightTextBuilder(
           query: searchQuery,
+          caseSensitive: _replaceOpen && _replaceMatchCase,
           backgroundColor:
               Theme.of(context).colorScheme.primary.withOpacity(0.22),
         ),
@@ -11526,10 +11686,12 @@ class _FrontmatterEditorState extends State<_FrontmatterEditor> {
 class _SearchHighlightTextBuilder extends MarkdownWidgetBuilder {
   const _SearchHighlightTextBuilder({
     required this.query,
+    required this.caseSensitive,
     required this.backgroundColor,
   });
 
   final String query;
+  final bool caseSensitive;
   final Color backgroundColor;
 
   @override
@@ -11546,27 +11708,20 @@ class _SearchHighlightTextBuilder extends MarkdownWidgetBuilder {
       return Text(text);
     }
 
-    final lowerText = text.toLowerCase();
-    final lowerQuery = query.toLowerCase();
+    final matches = RegExp(RegExp.escape(query),
+            caseSensitive: caseSensitive, unicode: true)
+        .allMatches(text);
     final spans = <TextSpan>[];
     var cursor = 0;
-    var matchStart = lowerText.indexOf(lowerQuery);
-
-    while (matchStart != -1) {
-      if (matchStart > cursor) {
-        spans.add(TextSpan(text: text.substring(cursor, matchStart)));
+    for (final match in matches) {
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: text.substring(cursor, match.start)));
       }
-
-      final matchEnd = matchStart + query.length;
-      spans.add(
-        TextSpan(
-          text: text.substring(matchStart, matchEnd),
-          style: TextStyle(backgroundColor: backgroundColor),
-        ),
-      );
-
-      cursor = matchEnd;
-      matchStart = lowerText.indexOf(lowerQuery, cursor);
+      spans.add(TextSpan(
+        text: text.substring(match.start, match.end),
+        style: TextStyle(backgroundColor: backgroundColor),
+      ));
+      cursor = match.end;
     }
 
     if (cursor < text.length) {
