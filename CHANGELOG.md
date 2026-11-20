@@ -7,12 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-20
+
+### Upgrade requirements
+
+- The minimum supported toolchain is Flutter 3.38 and Dart 3.10. Version 0.10.0 remains available for projects using earlier SDKs.
+- Native source builds require Cargo, Rust and the target for each platform. The build hook compiles the vendored core offline. Web builds continue to use Dart.
+
+### Added
+
+- `SmoothMarkdown.sliver` for static documents and `StreamMarkdown.sliver` for live responses in a parent-owned `CustomScrollView`. Eligible views build the visible blocks and nearby scroll cache. Whole-document selection keeps the existing complete tree.
+- Shared Rust core 0.2.0 for native batch and incremental parsing, host plugins, reference links, syntax highlighting, unified diffs and HTML export. Select `MarkdownParserBackend.legacyDart` to use the Dart parser.
+- `MarkdownCodeView`, `MarkdownDiffView` and `MarkdownSyntaxTheme`, including language-aware `diff dart` fenced blocks and custom code-builder precedence.
+- An example gallery with a long-document reader, offline field guide, streamable AI answers and a two-file code review. The long-document reader accepts pasted Markdown and includes the 435,200-unit benchmark sample.
+
+### Changed
+
+- Dart and Rust streaming retain committed blocks and update the changing tail. Incremental eligibility checks handle table separators and plugin markers split across publications. Native snapshots share unchanged node pages.
+- Compatible large static documents can show initial blocks while parsing the full input on a worker isolate on native targets. Automatic parsing falls back to Dart above the native input limit, including streams that cross it during an append.
+- Improved Dart parsing of long aligned text and paragraphs containing CJK characters. Native parsing reduces UTF-16 transfers, intermediate allocations and repeated AST decoding.
+- The parser and editor preserve compatibility paths for HTML, disclosures, ragged tables and in-progress whitespace edits. The existing box constructors and editor HTML-copy behavior remain available.
+
 ## [0.10.0] - 2026-09-18
 
 ### Added
 - Basic native Mermaid state, class and ER diagram rendering, including state
   terminals, class member compartments, UML relationships and ER cardinalities.
-  See [syntax coverage](docs/mermaid-structured-diagrams.md) for limitations.
+  See [syntax coverage](https://github.com/JackCaow/flutter-smooth-markdown/blob/v0.10.0/docs/mermaid-structured-diagrams.md) for limitations.
 
 ### Fixed
 - Self-loop arrowheads follow the curve tangent, with label space reserved
@@ -555,7 +576,8 @@ None - All optimizations are opt-in or enabled by default without breaking exist
 - 87+ unit tests with comprehensive coverage
 - Flutter lints enabled for code quality
 
-[Unreleased]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.9.0...v0.10.0
 [0.8.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.7.4...v0.8.0
 [0.7.4]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.7.3...v0.7.4

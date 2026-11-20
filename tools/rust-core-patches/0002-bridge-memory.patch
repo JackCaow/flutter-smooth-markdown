@@ -1,0 +1,749 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -9,6 +9,10 @@
+ name = "smooth_markdown_rust"
+ crate-type = ["rlib", "staticlib", "cdylib"]
+ 
++[features]
++# Internal Flutter build; the default Rust struct API is unchanged.
++flutter-compact-ast = []
++
+ [dependencies]
+ 
+ [profile.release]
+--- a/src/ast.rs
++++ b/src/ast.rs
+@@ -50,12 +50,82 @@
+     }
+ }
+ 
+-#[derive(Debug, Clone, PartialEq, Eq)]
++#[derive(Clone)]
++#[cfg_attr(not(feature = "flutter-compact-ast"), derive(Debug, PartialEq, Eq))]
+ pub struct Node {
++    #[cfg(feature = "flutter-compact-ast")]
++    attributes: Option<Box<NodeAttributes>>,
+     pub kind: Kind,
+     pub span: Span,
+     pub source: String,
+     pub children: Vec<Node>,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub level: u32,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub info: String,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub destination: String,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub title: Option<String>,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub ordered: bool,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub checked: Option<bool>,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub tight: Option<bool>,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub list_start: Option<u32>,
++    pub literal: Option<String>,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub alignments: Vec<Option<String>>,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub label: String,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub html_header: bool,
++    #[cfg(not(feature = "flutter-compact-ast"))]
++    pub html_number: Option<i64>,
++}
++impl Node {
++    pub fn new(kind: Kind, source: impl Into<String>, start: u32, len: u32) -> Self {
++        Self {
++            #[cfg(feature = "flutter-compact-ast")]
++            attributes: None,
++            kind,
++            span: Span { start, len },
++            source: source.into(),
++            children: Vec::new(),
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            level: 0,
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            info: String::new(),
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            destination: String::new(),
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            title: None,
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            ordered: false,
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            checked: None,
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            tight: None,
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            list_start: None,
++            literal: None,
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            alignments: Vec::new(),
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            label: String::new(),
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            html_header: false,
++            #[cfg(not(feature = "flutter-compact-ast"))]
++            html_number: None,
++        }
++    }
++}
++// Private build feature: the default Rust Node API/layout remains unchanged.
++#[cfg(feature = "flutter-compact-ast")]
++#[derive(Debug, Clone, PartialEq, Eq, Default)]
++pub struct NodeAttributes {
+     pub level: u32,
+     pub info: String,
+     pub destination: String,
+@@ -64,35 +134,72 @@
+     pub checked: Option<bool>,
+     pub tight: Option<bool>,
+     pub list_start: Option<u32>,
+-    pub literal: Option<String>,
+     pub alignments: Vec<Option<String>>,
+     pub label: String,
+     pub html_header: bool,
+     pub html_number: Option<i64>,
+ }
+-impl Node {
+-    pub fn new(kind: Kind, source: impl Into<String>, start: u32, len: u32) -> Self {
+-        Self {
+-            kind,
+-            span: Span { start, len },
+-            source: source.into(),
+-            children: Vec::new(),
+-            level: 0,
+-            info: String::new(),
+-            destination: String::new(),
+-            title: None,
+-            ordered: false,
+-            checked: None,
+-            tight: None,
+-            list_start: None,
+-            literal: None,
+-            alignments: Vec::new(),
+-            label: String::new(),
+-            html_header: false,
+-            html_number: None,
+-        }
+-    }
+-}
++#[cfg(feature = "flutter-compact-ast")]
++static EMPTY_ATTRIBUTES: NodeAttributes = NodeAttributes {
++    level: 0,
++    info: String::new(),
++    destination: String::new(),
++    title: None,
++    ordered: false,
++    checked: None,
++    tight: None,
++    list_start: None,
++    alignments: Vec::new(),
++    label: String::new(),
++    html_header: false,
++    html_number: None,
++};
++#[cfg(feature = "flutter-compact-ast")]
++impl std::ops::Deref for Node {
++    type Target = NodeAttributes;
++    fn deref(&self) -> &Self::Target { self.attributes.as_deref().unwrap_or(&EMPTY_ATTRIBUTES) }
++}
++#[cfg(feature = "flutter-compact-ast")]
++impl std::ops::DerefMut for Node {
++    fn deref_mut(&mut self) -> &mut Self::Target {
++        self.attributes.get_or_insert_with(|| Box::new(NodeAttributes::default()))
++    }
++}
++#[cfg(feature = "flutter-compact-ast")]
++impl PartialEq for Node {
++    fn eq(&self, other: &Self) -> bool {
++        self.kind == other.kind && self.span == other.span && self.source == other.source
++            && self.children == other.children && self.literal == other.literal
++            && **self == **other
++    }
++}
++#[cfg(feature = "flutter-compact-ast")]
++impl Eq for Node {}
++#[cfg(feature = "flutter-compact-ast")]
++impl std::fmt::Debug for Node {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("Node")
++            .field("kind", &self.kind)
++            .field("span", &self.span)
++            .field("source", &self.source)
++            .field("children", &self.children)
++            .field("level", &self.level)
++            .field("info", &self.info)
++            .field("destination", &self.destination)
++            .field("title", &self.title)
++            .field("ordered", &self.ordered)
++            .field("checked", &self.checked)
++            .field("tight", &self.tight)
++            .field("list_start", &self.list_start)
++            .field("literal", &self.literal)
++            .field("alignments", &self.alignments)
++            .field("label", &self.label)
++            .field("html_header", &self.html_header)
++            .field("html_number", &self.html_number)
++            .finish()
++    }
++}
++
+ #[derive(Debug, Clone, Copy)]
+ pub struct Options {
+     pub gfm: bool,
+@@ -115,3 +222,18 @@
+ pub fn utf16_len(s: &str) -> u32 {
+     s.encode_utf16().count() as u32
+ }
++
++#[cfg(all(test, feature = "flutter-compact-ast", target_pointer_width = "64"))]
++mod compact_contract {
++    use super::*;
++    #[test]
++    fn compact_leaf_size_and_default_metadata_equality() {
++        assert!(std::mem::size_of::<Node>() <= 96);
++        let a = Node::new(Kind::Text, "text", 0, 4);
++        let mut b = a.clone();
++        assert!(a.attributes.is_none());
++        b.level = 0;
++        assert!(b.attributes.is_some());
++        assert_eq!(a, b);
++    }
++}
+--- a/src/block.rs
++++ b/src/block.rs
+@@ -691,12 +691,17 @@
+         )
+     }
+     fn scan(&self, lines: &[Line], references: &References, depth: usize) -> Vec<Node> {
++        let mut result = Vec::new();
++        self.scan_into(lines, references, depth, |node| result.push(node));
++        result
++    }
++    fn scan_into(&self, lines: &[Line], references: &References, depth: usize, mut emit: impl FnMut(Node)) {
+         if lines.is_empty() {
+-            return Vec::new();
++            return;
+         }
+         // Keep room for host callback/context frames on small native worker stacks.
+         if depth >= 64 {
+-            return vec![self.node(Kind::Raw, lines, 0, lines.len())];
++            emit(self.node(Kind::Raw, lines, 0, lines.len())); return;
+         }
+         if self.hooks.is_some() {
+             self.block_contexts.borrow_mut().push((lines.as_ptr() as usize,lines.len(),lines.iter().map(|l|l.text.encode_utf16().collect()).collect()));
+@@ -706,7 +711,6 @@
+             h.begin_block(&contexts.last().unwrap().2);
+         }
+         let _scope=crate::hooks::BlockScope(self.hooks);
+-        let mut result = Vec::new();
+         let mut index = 0;
+         while index < lines.len() {
+             if lines[index].blank() {
+@@ -722,13 +726,13 @@
+                     node.label = def.label;
+                     node.destination = def.destination;
+                     node.title = def.title;
+-                    result.push(node);
++                    emit(node);
+                     continue;
+                 }
+             }
+             if self.hooks_before_fences {
+                 if let Some((node,end)) = self.custom_node(lines,index) {
+-                    result.push(node);index=end;continue;
++                    emit(node);index=end;continue;
+                 }
+             }
+             if let Some(fence) = fence_open(text) {
+@@ -751,12 +755,12 @@
+                     literal.push('\n')
+                 }
+                 node.literal = Some(literal);
+-                result.push(node);
++                emit(node);
+                 continue;
+             }
+             if !self.hooks_before_fences {
+                 if let Some((node,end)) = self.custom_node(lines,index) {
+-                    result.push(node);index=end;continue;
++                    emit(node);index=end;continue;
+                 }
+             }
+             if self.options.extensions {
+@@ -801,7 +805,7 @@
+                     let mut contents = vec![body_line];
+                     contents.extend(lines[first+1..index].iter().map(|line| project(line,4)));
+                     node.children = self.scan(&contents, references, depth+1);
+-                    result.push(node);
++                    emit(node);
+                     continue;
+                 }
+             }
+@@ -837,8 +841,8 @@
+                 }
+                 if let Some(end) = close { body.truncate(end); }
+                 node.literal = Some(body.trim().to_owned());
+-                result.push(node);
+-                if let Some(paragraph) = trailing { result.push(paragraph); }
++                emit(node);
++                if let Some(paragraph) = trailing { emit(paragraph); }
+                 continue;
+             }
+             if let (Some((level, prefix, body)), _) = (heading(text), ()) {
+@@ -852,12 +856,12 @@
+                     self.options,
+                     self.hooks,
+                 );
+-                result.push(node);
++                emit(node);
+                 index += 1;
+                 continue;
+             }
+             if thematic(text) {
+-                result.push(self.node(Kind::ThematicBreak, lines, first, first + 1));
++                emit(self.node(Kind::ThematicBreak, lines, first, first + 1));
+                 index += 1;
+                 continue;
+             }
+@@ -896,13 +900,13 @@
+                         node.children.push(row_node);
+                     }
+                     node.alignments = alignments;
+-                    result.push(node);
++                    emit(node);
+                     continue;
+                 }
+             }
+             if list_marker(text, 3).is_some() {
+                 let (node, next) = self.list(lines, index, references, depth);
+-                result.push(node);
++                emit(node);
+                 index = next;
+                 continue;
+             }
+@@ -923,7 +927,7 @@
+                 let projected: Vec<Line> = lines[first..index].iter().map(project_quote).collect();
+                 let mut node = self.node(Kind::BlockQuote, lines, first, index);
+                 node.children = self.scan(&projected, references, depth + 1);
+-                result.push(node);
++                emit(node);
+                 continue;
+             }
+             if indent(text) >= 4 {
+@@ -946,7 +950,7 @@
+                     literal.push('\n')
+                 }
+                 node.literal = Some(literal);
+-                result.push(node);
++                emit(node);
+                 continue;
+             }
+             if let Some(end) = html_end(text, false) {
+@@ -969,7 +973,7 @@
+                         .map(|line| line.raw.replace("\r\n", "\n").replace('\r', "\n"))
+                         .collect::<String>(),
+                 );
+-                result.push(node);
++                emit(node);
+                 continue;
+             }
+             index += 1;
+@@ -987,17 +991,16 @@
+                     let mut node = self.node(Kind::Heading, lines, first, index + 1);
+                     node.level = level;
+                     node.children = self.paragraph(&lines[first..index], references, true);
+-                    result.push(node);
++                    emit(node);
+                     index += 1;
+                     continue;
+                 }
+             }
+             let mut node = self.node(Kind::Paragraph, lines, first, index);
+             node.children = self.paragraph(&lines[first..index], references, false);
+-            result.push(node);
++            emit(node);
+         }
+         if self.hooks.is_some() { self.block_contexts.borrow_mut().pop(); }
+-        result
+     }
+     fn paragraph(&self, lines: &[Line], refs: &References, setext: bool) -> Vec<Node> {
+         if lines.is_empty() {
+@@ -1230,7 +1233,7 @@
+                 break;
+             }
+             let mut item = self.node(Kind::ListItem, lines, item_start, last_content + 1);
+-            item.checked = checked;
++            if checked.is_some() { item.checked = checked; }
+             item.children = self.scan(&contents, references, depth + 1);
+             items.push(item);
+             if index >= lines.len()
+@@ -1506,9 +1509,29 @@
+     node.children = if references.is_empty() {
+         first
+     } else {
++        drop(first);
+         scanner.scan(&lines, &references, 0)
+     };
+     node
++}
++
++/// FFI sink: never hold the entire top-level forest alongside its wire buffer.
++/// None rewinds the first pass when reference definitions require resolution.
++pub(crate) fn visit_blocks(source: &str, options: Options,
++    hooks: Option<&dyn crate::hooks::Hooks>, hooks_before_fences: bool,
++    mut emit: impl FnMut(Option<&Node>)) {
++    let scanner = Scanner { utf16: source.encode_utf16().collect(), options, hooks,
++        hooks_before_fences, block_contexts: std::cell::RefCell::new(Vec::new()) };
++    let lines = lines(source);
++    let mut references = References::new();
++    scanner.scan_into(&lines, &References::new(), 0, |node| {
++        collect_references(std::slice::from_ref(&node), &mut references);
++        emit(Some(&node));
++    });
++    if !references.is_empty() {
++        emit(None);
++        scanner.scan_into(&lines, &references, 0, |node| emit(Some(&node)));
++    }
+ }
+ 
+ #[cfg(test)]
+--- a/src/ffi.rs
++++ b/src/ffi.rs
+@@ -69,6 +69,36 @@
+     }
+ }
+ 
++/// Optional ABI-1 extension. Decode against the accumulated source. The older
++/// complete-prefix entry remains valid and supports replacements after appends.
++#[no_mangle]
++pub unsafe extern "C" fn smr_stream_append_utf16(
++    session: *mut c_void, suffix: *const u16, length: usize,
++    result: *mut SmrBuffer, retained_blocks: *mut u32,
++) -> i32 {
++    if !result.is_null() { *result = SmrBuffer::default(); }
++    if !retained_blocks.is_null() { *retained_blocks = 0; }
++    if session.is_null() { return 1; }
++    let session = &mut *session.cast::<crate::stream::Session>();
++    if result.is_null() || retained_blocks.is_null() || (length != 0 && suffix.is_null()) {
++        session.reset(); return 1;
++    }
++    if length > MAX_UNITS.saturating_sub(session.source().len()) { session.reset(); return 2; }
++    let attempt = catch_unwind(AssertUnwindSafe(|| {
++        let units = if length == 0 { &[][..] } else { std::slice::from_raw_parts(suffix, length) };
++        let delta = session.append(units);
++        if delta.total_nodes > MAX_NODES || delta.total_wire_bytes > MAX_WIRE_BYTES { return Err(2); }
++        let retained = delta.retained_blocks as u32;
++        let bytes = encode(&delta.into_wire_root(), session.source())?;
++        Ok::<_, i32>((owned(bytes), retained))
++    }));
++    match attempt {
++        Ok(Ok((buffer, retained))) => { *result = buffer; *retained_blocks = retained; 0 }
++        Ok(Err(status)) => { session.reset(); status }
++        Err(_) => { session.reset(); 3 }
++    }
++}
++
+ /// Caller supplies a readable UTF-16 allocation and a writable, empty result.
+ /// Input is copied before parsing. Original UTF-16 is retained for source strings,
+ /// including temporary isolated surrogates from an editor/streaming prefix.
+@@ -90,23 +120,16 @@
+         return 1;
+     }
+     let attempt = catch_unwind(AssertUnwindSafe(|| {
+-        let units = if length == 0 {
+-            Vec::new()
+-        } else {
+-            std::slice::from_raw_parts(source, length).to_vec()
++        let units = if length == 0 { &[][..] } else {
++            std::slice::from_raw_parts(source, length)
+         };
+-        let text = String::from_utf16_lossy(&units);
+-        // Lossy decoding preserves UTF-16 length: each unpaired surrogate becomes
+-        // one replacement character; valid surrogate pairs remain two units.
++        // Own the decoded text before parsing; source fields in SMR1 refer to
++        // the caller's original UTF-16, so no second UTF-16 input copy is needed.
++        let text = String::from_utf16_lossy(units);
+         debug_assert_eq!(utf16_len(&text) as usize, units.len());
+-        let tree = crate::parse(
+-            &text,
+-            Options {
+-                gfm: options & 1 != 0,
+-                extensions: options & 2 != 0,
+-            },
+-        );
+-        let bytes = encode(&tree, &units)?;
++        let bytes = encode_blocks(&text, units.len(), Options {
++            gfm: options & 1 != 0, extensions: options & 2 != 0,
++        }, None, false)?;
+         let owner = Box::new(bytes);
+         let output = SmrBuffer {
+             data: owner.as_ptr(),
+@@ -265,6 +288,78 @@
+     56 + values.into_iter().flatten().map(|v| v.encode_utf16().count() * 2).sum::<usize>()
+         + node.alignments.iter().map(|v| 4 + v.as_ref().map_or(0, |v| v.encode_utf16().count() * 2)).sum::<usize>()
+ }
++fn encode_node(out: &mut Vec<u8>, node: &Node) {
++    word(out, node.kind as u32);
++    word(out, node.span.start);
++    word(out, node.span.len);
++    word(out, node.level);
++    let flags = u32::from(node.ordered)
++        | (u32::from(node.checked == Some(true)) << 1)
++        | (u32::from(node.checked.is_some()) << 2)
++        | (u32::from(node.tight == Some(true)) << 3)
++        | (u32::from(node.tight.is_some()) << 4)
++        | (u32::from(node.list_start.is_some()) << 5);
++    word(out, flags);
++    word(out, node.list_start.unwrap_or(0));
++    word(out, node.children.len() as u32);
++    word(out, 0xfffffffe);
++    string(out, Some(&node.info));
++    string(out, Some(&node.destination));
++    string(out, node.title.as_deref());
++    string(out, node.literal.as_deref());
++    string(out, Some(&node.label));
++    word(out, node.alignments.len() as u32);
++    for alignment in &node.alignments {
++        string(out, alignment.as_deref());
++    }
++}
++
++/// SMR1 sink bounded identically to encode(), but only one top-level subtree
++/// remains alive during serialization. A reference pass can rewind this sink.
++fn encode_blocks(text: &str, units: usize, options: Options,
++    hooks: Option<&dyn crate::hooks::Hooks>, hooks_before_fences: bool) -> Result<Vec<u8>, i32> {
++    let root = Node::new(crate::ast::Kind::Document, "", 0, units as u32);
++    let mut out = Vec::new();
++    let mut nodes = 1usize;
++    let mut children = 0u32;
++    let mut failure = None;
++    let reset = |out: &mut Vec<u8>| {
++        out.clear(); out.extend_from_slice(b"SMR1"); word(out, 1); encode_node(out, &root);
++    };
++    reset(&mut out);
++    crate::block::visit_blocks(text, options, hooks, hooks_before_fences, |block| {
++        let Some(block) = block else {
++            reset(&mut out); nodes = 1; children = 0; failure = None; return;
++        };
++        if failure.is_some() { return; }
++        let mut bytes = out.len();
++        let mut count = nodes;
++        let mut stack = vec![(block, 1usize)];
++        while let Some((node, depth)) = stack.pop() {
++            count += 1;
++            if node.span.start as usize + node.span.len as usize > units {
++                failure = Some(3); return;
++            }
++            bytes += encoded_node_size(node);
++            if count > MAX_NODES || bytes > MAX_WIRE_BYTES || depth > 256 {
++                failure = Some(2); return;
++            }
++            stack.extend(node.children.iter().rev().map(|child| (child, depth + 1)));
++        }
++        // Vec grows geometrically across blocks; never reserve an entire AST.
++        let mut stack = vec![block];
++        while let Some(node) = stack.pop() {
++            encode_node(&mut out, node);
++            stack.extend(node.children.iter().rev());
++        }
++        nodes = count; children += 1;
++    });
++    if let Some(status) = failure { return Err(status); }
++    out[4..8].copy_from_slice(&(nodes as u32).to_le_bytes());
++    out[32..36].copy_from_slice(&children.to_le_bytes());
++    Ok(out)
++}
++
+ fn encode(root: &Node, original: &[u16]) -> Result<Vec<u8>, i32> {
+     let mut count = 0usize;
+     let mut wire_bytes = 8usize;
+@@ -291,29 +386,7 @@
+     word(&mut out, count as u32);
+     let mut stack = vec![root];
+     while let Some(node) = stack.pop() {
+-        word(&mut out, node.kind as u32);
+-        word(&mut out, node.span.start);
+-        word(&mut out, node.span.len);
+-        word(&mut out, node.level);
+-        let flags = u32::from(node.ordered)
+-            | (u32::from(node.checked == Some(true)) << 1)
+-            | (u32::from(node.checked.is_some()) << 2)
+-            | (u32::from(node.tight == Some(true)) << 3)
+-            | (u32::from(node.tight.is_some()) << 4)
+-            | (u32::from(node.list_start.is_some()) << 5);
+-        word(&mut out, flags);
+-        word(&mut out, node.list_start.unwrap_or(0));
+-        word(&mut out, node.children.len() as u32);
+-        word(&mut out, 0xfffffffe);
+-        string(&mut out, Some(&node.info));
+-        string(&mut out, Some(&node.destination));
+-        string(&mut out, node.title.as_deref());
+-        string(&mut out, node.literal.as_deref());
+-        string(&mut out, Some(&node.label));
+-        word(&mut out, node.alignments.len() as u32);
+-        for alignment in &node.alignments {
+-            string(&mut out, alignment.as_deref());
+-        }
++        encode_node(&mut out, node);
+         stack.extend(node.children.iter().rev());
+     }
+     Ok(out)
+@@ -606,8 +679,8 @@
+             error: std::cell::Cell::new(false),
+             block_contexts: std::cell::RefCell::new(Vec::new()),
+         });
+-        let ast = crate::block::parse_with_hook_policy(
+-            &text,
++        let bytes = encode_blocks(
++            &text, units.len(),
+             Options {
+                 gfm: options & 1 != 0,
+                 extensions: options & 2 != 0,
+@@ -618,7 +691,7 @@
+         if callbacks.as_ref().is_some_and(|c| c.error.get()) {
+             return Err(4);
+         }
+-        encode(&ast, units)
++        bytes
+     })
+ }
+ #[no_mangle]
+@@ -715,3 +788,67 @@
+         }))
+     })
+ }
++
++#[cfg(test)]
++mod bridge_contract {
++    use super::*;
++
++    unsafe fn bytes(buffer: &mut SmrBuffer) -> Vec<u8> {
++        let result = std::slice::from_raw_parts(buffer.data, buffer.len).to_vec();
++        smr_buffer_free(buffer); result
++    }
++
++    #[test]
++    fn block_sink_matches_whole_tree_encoding_at_every_utf16_prefix() {
++        let documents = [
++            "# **中文🙂**\r\n\r\n[site][ref]\n\n- [x] first\n  - second\n\n| A | B |\n| :- | -: |\n| x | y |\n\n[ref]: /target \"title\"\n",
++            "one\n\n> [id]: /first\n> [id]: /second\n\n***[link][id]***\n\n![image *alt*](url)\n\n\\[x\\] trailing\n\n[^a]: body\n    next\n",
++            "```dart\n[x]: literal\n```\n\n$$\nx^2\n$$\n\n<div>\nraw\n\nend\n",
++        ];
++        for document in documents {
++            let units: Vec<_> = document.encode_utf16().collect();
++            for end in 0..=units.len() {
++                for flags in 0..4 {
++                    let text = String::from_utf16_lossy(&units[..end]);
++                    let expected = encode(&crate::parse(&text, Options {
++                        gfm: flags & 1 != 0, extensions: flags & 2 != 0,
++                    }), &units[..end]).unwrap();
++                    let mut result = SmrBuffer::default();
++                    unsafe {
++                        assert_eq!(smr_parse_utf16(units.as_ptr(), end, flags, &mut result), 0);
++                        assert_eq!(bytes(&mut result), expected, "flags={flags}, prefix={end}");
++                    }
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn suffix_and_full_prefix_transports_match_including_edits_and_failures() {
++        let append = smr_stream_new(3); let full = smr_stream_new(3);
++        let source: Vec<_> = "one\n\ntwo\n\nthree\n\nfour🙂\n\n[site][ref]\n\n[ref]: /url\n".encode_utf16().collect();
++        let mut a = SmrBuffer::default(); let mut b = SmrBuffer::default();
++        let mut ar = 0; let mut br = 0;
++        unsafe {
++            for end in 1..=source.len() {
++                assert_eq!(smr_stream_append_utf16(append, source[end-1..].as_ptr(), 1, &mut a, &mut ar), 0);
++                assert_eq!(smr_stream_update_utf16(full, source.as_ptr(), end, &mut b, &mut br), 0);
++                assert_eq!(ar, br); assert_eq!(bytes(&mut a), bytes(&mut b));
++            }
++            assert_eq!(smr_stream_append_utf16(append, std::ptr::null(), 0, &mut a, &mut ar), 0);
++            assert_eq!(smr_stream_update_utf16(full, source.as_ptr(), source.len(), &mut b, &mut br), 0);
++            assert_eq!(ar, br); assert_eq!(bytes(&mut a), bytes(&mut b));
++            let edit: Vec<_> = "replacement\n\ntail".encode_utf16().collect();
++            assert_eq!(smr_stream_update_utf16(append, edit.as_ptr(), edit.len(), &mut a, &mut ar), 0);
++            assert_eq!(smr_stream_update_utf16(full, edit.as_ptr(), edit.len(), &mut b, &mut br), 0);
++            assert_eq!(ar, br); assert_eq!(bytes(&mut a), bytes(&mut b));
++            assert_eq!(smr_stream_append_utf16(append, std::ptr::null(), 1, &mut a, &mut ar), 1);
++            assert_eq!(ar, 0); assert!(a.owner.is_null());
++            assert_eq!(smr_stream_append_utf16(append, edit.as_ptr(), MAX_UNITS + 1, &mut a, &mut ar), 2);
++            assert!(a.owner.is_null());
++            assert_eq!(smr_stream_append_utf16(append, edit.as_ptr(), edit.len(), &mut a, &mut ar), 0);
++            assert_eq!(ar, 0); bytes(&mut a);
++            smr_stream_free(append); smr_stream_free(full);
++        }
++    }
++}
+--- a/src/stream.rs
++++ b/src/stream.rs
+@@ -52,18 +52,37 @@
+ 
+     pub fn update(&mut self, source: &[u16]) -> Delta {
+         let append = source.starts_with(&self.source);
+-        if append && source.len() == self.source.len() {
++        let previous_len = self.source.len();
++        let delta = self.update_tail(source, append, previous_len);
++        if append { self.source.extend_from_slice(&source[previous_len..]); }
++        else { self.source.clear(); self.source.extend_from_slice(source); }
++        delta
++    }
++
++    /// Additive transport entry: same parsing policy, only transfer new units.
++    pub fn append(&mut self, suffix: &[u16]) -> Delta {
++        let mut source = std::mem::take(&mut self.source);
++        let previous_len = source.len();
++        source.extend_from_slice(suffix);
++        let delta = self.update_tail(&source, true, previous_len);
++        self.source = source;
++        delta
++    }
++
++    pub(crate) fn source(&self) -> &[u16] { &self.source }
++
++    fn update_tail(&mut self, source: &[u16], append: bool, previous_len: usize) -> Delta {
++        if append && source.len() == previous_len {
+             return Delta {
+                 retained_blocks: self.blocks.len(), children: Vec::new(),
+                 source_units: source.len(), parsed_units: 0,
+-                total_nodes: self.total_nodes,
+-                total_wire_bytes: self.total_wire_bytes,
++                total_nodes: self.total_nodes, total_wire_bytes: self.total_wire_bytes,
+             };
+         }
+         // A definition can resolve links anywhere, including inside quotes and
+         // lists. Every recognized reference/footnote definition contains ]:.
+         // False positives (e.g. code strings) are intentionally conservative.
+-        let scan_start = if append { self.source.len().saturating_sub(1) } else { 0 };
++        let scan_start = if append { previous_len.saturating_sub(1) } else { 0 };
+         let definitions = (append && self.global_definitions)
+             || source[scan_start..].windows(2).any(|s| s == [b']' as u16, b':' as u16]);
+         let retained = if append && !definitions { self.blocks.len().saturating_sub(2) } else { 0 };
+@@ -84,8 +103,6 @@
+             self.total_nodes += stats.0; self.total_wire_bytes += stats.1;
+             self.blocks.push((node.span.start, stats.0, stats.1));
+         }
+-        if append { self.source.extend_from_slice(&source[self.source.len()..]); }
+-        else { self.source.clear(); self.source.extend_from_slice(source); }
+         self.global_definitions = definitions;
+         Delta {
+             retained_blocks: retained, children: root.children,
+--- a/include/smooth_markdown_rust.h
++++ b/include/smooth_markdown_rust.h
+@@ -24,6 +24,11 @@
+    Decode output against the supplied source before freeing it; free session once. */
+ void *smr_stream_new(uint32_t options);
+ int32_t smr_stream_update_utf16(void *session, const uint16_t *source, size_t length,
++                               SmrBuffer *result, uint32_t *retained_blocks);
++/* Optional ABI-1 extension: append just the new UTF-16 suffix. Same retention,
++   limits and invalidation as update. Empty suffix is an unchanged publication.
++   A later update may still replace the entire source. */
++int32_t smr_stream_append_utf16(void *session, const uint16_t *suffix, size_t length,
+                                SmrBuffer *result, uint32_t *retained_blocks);
+ void smr_stream_free(void *session);
+ typedef struct SmrMatch { uint32_t consumed; uint32_t id; } SmrMatch;

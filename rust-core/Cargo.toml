@@ -1,0 +1,23 @@
+[package]
+name = "smooth-markdown-rust"
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+description = "Owned source-preserving Markdown parser shared by native Smooth Markdown libraries"
+
+[lib]
+name = "smooth_markdown_rust"
+crate-type = ["rlib", "staticlib", "cdylib"]
+
+[features]
+# Internal Flutter build; the default Rust struct API is unchanged.
+flutter-compact-ast = []
+
+[dependencies]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = "debuginfo"
+

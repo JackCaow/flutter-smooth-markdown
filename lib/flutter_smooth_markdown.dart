@@ -1,9 +1,13 @@
 /// A high-performance Flutter package for smooth markdown rendering with streaming support
 library;
 
+// Shared-core highlighting and diff API.
+export 'src/rust/markdown_core.dart';
+
 // Export configuration
 export 'src/config/markdown_config.dart';
 export 'src/config/style_sheet.dart';
+export 'src/config/syntax_theme.dart' show MarkdownSyntaxTheme;
 
 // Export editor
 export 'src/editor/document/markdown_document.dart';
@@ -21,7 +25,8 @@ export 'src/parser/ast/html_nodes.dart';
 export 'src/parser/ast/markdown_node.dart';
 
 // Export parser
-export 'src/parser/markdown_parser.dart';
+export 'src/parser/markdown_parser.dart'
+    show MarkdownParser, MarkdownParserBackend;
 export 'src/parser/parse_cache.dart';
 
 // Export plugin system
@@ -55,6 +60,8 @@ export 'src/renderer/markdown_renderer.dart';
 export 'src/renderer/widget_builder.dart';
 
 // Export widgets
+export 'widgets/markdown_code_view.dart' show MarkdownCodeView;
+export 'widgets/markdown_diff_view.dart';
 export 'widgets/smooth_markdown.dart';
 export 'widgets/smooth_markdown_editor.dart';
 export 'widgets/smooth_selection_region.dart';

@@ -1,0 +1,250 @@
+{
+  "frames_legacyDart": {
+    "frame_count": 40,
+    "median_build_ms": 4.74,
+    "p95_build_ms": 10.199,
+    "average_build_ms": 4.9568249999999985,
+    "median_raster_ms": 0.834,
+    "p95_raster_ms": 1.362,
+    "average_raster_ms": 0.9825500000000001,
+    "build_over_16_7ms": 0
+  },
+  "frames_rust": {
+    "frame_count": 40,
+    "median_build_ms": 3.256,
+    "p95_build_ms": 4.32,
+    "average_build_ms": 3.311950000000001,
+    "median_raster_ms": 0.668,
+    "p95_raster_ms": 1.147,
+    "average_raster_ms": 0.75425,
+    "build_over_16_7ms": 0
+  },
+  "stream_frames_legacyDart": {
+    "frame_count": 40,
+    "median_build_ms": 4.677,
+    "p95_build_ms": 10.097,
+    "average_build_ms": 5.328525,
+    "median_raster_ms": 0.887,
+    "p95_raster_ms": 1.463,
+    "publications": 40,
+    "ai_registry": true
+  },
+  "stream_frames_rust": {
+    "frame_count": 40,
+    "median_build_ms": 1.098,
+    "p95_build_ms": 2.542,
+    "average_build_ms": 1.19335,
+    "median_raster_ms": 0.666,
+    "p95_raster_ms": 1.287,
+    "publications": 40,
+    "ai_registry": true
+  },
+  "metadata": {
+    "profile_mode": true,
+    "physical_size": [
+      646.0,
+      1200.0
+    ],
+    "device_pixel_ratio": 2.0,
+    "transport": "direct-flutter-ast",
+    "rust_opt_level": "3",
+    "platform": "macos",
+    "os": "Version 27.2 (Build 26B123)",
+    "render_utf16_units": 3264,
+    "note": "Single device, warm parses, no cache; parse includes FFI/decoding/Flutter adaptation. Frame tests use the same highlighter."
+  },
+  "parses": {
+    "small_message": {
+      "utf16_units": 60,
+      "rust_ffi_decode_adapt": {
+        "median_us": 6.748,
+        "p90_us": 15.726,
+        "iterations": 500,
+        "samples": [
+          3.906,
+          3.984,
+          4.2,
+          4.786,
+          6.748,
+          7.986,
+          9.352,
+          9.876,
+          15.726
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 3.418,
+        "p90_us": 7.23,
+        "iterations": 500,
+        "samples": [
+          3.4,
+          3.402,
+          3.402,
+          3.404,
+          3.418,
+          3.598,
+          3.674,
+          3.766,
+          7.23
+        ]
+      }
+    },
+    "mixed_document_12k": {
+      "utf16_units": 10880,
+      "rust_ffi_decode_adapt": {
+        "median_us": 698.6666666666666,
+        "p90_us": 1851.0833333333333,
+        "iterations": 12,
+        "samples": [
+          664.5833333333334,
+          668.5833333333334,
+          675.0833333333334,
+          676.5833333333334,
+          698.6666666666666,
+          708.5,
+          902.75,
+          1111.3333333333333,
+          1851.0833333333333
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 684.1666666666666,
+        "p90_us": 974.6666666666666,
+        "iterations": 12,
+        "samples": [
+          650.1666666666666,
+          651.25,
+          669.25,
+          677.75,
+          684.1666666666666,
+          692.25,
+          814.3333333333334,
+          901.4166666666666,
+          974.6666666666666
+        ]
+      }
+    },
+    "mixed_document_48k": {
+      "utf16_units": 43520,
+      "rust_ffi_decode_adapt": {
+        "median_us": 2966.3333333333335,
+        "p90_us": 3274.75,
+        "iterations": 12,
+        "samples": [
+          2877.1666666666665,
+          2933.0833333333335,
+          2939.5833333333335,
+          2943.5833333333335,
+          2966.3333333333335,
+          2985.0,
+          3115.0,
+          3129.3333333333335,
+          3274.75
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 2695.4166666666665,
+        "p90_us": 2747.4166666666665,
+        "iterations": 12,
+        "samples": [
+          2670.9166666666665,
+          2673.6666666666665,
+          2676.9166666666665,
+          2679.9166666666665,
+          2695.4166666666665,
+          2696.9166666666665,
+          2700.0833333333335,
+          2701.75,
+          2747.4166666666665
+        ]
+      }
+    },
+    "single_paragraph_48k": {
+      "utf16_units": 50400,
+      "rust_ffi_decode_adapt": {
+        "median_us": 2025.0,
+        "p90_us": 2075.25,
+        "iterations": 12,
+        "samples": [
+          1979.9166666666667,
+          2004.25,
+          2006.9166666666667,
+          2011.8333333333333,
+          2025.0,
+          2040.25,
+          2052.1666666666665,
+          2066.0,
+          2075.25
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 2581.25,
+        "p90_us": 2685.75,
+        "iterations": 12,
+        "samples": [
+          2327.0,
+          2481.75,
+          2497.3333333333335,
+          2518.6666666666665,
+          2581.25,
+          2613.5,
+          2638.9166666666665,
+          2656.4166666666665,
+          2685.75
+        ]
+      }
+    }
+  },
+  "streams": {
+    "utf16_units": 14800,
+    "publications": 58,
+    "rust_batch": {
+      "median_us": 24205.5,
+      "p90_us": 25526.0,
+      "iterations": 2,
+      "samples": [
+        23988.0,
+        24002.0,
+        24064.0,
+        24191.5,
+        24205.5,
+        24277.0,
+        24434.5,
+        25370.5,
+        25526.0
+      ]
+    },
+    "dart_batch": {
+      "median_us": 23220.5,
+      "p90_us": 23449.0,
+      "iterations": 2,
+      "samples": [
+        23154.5,
+        23185.0,
+        23202.0,
+        23203.5,
+        23220.5,
+        23313.5,
+        23317.5,
+        23328.5,
+        23449.0
+      ]
+    },
+    "rust_incremental": {
+      "median_us": 2526.0,
+      "p90_us": 2588.5,
+      "iterations": 2,
+      "samples": [
+        2484.5,
+        2488.0,
+        2488.5,
+        2500.5,
+        2526.0,
+        2539.0,
+        2560.5,
+        2574.5,
+        2588.5
+      ]
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "hardware": "Apple M4",
+    "platform": "macos",
+    "profile_mode": true,
+    "render_utf16_units": 3264,
+    "record_kind": "recovered_aggregate_only",
+    "provenance": "Successful pre-optimization Profile run. These rounded aggregates were recorded in the original tool output; its raw sample file was overwritten by the subsequent stage probe. The first-run file retains a separate complete sample distribution and notes its post-measurement UI cleanup failure."
+  },
+  "parses": {
+    "small_message": {
+      "utf16_units": 60,
+      "rust_ffi_decode_adapt": {
+        "median_us": 7.75
+      },
+      "legacy_dart": {
+        "median_us": 3.45
+      }
+    },
+    "mixed_document_12k": {
+      "utf16_units": 10880,
+      "rust_ffi_decode_adapt": {
+        "median_us": 1436.0
+      },
+      "legacy_dart": {
+        "median_us": 620.42
+      }
+    },
+    "mixed_document_48k": {
+      "utf16_units": 43520,
+      "rust_ffi_decode_adapt": {
+        "median_us": 6051.83
+      },
+      "legacy_dart": {
+        "median_us": 2449.17
+      }
+    },
+    "single_paragraph_48k": {
+      "utf16_units": 50400,
+      "rust_ffi_decode_adapt": {
+        "median_us": 4243.75
+      },
+      "legacy_dart": {
+        "median_us": 2110.42
+      }
+    }
+  },
+  "streams": {
+    "utf16_units": 14800,
+    "publications": 58,
+    "rust_batch": {
+      "median_us": 46759.5
+    },
+    "dart_batch": {
+      "median_us": 23153.0
+    },
+    "rust_incremental": {
+      "median_us": 3260.0
+    }
+  },
+  "frames_legacyDart": {
+    "frame_count": 40,
+    "median_build_ms": 3.555,
+    "p95_build_ms": 5.535
+  },
+  "frames_rust": {
+    "frame_count": 40,
+    "median_build_ms": 4.25,
+    "p95_build_ms": 9.45
+  }
+}

@@ -1,8 +1,17 @@
+import '../rust/platform.dart' as core;
+import '../rust/stream_eligibility.dart' show usesCompatiblePluginOrder;
+import '../rust/core_types.dart';
 import 'ast/html_nodes.dart';
 import 'ast/markdown_node.dart';
 import 'block_parser.dart';
 import 'inline_parser.dart';
 import 'parser_plugin.dart';
+import 'parser_backend.dart';
+import 'parser_compatibility.dart';
+
+export 'parser_backend.dart';
+
+part 'dart_stream_parser.dart';
 
 /// Main Markdown parser that combines block and inline parsing
 ///
@@ -36,11 +45,19 @@ class MarkdownParser {
   /// Optionally accepts a [ParserPluginRegistry] for custom syntax plugins.
   /// When [enableHtml] is true, whitelisted HTML tags and blocks are
   /// parsed; it is disabled by default for security.
-  MarkdownParser({ParserPluginRegistry? plugins, bool enableHtml = false})
-      : _plugins = plugins,
-        _blockParser = BlockParser(plugins: plugins, enableHtml: enableHtml),
-        _inlineParser = InlineParser(plugins: plugins, enableHtml: enableHtml);
+  MarkdownParser({
+    ParserPluginRegistry? plugins,
+    bool enableHtml = false,
+    this.backend = MarkdownParserBackend.automatic,
+  }) : _plugins = plugins,
+       _enableHtml = enableHtml,
+       _blockParser = BlockParser(plugins: plugins, enableHtml: enableHtml),
+       _inlineParser = InlineParser(plugins: plugins, enableHtml: enableHtml);
 
+  /// Backend policy; existing callers keep automatic selection.
+  final MarkdownParserBackend backend;
+
+  final bool _enableHtml;
   final BlockParser _blockParser;
   final InlineParser _inlineParser;
   final ParserPluginRegistry? _plugins;
@@ -60,6 +77,18 @@ class MarkdownParser {
   List<MarkdownNode> parse(String markdown) {
     if (markdown.isEmpty) {
       return [];
+    }
+
+    // Safe HTML/disclosures retain the established Flutter interpretation.
+    final effectiveBackend = backendForSourceLength(backend, markdown.length);
+    if (effectiveBackend != MarkdownParserBackend.legacyDart &&
+        !_enableHtml &&
+        usesCompatiblePluginOrder(_plugins) &&
+        !requiresLegacyMarkdown(markdown)) {
+      final native = core.parseNative(markdown, plugins: _plugins);
+      if (native != null) return native;
+      if (backend == MarkdownParserBackend.rust)
+        throw UnsupportedError('Rust Markdown is unavailable on this target');
     }
 
     // First, parse block-level elements
@@ -180,10 +209,7 @@ class MarkdownParser {
       }
     }
 
-    return ListItemNode(
-      children: newChildren,
-      checked: node.checked,
-    );
+    return ListItemNode(children: newChildren, checked: node.checked);
   }
 
   /// Parses only block-level elements (useful for certain use cases)
@@ -193,6 +219,15 @@ class MarkdownParser {
 
   /// Parses only inline elements from text (useful for certain use cases)
   List<MarkdownNode> parseInlineOnly(String text) {
+    if (backendForSourceLength(backend, text.length) !=
+            MarkdownParserBackend.legacyDart &&
+        !_enableHtml &&
+        usesCompatiblePluginOrder(_plugins)) {
+      final native = core.parseNative(text, plugins: _plugins, inline: true);
+      if (native != null) return native;
+      if (backend == MarkdownParserBackend.rust)
+        throw UnsupportedError('Rust Markdown is unavailable on this target');
+    }
     return _inlineParser.parse(text);
   }
 }

@@ -1,0 +1,99 @@
+{
+  "metadata": {
+    "trial": 3,
+    "fresh_process": true,
+    "same_small_warmup_for_both_backends": true,
+    "gc_method": "VM-service _collectAllGarbage twice at each retained snapshot",
+    "rss_high_watermark": "ProcessInfo.maxRss, includes pre-workload startup",
+    "dart_external_excludes_unregistered_rust_allocations": true
+  },
+  "preparation": {
+    "backend": "rust",
+    "case": "static_43k",
+    "mode": "batch",
+    "source_utf16_units": 43520,
+    "stride_utf16_units": 43520,
+    "publications": 1,
+    "source_prepared_before_baseline": true,
+    "all_prefixes_preallocated": false,
+    "platform": "macos",
+    "os": "Version 27.2 (Build 26B123)",
+    "pid": 69092,
+    "rss_bytes": 116899840,
+    "max_rss_bytes": 116916224,
+    "retained_flutter_blocks": 0,
+    "malloc_blocks_in_use": 65230,
+    "malloc_in_use_bytes": 9132128,
+    "malloc_high_water_bytes": 0,
+    "malloc_allocated_bytes": 54525952
+  },
+  "baseline": {
+    "forced_gc": true,
+    "dart_heap_used_bytes": 3236352,
+    "dart_heap_capacity_bytes": 3817472,
+    "dart_external_tracked_bytes": 0,
+    "pid": 69092,
+    "rss_bytes": 117243904,
+    "max_rss_bytes": 117637120,
+    "retained_flutter_blocks": 0,
+    "malloc_blocks_in_use": 65393,
+    "malloc_in_use_bytes": 9202656,
+    "malloc_high_water_bytes": 0,
+    "malloc_allocated_bytes": 54525952
+  },
+  "workload": {
+    "rss_after_each_update_bytes": [
+      118931456
+    ],
+    "pid": 69092,
+    "rss_bytes": 118931456,
+    "max_rss_bytes": 118931456,
+    "retained_flutter_blocks": 800,
+    "malloc_blocks_in_use": 65397,
+    "malloc_in_use_bytes": 9202880,
+    "malloc_high_water_bytes": 0,
+    "malloc_allocated_bytes": 54525952
+  },
+  "before_gc": {
+    "forced_gc": false,
+    "dart_heap_used_bytes": 4089888,
+    "dart_heap_capacity_bytes": 4866048,
+    "dart_external_tracked_bytes": 0,
+    "pid": 69092,
+    "rss_bytes": 118964224,
+    "max_rss_bytes": 118964224,
+    "retained_flutter_blocks": 800,
+    "malloc_blocks_in_use": 65400,
+    "malloc_in_use_bytes": 9203632,
+    "malloc_high_water_bytes": 0,
+    "malloc_allocated_bytes": 54525952
+  },
+  "retained_after_gc": {
+    "forced_gc": true,
+    "dart_heap_used_bytes": 3792544,
+    "dart_heap_capacity_bytes": 4866048,
+    "dart_external_tracked_bytes": 0,
+    "pid": 69092,
+    "rss_bytes": 119013376,
+    "max_rss_bytes": 119013376,
+    "retained_flutter_blocks": 800,
+    "malloc_blocks_in_use": 65462,
+    "malloc_in_use_bytes": 9206368,
+    "malloc_high_water_bytes": 0,
+    "malloc_allocated_bytes": 54525952
+  },
+  "released_after_gc": {
+    "forced_gc": true,
+    "dart_heap_used_bytes": 3236352,
+    "dart_heap_capacity_bytes": 4866048,
+    "dart_external_tracked_bytes": 0,
+    "pid": 69092,
+    "rss_bytes": 119095296,
+    "max_rss_bytes": 119095296,
+    "retained_flutter_blocks": 0,
+    "malloc_blocks_in_use": 65526,
+    "malloc_in_use_bytes": 9209296,
+    "malloc_high_water_bytes": 0,
+    "malloc_allocated_bytes": 54525952
+  }
+}

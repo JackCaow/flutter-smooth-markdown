@@ -1,0 +1,871 @@
+{
+  "stream_14k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 108609536,
+        "min": 107069440,
+        "max": 117358592,
+        "samples": [
+          107069440,
+          117358592,
+          108609536
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 159536,
+        "min": 159536,
+        "max": 159536,
+        "samples": [
+          159536,
+          159536,
+          159536
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 2768896,
+        "min": 2752512,
+        "max": 2785280,
+        "samples": [
+          2785280,
+          2752512,
+          2768896
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 115785728,
+        "min": 115343360,
+        "max": 120029184,
+        "samples": [
+          115343360,
+          120029184,
+          115785728
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 2195456,
+        "samples": [
+          0,
+          2195456,
+          0
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 2834432,
+        "min": 2785280,
+        "max": 2834432,
+        "samples": [
+          2834432,
+          2785280,
+          2834432
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 117112832,
+        "min": 108068864,
+        "max": 124010496,
+        "samples": [
+          117112832,
+          124010496,
+          108068864
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 181104,
+        "min": 181104,
+        "max": 181104,
+        "samples": [
+          181104,
+          181104,
+          181104
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 3244032,
+        "min": 3112960,
+        "max": 3342336,
+        "samples": [
+          3112960,
+          3342336,
+          3244032
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 120143872,
+        "min": 116326400,
+        "max": 132497408,
+        "samples": [
+          120143872,
+          132497408,
+          116326400
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 2670592,
+        "samples": [
+          2670592,
+          0,
+          0
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 3325952,
+        "min": 3178496,
+        "max": 3391488,
+        "samples": [
+          3178496,
+          3391488,
+          3325952
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "stream_43k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 117161984,
+        "min": 103284736,
+        "max": 117587968,
+        "samples": [
+          117587968,
+          103284736,
+          117161984
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 590832,
+        "min": 590832,
+        "max": 590832,
+        "samples": [
+          590832,
+          590832,
+          590832
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 7847936,
+        "min": 7831552,
+        "max": 7847936,
+        "samples": [
+          7831552,
+          7847936,
+          7847936
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 124698624,
+        "min": 115654656,
+        "max": 125075456,
+        "samples": [
+          125075456,
+          115654656,
+          124698624
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 7094272,
+        "min": 0,
+        "max": 7143424,
+        "samples": [
+          7094272,
+          0,
+          7143424
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 7929856,
+        "min": 7913472,
+        "max": 7946240,
+        "samples": [
+          7929856,
+          7913472,
+          7946240
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 106577920,
+        "min": 104988672,
+        "max": 117112832,
+        "samples": [
+          104988672,
+          106577920,
+          117112832
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 631344,
+        "min": 631344,
+        "max": 631344,
+        "samples": [
+          631344,
+          631344,
+          631344
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 6340608,
+        "min": 3784704,
+        "max": 6914048,
+        "samples": [
+          3784704,
+          6914048,
+          6340608
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 115802112,
+        "min": 115769344,
+        "max": 123322368,
+        "samples": [
+          115802112,
+          115769344,
+          123322368
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 5816320,
+        "samples": [
+          0,
+          0,
+          5816320
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 6389760,
+        "min": 3833856,
+        "max": 6979584,
+        "samples": [
+          3833856,
+          6979584,
+          6389760
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "stream_435k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 117964800,
+        "min": 104169472,
+        "max": 118439936,
+        "samples": [
+          117964800,
+          104169472,
+          118439936
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 5889776,
+        "min": 5889776,
+        "max": 5889776,
+        "samples": [
+          5889776,
+          5889776,
+          5889776
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 18923520,
+        "min": 18726912,
+        "max": 19431424,
+        "samples": [
+          18923520,
+          19431424,
+          18726912
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 145915904,
+        "min": 133824512,
+        "max": 146112512,
+        "samples": [
+          145915904,
+          133824512,
+          146112512
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 27312128,
+        "min": 15761408,
+        "max": 27574272,
+        "samples": [
+          27574272,
+          15761408,
+          27312128
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 18857984,
+        "min": 18694144,
+        "max": 19365888,
+        "samples": [
+          18857984,
+          19365888,
+          18694144
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 106004480,
+        "min": 105037824,
+        "max": 118112256,
+        "samples": [
+          118112256,
+          106004480,
+          105037824
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 6310704,
+        "min": 6310704,
+        "max": 6310704,
+        "samples": [
+          6310704,
+          6310704,
+          6310704
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 19054592,
+        "min": 18382848,
+        "max": 20234240,
+        "samples": [
+          18382848,
+          20234240,
+          19054592
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 134119424,
+        "min": 134004736,
+        "max": 143736832,
+        "samples": [
+          143736832,
+          134119424,
+          134004736
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 18448384,
+        "min": 16023552,
+        "max": 25264128,
+        "samples": [
+          25264128,
+          18448384,
+          16023552
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 19070976,
+        "min": 18415616,
+        "max": 20414464,
+        "samples": [
+          18415616,
+          20414464,
+          19070976
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "static_43k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 117194752,
+        "min": 117030912,
+        "max": 117522432,
+        "samples": [
+          117522432,
+          117194752,
+          117030912
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 556976,
+        "min": 556976,
+        "max": 556976,
+        "samples": [
+          556976,
+          556976,
+          556976
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 3473408,
+        "min": 3457024,
+        "max": 3473408,
+        "samples": [
+          3473408,
+          3457024,
+          3473408
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 120520704,
+        "min": 120291328,
+        "max": 120782848,
+        "samples": [
+          120782848,
+          120520704,
+          120291328
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 2867200,
+        "min": 2867200,
+        "max": 2949120,
+        "samples": [
+          2867200,
+          2949120,
+          2867200
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 3538944,
+        "min": 3538944,
+        "max": 3555328,
+        "samples": [
+          3538944,
+          3538944,
+          3555328
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 117473280,
+        "min": 113360896,
+        "max": 121356288,
+        "samples": [
+          121356288,
+          113360896,
+          117473280
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 556192,
+        "min": 556192,
+        "max": 556192,
+        "samples": [
+          556192,
+          556192,
+          556192
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 6619136,
+        "min": 3031040,
+        "max": 6799360,
+        "samples": [
+          6799360,
+          6619136,
+          3031040
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 124583936,
+        "min": 120389632,
+        "max": 128548864,
+        "samples": [
+          128548864,
+          120389632,
+          124583936
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 3473408,
+        "min": 2752512,
+        "max": 6717440,
+        "samples": [
+          2752512,
+          3473408,
+          6717440
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 6701056,
+        "min": 3112960,
+        "max": 6864896,
+        "samples": [
+          6864896,
+          6701056,
+          3112960
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "static_435k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 118325248,
+        "min": 118161408,
+        "max": 126861312,
+        "samples": [
+          126861312,
+          118161408,
+          118325248
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 5568176,
+        "min": 5568176,
+        "max": 5568176,
+        "samples": [
+          5568176,
+          5568176,
+          5568176
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 24379392,
+        "min": 24248320,
+        "max": 24395776,
+        "samples": [
+          24248320,
+          24379392,
+          24395776
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 142999552,
+        "min": 142819328,
+        "max": 151388160,
+        "samples": [
+          151388160,
+          142819328,
+          142999552
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 24297472,
+        "min": 24150016,
+        "max": 24297472,
+        "samples": [
+          24150016,
+          24297472,
+          24297472
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 24444928,
+        "min": 24313856,
+        "max": 24477696,
+        "samples": [
+          24313856,
+          24444928,
+          24477696
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 117800960,
+        "min": 109084672,
+        "max": 129777664,
+        "samples": [
+          129777664,
+          109084672,
+          117800960
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 5544096,
+        "min": 5544096,
+        "max": 5544096,
+        "samples": [
+          5544096,
+          5544096,
+          5544096
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 69681152,
+        "min": 65388544,
+        "max": 69992448,
+        "samples": [
+          65388544,
+          69992448,
+          69681152
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 192086016,
+        "min": 183697408,
+        "max": 199770112,
+        "samples": [
+          199770112,
+          183697408,
+          192086016
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 69648384,
+        "min": 68517888,
+        "max": 73891840,
+        "samples": [
+          69648384,
+          68517888,
+          73891840
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 69730304,
+        "min": 65437696,
+        "max": 70057984,
+        "samples": [
+          65437696,
+          70057984,
+          69730304
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "created_utc": "2026-11-19T15:02:24.312333+00:00",
+    "trials_per_engine_per_case": 3,
+    "fresh_pids": [
+      88957,
+      89013,
+      89064,
+      89122,
+      89169,
+      89219,
+      89271,
+      89319,
+      89366,
+      89419,
+      89468,
+      89518,
+      89565,
+      89615,
+      89662,
+      89713,
+      89789,
+      89835,
+      89896,
+      90016,
+      90084,
+      90149,
+      90209,
+      90267,
+      90329,
+      90395,
+      90469,
+      90530,
+      90591,
+      90655
+    ],
+    "binary_sha256": "3630af0e742c73212abfe808d29dd6e5c211da8dce9bfe3825baf75ca0150d16",
+    "profile_mode": true,
+    "sample_count": 30
+  }
+}

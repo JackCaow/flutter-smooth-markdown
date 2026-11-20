@@ -4,8 +4,15 @@ import 'package:flutter/widgets.dart';
 
 import '../src/config/markdown_config.dart';
 import '../src/config/style_sheet.dart';
+import '../src/parser/ast/markdown_node.dart';
+import '../src/parser/markdown_parser.dart' show DartStreamParser;
 import '../src/parser/parser_plugin.dart';
+import '../src/parser/parser_compatibility.dart' show backendForSourceLength;
+import '../src/renderer/stream_block_cache.dart';
 import '../src/renderer/widget_builder.dart';
+import '../src/rust/core_types.dart';
+import '../src/rust/platform.dart' as core;
+import '../src/rust/stream_eligibility.dart';
 import 'smooth_markdown.dart';
 import 'smooth_selection_region.dart';
 
@@ -75,15 +82,16 @@ import 'smooth_selection_region.dart';
 ///
 /// ## Performance Considerations
 ///
-/// - The widget re-parses and re-renders the entire accumulated content on each chunk
+/// - Eligible Dart and Rust sessions retain completed blocks and reparse the
+///   last two top-level blocks; active extensions/HTML use the full parser
 /// - For very large documents with frequent updates, consider batching chunks
 /// - The parsing is fast (AST-based), but very large documents may cause frame drops
 /// - Consider using [SmoothMarkdown] for static content instead
 ///
 /// ## Error Handling
 ///
-/// Currently, stream errors are silently ignored. The `errorBuilder` parameter is
-/// available but not yet fully implemented. To handle errors:
+/// Stream errors are passed to `errorBuilder` when provided. To additionally
+/// transform upstream errors:
 ///
 /// ```dart
 /// final stream = sourceStream.handleError((error) {
@@ -118,8 +126,7 @@ class StreamMarkdown extends StatefulWidget {
   /// - [useEnhancedComponents]: When `true`, uses enhanced UI components.
   /// - [loadingWidget]: Widget to display while waiting for the first chunk.
   ///   Defaults to an empty container if not provided.
-  /// - [errorBuilder]: Custom widget builder for displaying errors. Currently
-  ///   not fully implemented - errors are silently ignored.
+  /// - [errorBuilder]: Custom widget builder for displaying stream errors.
   ///
   /// Example:
   ///
@@ -160,7 +167,32 @@ class StreamMarkdown extends StatefulWidget {
     this.errorBuilder,
     this.plugins,
     this.builderRegistry,
-  });
+  }) : _sliver = false;
+
+  /// Lazily builds retained blocks inside a CustomScrollView's slivers.
+  /// The parent owns scrolling. Selectable content and compatibility routes
+  /// keep a complete box tree to preserve selection and callback behavior.
+  const StreamMarkdown.sliver({
+    required this.stream,
+    super.key,
+    this.styleSheet,
+    this.config,
+    this.onTapLink,
+    this.onTapImage,
+    this.imageBuilder,
+    this.codeBuilder,
+    this.useEnhancedComponents = false,
+    this.selectable = false,
+    this.contextMenuBuilder,
+    this.selectionController,
+    this.selectableRegionKey,
+    this.loadingWidget,
+    this.errorBuilder,
+    this.plugins,
+    this.builderRegistry,
+  }) : _sliver = true;
+
+  final bool _sliver;
 
   /// The stream of Markdown text chunks to render.
   ///
@@ -230,8 +262,11 @@ class StreamMarkdown extends StatefulWidget {
   /// Custom context menu builder for text selection.
   ///
   /// See [SmoothMarkdown.contextMenuBuilder] for detailed documentation.
-  final Widget Function(BuildContext context,
-      SmoothSelectionRegionState selectableRegionState)? contextMenuBuilder;
+  final Widget Function(
+    BuildContext context,
+    SmoothSelectionRegionState selectableRegionState,
+  )?
+  contextMenuBuilder;
 
   /// Controller for programmatic text selection.
   ///
@@ -315,6 +350,11 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
   StreamSubscription<String>? _subscription;
   Timer? _throttleTimer;
   Object? _error;
+  CoreStream? _parserStream;
+  final _eligibility = StreamEligibility();
+  final _blockWidgets = StreamBlockCache();
+  String? _parsedSource;
+  List<MarkdownNode>? _parsedNodes;
 
   /// Throttle duration to batch rapid updates
   static const _throttleDuration = Duration(milliseconds: 50);
@@ -345,14 +385,11 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
         } else {
           // Schedule delayed update
           _throttleTimer?.cancel();
-          _throttleTimer = Timer(
-            _throttleDuration - timeSinceLastUpdate,
-            () {
-              if (mounted && _hasPendingUpdate) {
-                _performUpdate();
-              }
-            },
-          );
+          _throttleTimer = Timer(_throttleDuration - timeSinceLastUpdate, () {
+            if (mounted && _hasPendingUpdate) {
+              _performUpdate();
+            }
+          });
         }
       },
       onError: (Object error) {
@@ -538,7 +575,9 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
         if (open < 0) {
           open = i;
         } else {
-          spans..add(open)..add(i);
+          spans
+            ..add(open)
+            ..add(i);
           open = -1;
         }
       }
@@ -555,9 +594,36 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _blockWidgets.clear();
+  }
+
+  @override
   void didUpdateWidget(StreamMarkdown oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.stream != widget.stream) {
+    // Host rebuilds must re-evaluate callbacks/custom state just as before.
+    // Chunk publications only rebuild this State, so committed blocks survive.
+    _blockWidgets.clear();
+    // A new stream can replace the whole text. Toggling HTML can also change
+    // the visible prefix when a partial tag was withheld.
+    final streamChanged = oldWidget.stream != widget.stream;
+    if (streamChanged ||
+        (oldWidget.config?.enableHtml ?? false) !=
+            (widget.config?.enableHtml ?? false)) {
+      _eligibility.reset();
+    }
+    if (oldWidget.config?.parserBackend != widget.config?.parserBackend) {
+      _parserStream?.dispose();
+      _parserStream = null;
+      _parsedSource = null;
+      _parsedNodes = null;
+    }
+    if (streamChanged) {
+      _parserStream?.dispose();
+      _parserStream = null;
+      _parsedSource = null;
+      _parsedNodes = null;
       _buffer.clear();
       _currentText = '';
       _error = null;
@@ -568,43 +634,114 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
   @override
   Widget build(BuildContext context) {
     if (_error != null && widget.errorBuilder != null) {
-      return widget.errorBuilder!(_error!);
+      final child = widget.errorBuilder!(_error!);
+      return widget._sliver ? SliverToBoxAdapter(child: child) : child;
     }
 
     if (_currentText.isEmpty) {
-      return widget.loadingWidget ??
-          const Center(
-            child: SizedBox.shrink(),
-          );
+      final child =
+          widget.loadingWidget ?? const Center(child: SizedBox.shrink());
+      return widget._sliver ? SliverToBoxAdapter(child: child) : child;
     }
 
-    // Use RepaintBoundary and disable cache for streaming content
-    return RepaintBoundary(
-      child: SmoothMarkdown(
-        data: _currentText,
-        styleSheet: widget.styleSheet,
-        config: widget.config,
-        onTapLink: widget.onTapLink,
-        onTapImage: widget.onTapImage,
-        imageBuilder: widget.imageBuilder,
-        codeBuilder: widget.codeBuilder,
-        useEnhancedComponents: widget.useEnhancedComponents,
-        selectable: widget.selectable,
-        contextMenuBuilder: widget.contextMenuBuilder,
-        selectionController: widget.selectionController,
-        selectableRegionKey: widget.selectableRegionKey,
-        enableCache: false, // Disable cache for constantly changing content
-        useRepaintBoundary: false, // Already wrapped in RepaintBoundary
-        plugins: widget.plugins,
-        builderRegistry: widget.builderRegistry,
-      ),
+    final markdown = SmoothMarkdown(
+      data: _currentText,
+      styleSheet: widget.styleSheet,
+      config: widget.config,
+      onTapLink: widget.onTapLink,
+      onTapImage: widget.onTapImage,
+      imageBuilder: widget.imageBuilder,
+      codeBuilder: widget.codeBuilder,
+      useEnhancedComponents: widget.useEnhancedComponents,
+      selectable: widget.selectable,
+      contextMenuBuilder: widget.contextMenuBuilder,
+      selectionController: widget.selectionController,
+      selectableRegionKey: widget.selectableRegionKey,
+      enableCache: false, // Disable cache for constantly changing content
+      useRepaintBoundary: false, // Already wrapped in RepaintBoundary
+      plugins: widget.plugins,
+      builderRegistry: widget.builderRegistry,
     );
+    final eligible =
+        widget.config?.enableHtml != true &&
+        _eligibility.checkAppend(_currentText, widget.plugins);
+    if (eligible) {
+      final backend = backendForSourceLength(
+        widget.config?.parserBackend ?? MarkdownParserBackend.automatic,
+        _currentText.length,
+      );
+      if (backend == MarkdownParserBackend.legacyDart &&
+          _parserStream is! DartStreamParser) {
+        // A native session can cross its input limit midway through a reply.
+        // Start the Dart session from the current complete source once.
+        _parserStream?.dispose();
+        _parserStream = DartStreamParser();
+        _parsedNodes = null;
+      }
+      _parserStream ??=
+          core.createNativeStream() ??
+          (backend == MarkdownParserBackend.automatic
+              ? DartStreamParser()
+              : null);
+      if (_parserStream != null) {
+        if (_parsedSource != _currentText || _parsedNodes == null) {
+          _parsedNodes = _parserStream!.update(_currentText);
+          _parsedSource = _currentText;
+          final parser = _parserStream;
+          _blockWidgets.updateNodes(
+            _parsedNodes!,
+            parser is RetainedCoreStream ? parser.retainedNodeCount : 0,
+          );
+        }
+        final nodes = _parsedNodes!;
+        // Custom builders may consult mutable host state. Preserve their
+        // per-publication evaluation rather than assuming they are pure.
+        final retainWidgets =
+            widget.builderRegistry == null &&
+            widget.codeBuilder == null &&
+            widget.imageBuilder == null;
+        if (!retainWidgets) {
+          _blockWidgets.clear();
+        }
+        // Host/inherited changes may have cleared pages without parsing again.
+        if (retainWidgets && !_blockWidgets.owns(nodes)) {
+          _blockWidgets.updateNodes(nodes, 0);
+        }
+        if (widget._sliver) {
+          return retainWidgets
+              ? markdown.renderSliverNodes(
+                  context,
+                  nodes,
+                  blockCache: _blockWidgets,
+                )
+              : SliverToBoxAdapter(child: markdown.renderNodes(context, nodes));
+        }
+        return RepaintBoundary(
+          child: markdown.renderNodes(
+            context,
+            nodes,
+            blockCache: retainWidgets ? _blockWidgets : null,
+          ),
+        );
+      }
+    } else {
+      _parserStream?.dispose();
+      _parserStream = null;
+      _parsedSource = null;
+      _parsedNodes = null;
+      _blockWidgets.clear();
+    }
+    final child = RepaintBoundary(child: markdown);
+    return widget._sliver ? SliverToBoxAdapter(child: child) : child;
   }
 
   @override
   void dispose() {
     _subscription?.cancel();
     _throttleTimer?.cancel();
+    _parserStream?.dispose();
+    _blockWidgets.clear();
+    _parsedNodes = null;
     _buffer.clear();
     super.dispose();
   }

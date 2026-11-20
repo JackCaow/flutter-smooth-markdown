@@ -1,5 +1,9 @@
 import 'package:flutter/widgets.dart';
 
+import '../parser/parser_backend.dart';
+import 'syntax_theme.dart';
+export '../parser/parser_backend.dart';
+
 /// Configuration options for Markdown parsing and rendering behavior.
 ///
 /// [MarkdownConfig] controls which markdown features are enabled and how
@@ -142,6 +146,7 @@ class MarkdownConfig {
   /// ```
   const MarkdownConfig({
     this.enableHtml = false,
+    this.parserBackend = MarkdownParserBackend.automatic,
     this.enableCodeHighlight = true,
     this.enableImageCache = true,
     this.enableTaskLists = true,
@@ -151,6 +156,7 @@ class MarkdownConfig {
     this.enableEmoji = false,
     this.enableLatex = false,
     this.syntaxHighlightTheme = 'github',
+    this.syntaxTheme,
     this.imageErrorBuilder,
     this.imagePlaceholderBuilder,
   });
@@ -164,6 +170,9 @@ class MarkdownConfig {
   /// rendered. Unknown tags are stripped keeping their content, and
   /// unsafe URL schemes such as `javascript:` are rejected.
   final bool enableHtml;
+
+  /// Selects a core backend without changing widget or AST integrations.
+  final MarkdownParserBackend parserBackend;
 
   /// Whether to enable syntax highlighting for code blocks
   final bool enableCodeHighlight;
@@ -202,10 +211,16 @@ class MarkdownConfig {
   /// Common themes: 'github', 'monokai', 'darcula', 'vs', etc.
   final String syntaxHighlightTheme;
 
+  /// Semantic syntax colors shared by code blocks and source/diff viewers.
+  final MarkdownSyntaxTheme? syntaxTheme;
+
   /// Custom error widget builder for failed image loads
   final Widget Function(
-          BuildContext context, Object error, StackTrace? stackTrace)?
-      imageErrorBuilder;
+    BuildContext context,
+    Object error,
+    StackTrace? stackTrace,
+  )?
+  imageErrorBuilder;
 
   /// Custom placeholder widget builder for loading images
   final Widget Function(BuildContext context)? imagePlaceholderBuilder;
@@ -213,6 +228,7 @@ class MarkdownConfig {
   /// Creates a copy of this configuration with the given fields replaced
   MarkdownConfig copyWith({
     bool? enableHtml,
+    MarkdownParserBackend? parserBackend,
     bool? enableCodeHighlight,
     bool? enableImageCache,
     bool? enableTaskLists,
@@ -222,11 +238,13 @@ class MarkdownConfig {
     bool? enableEmoji,
     bool? enableLatex,
     String? syntaxHighlightTheme,
+    MarkdownSyntaxTheme? syntaxTheme,
     Widget Function(BuildContext, Object, StackTrace?)? imageErrorBuilder,
     Widget Function(BuildContext)? imagePlaceholderBuilder,
   }) {
     return MarkdownConfig(
       enableHtml: enableHtml ?? this.enableHtml,
+      parserBackend: parserBackend ?? this.parserBackend,
       enableCodeHighlight: enableCodeHighlight ?? this.enableCodeHighlight,
       enableImageCache: enableImageCache ?? this.enableImageCache,
       enableTaskLists: enableTaskLists ?? this.enableTaskLists,
@@ -236,6 +254,7 @@ class MarkdownConfig {
       enableEmoji: enableEmoji ?? this.enableEmoji,
       enableLatex: enableLatex ?? this.enableLatex,
       syntaxHighlightTheme: syntaxHighlightTheme ?? this.syntaxHighlightTheme,
+      syntaxTheme: syntaxTheme ?? this.syntaxTheme,
       imageErrorBuilder: imageErrorBuilder ?? this.imageErrorBuilder,
       imagePlaceholderBuilder:
           imagePlaceholderBuilder ?? this.imagePlaceholderBuilder,
@@ -243,7 +262,8 @@ class MarkdownConfig {
   }
 
   @override
-  String toString() => 'MarkdownConfig('
+  String toString() =>
+      'MarkdownConfig('
       'enableHtml: $enableHtml, '
       'enableCodeHighlight: $enableCodeHighlight, '
       'enableImageCache: $enableImageCache, '

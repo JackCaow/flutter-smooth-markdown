@@ -1,0 +1,50 @@
+{
+  "hardware": "Apple M4",
+  "platform": "macOS 27.2",
+  "source_core": "3e89ac88a49696bf9a45814b39ea06bd3703d692",
+  "method": "Owned Rust source, same input; indirect C ABI entry point protected with black_box; median of nine samples, 60 iterations/sample. Observational host microbenchmark, excludes Dart bridge and rendering.",
+  "runs": [
+    {
+      "utf16_units": 43520,
+      "core_parse_us": 2127.962,
+      "c_abi_parse_wire_free_us": 2267.035,
+      "trial": 1,
+      "opt_level": "s"
+    },
+    {
+      "utf16_units": 43520,
+      "core_parse_us": 1814.663,
+      "c_abi_parse_wire_free_us": 2172.64,
+      "trial": 1,
+      "opt_level": "3"
+    },
+    {
+      "utf16_units": 43520,
+      "core_parse_us": 2002.617,
+      "c_abi_parse_wire_free_us": 2255.697,
+      "trial": 2,
+      "opt_level": "s"
+    },
+    {
+      "utf16_units": 43520,
+      "core_parse_us": 1777.274,
+      "c_abi_parse_wire_free_us": 2072.467,
+      "trial": 2,
+      "opt_level": "3"
+    },
+    {
+      "utf16_units": 43520,
+      "core_parse_us": 2205.199,
+      "c_abi_parse_wire_free_us": 2201.394,
+      "trial": 3,
+      "opt_level": "s"
+    },
+    {
+      "utf16_units": 43520,
+      "core_parse_us": 1781.977,
+      "c_abi_parse_wire_free_us": 1977.699,
+      "trial": 3,
+      "opt_level": "3"
+    }
+  ]
+}

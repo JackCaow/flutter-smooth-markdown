@@ -1,0 +1,230 @@
+{
+  "sample_count": 6266,
+  "note": "Whole benchmark samples, inclusive counts overlap; do not treat as per-stage duration percentages.",
+  "adapter_functions": [
+    {
+      "function": "parseNative",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 46,
+      "inclusive_ticks": 1637,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "_result",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 30,
+      "inclusive_ticks": 1102,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "parse",
+      "file": "package:flutter_smooth_markdown/src/rust/bindings.dart",
+      "line": 60,
+      "inclusive_ticks": 1061,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 55,
+      "inclusive_ticks": 1061,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "_node",
+      "file": "package:flutter_smooth_markdown/src/rust/wire.dart",
+      "line": 101,
+      "inclusive_ticks": 372,
+      "exclusive_ticks": 21
+    },
+    {
+      "function": "tree",
+      "file": "package:flutter_smooth_markdown/src/rust/wire.dart",
+      "line": 91,
+      "inclusive_ticks": 372,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/wire.dart",
+      "line": 132,
+      "inclusive_ticks": 372,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "string",
+      "file": "package:flutter_smooth_markdown/src/rust/wire.dart",
+      "line": 52,
+      "inclusive_ticks": 282,
+      "exclusive_ticks": 61
+    },
+    {
+      "function": "requiredString",
+      "file": "package:flutter_smooth_markdown/src/rust/wire.dart",
+      "line": 74,
+      "inclusive_ticks": 207,
+      "exclusive_ticks": 13
+    },
+    {
+      "function": "adaptNodes",
+      "file": "package:flutter_smooth_markdown/src/rust/ast_adapter.dart",
+      "line": 4,
+      "inclusive_ticks": 167,
+      "exclusive_ticks": 1
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/ast_adapter.dart",
+      "line": 7,
+      "inclusive_ticks": 161,
+      "exclusive_ticks": 2
+    },
+    {
+      "function": "adaptNode",
+      "file": "package:flutter_smooth_markdown/src/rust/ast_adapter.dart",
+      "line": 9,
+      "inclusive_ticks": 160,
+      "exclusive_ticks": 14
+    },
+    {
+      "function": "children",
+      "file": "package:flutter_smooth_markdown/src/rust/ast_adapter.dart",
+      "line": 10,
+      "inclusive_ticks": 80,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "update",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 431,
+      "inclusive_ticks": 59,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "_source",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 21,
+      "inclusive_ticks": 48,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "word",
+      "file": "package:flutter_smooth_markdown/src/rust/wire.dart",
+      "line": 43,
+      "inclusive_ticks": 44,
+      "exclusive_ticks": 44
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/ast_adapter.dart",
+      "line": 66,
+      "inclusive_ticks": 42,
+      "exclusive_ticks": 1
+    },
+    {
+      "function": "streamUpdate",
+      "file": "package:flutter_smooth_markdown/src/rust/bindings.dart",
+      "line": 178,
+      "inclusive_ticks": 29,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 438,
+      "inclusive_ticks": 29,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "cells",
+      "file": "package:flutter_smooth_markdown/src/rust/ast_adapter.dart",
+      "line": 45,
+      "inclusive_ticks": 18,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/ast_adapter.dart",
+      "line": 46,
+      "inclusive_ticks": 13,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "nativeHighlightedCode",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 337,
+      "inclusive_ticks": 12,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "highlightedCode",
+      "file": "package:flutter_smooth_markdown/src/rust/markdown_core.dart",
+      "line": 32,
+      "inclusive_ticks": 12,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "_highlight",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 300,
+      "inclusive_ticks": 11,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/ast_adapter.dart",
+      "line": 61,
+      "inclusive_ticks": 11,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "_language",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 276,
+      "inclusive_ticks": 10,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "highlight",
+      "file": "package:flutter_smooth_markdown/src/rust/bindings.dart",
+      "line": 116,
+      "inclusive_ticks": 9,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 309,
+      "inclusive_ticks": 9,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/transport_native.dart",
+      "line": 311,
+      "inclusive_ticks": 9,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "count",
+      "file": "package:flutter_smooth_markdown/src/rust/wire.dart",
+      "line": 77,
+      "inclusive_ticks": 6,
+      "exclusive_ticks": 4
+    },
+    {
+      "function": "tokens",
+      "file": "package:flutter_smooth_markdown/src/rust/wire.dart",
+      "line": 152,
+      "inclusive_ticks": 1,
+      "exclusive_ticks": 0
+    },
+    {
+      "function": "<anonymous closure>",
+      "file": "package:flutter_smooth_markdown/src/rust/wire.dart",
+      "line": 68,
+      "inclusive_ticks": 1,
+      "exclusive_ticks": 0
+    }
+  ]
+}

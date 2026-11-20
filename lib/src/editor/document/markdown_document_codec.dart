@@ -17,7 +17,12 @@ class MarkdownDocumentCodec {
 
   /// Parses [markdown] into an editable document tree.
   MarkdownDocument parse(String markdown) {
-    final parser = MarkdownParser(plugins: _plugins);
+    // The source cursor consumes one original block per parsed block. Keep
+    // reference definitions and other source-only constructs in that sequence.
+    final parser = MarkdownParser(
+      plugins: _plugins,
+      backend: MarkdownParserBackend.legacyDart,
+    );
     final ids = _DocumentIdFactory();
     final frontmatter = _consumeFrontmatter(markdown);
     final body = frontmatter?.body ?? markdown;

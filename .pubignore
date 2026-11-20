@@ -10,3 +10,10 @@ coverage/
 pubspec.lock
 example/pubspec.lock
 example/macos/Podfile.lock
+
+rust-core/target/
+
+# Repository-only reports, migration history and maintainer scripts.
+/benchmarks/
+/docs/
+/tools/

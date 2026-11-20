@@ -1,0 +1,1429 @@
+{
+  "render_append_stages": [
+    {
+      "trial": 1,
+      "backend": "dart",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.677,
+        0.937,
+        0.781,
+        0.677,
+        0.99,
+        0.677,
+        0.729,
+        0.781
+      ],
+      "session_update_us": [
+        812.448,
+        810.469,
+        815.469,
+        834.375,
+        812.656,
+        811.979,
+        812.552,
+        811.198
+      ]
+    },
+    {
+      "trial": 1,
+      "backend": "dart",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2520.937,
+        2511.771,
+        2510.782,
+        3306.354,
+        2509.844,
+        2517.812,
+        2698.438,
+        2539.48
+      ],
+      "session_update_us": [
+        819.532,
+        830.885,
+        816.77,
+        846.771,
+        811.094,
+        812.188,
+        810.0,
+        808.75
+      ]
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2510.365,
+        2510.833,
+        2525.521,
+        2581.094,
+        2519.739,
+        2511.563,
+        2581.666,
+        2522.135
+      ],
+      "session_update_us": [
+        652.5,
+        572.657,
+        577.813,
+        576.823,
+        576.25,
+        573.125,
+        573.646,
+        576.25
+      ]
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.885,
+        0.677,
+        0.937,
+        0.938,
+        0.781,
+        0.886,
+        0.937,
+        1.041
+      ],
+      "session_update_us": [
+        576.615,
+        576.875,
+        572.76,
+        576.719,
+        572.969,
+        576.302,
+        603.542,
+        576.875
+      ]
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.834,
+        0.834,
+        0.885,
+        0.782,
+        1.093,
+        0.938,
+        1.094,
+        1.041
+      ],
+      "session_update_us": [
+        572.968,
+        575.885,
+        573.125,
+        583.854,
+        572.657,
+        575.416,
+        576.875,
+        572.865
+      ]
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2632.344,
+        2518.594,
+        2580.469,
+        2515.781,
+        2512.969,
+        2576.927,
+        2524.271,
+        2570.313
+      ],
+      "session_update_us": [
+        577.656,
+        576.354,
+        579.062,
+        588.594,
+        576.719,
+        577.969,
+        577.969,
+        576.354
+      ]
+    },
+    {
+      "trial": 2,
+      "backend": "dart",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2508.802,
+        2508.75,
+        2559.844,
+        2521.093,
+        2543.281,
+        2524.844,
+        2514.843,
+        2517.5
+      ],
+      "session_update_us": [
+        817.5,
+        811.406,
+        814.479,
+        812.657,
+        810.313,
+        810.104,
+        842.761,
+        808.021
+      ]
+    },
+    {
+      "trial": 2,
+      "backend": "dart",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.781,
+        0.782,
+        0.677,
+        0.885,
+        0.729,
+        0.677,
+        1.042,
+        0.886
+      ],
+      "session_update_us": [
+        812.709,
+        812.343,
+        810.312,
+        831.719,
+        811.302,
+        810.157,
+        812.239,
+        811.302
+      ]
+    },
+    {
+      "trial": 3,
+      "backend": "dart",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2510.729,
+        2512.5,
+        2549.635,
+        2516.823,
+        2543.125,
+        2522.969,
+        2514.271,
+        2510.938
+      ],
+      "session_update_us": [
+        819.896,
+        807.969,
+        811.146,
+        810.364,
+        809.375,
+        811.094,
+        845.625,
+        813.125
+      ]
+    },
+    {
+      "trial": 3,
+      "backend": "dart",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.937,
+        0.625,
+        0.677,
+        0.782,
+        1.094,
+        0.729,
+        1.042,
+        0.937
+      ],
+      "session_update_us": [
+        813.281,
+        813.594,
+        809.688,
+        822.916,
+        814.479,
+        814.532,
+        809.27,
+        812.5
+      ]
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.781,
+        0.833,
+        1.25,
+        0.781,
+        0.937,
+        0.833,
+        0.937,
+        1.041
+      ],
+      "session_update_us": [
+        587.865,
+        573.282,
+        575.469,
+        572.813,
+        575.469,
+        575.417,
+        573.125,
+        652.188
+      ]
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2581.354,
+        2524.687,
+        2512.969,
+        2510.625,
+        2519.063,
+        2536.302,
+        2508.125,
+        2510.104
+      ],
+      "session_update_us": [
+        574.688,
+        573.75,
+        602.656,
+        572.657,
+        577.396,
+        575.469,
+        585.469,
+        575.052
+      ]
+    },
+    {
+      "trial": 4,
+      "backend": "rust",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2512.969,
+        2528.594,
+        2539.687,
+        2519.896,
+        2509.427,
+        2510.573,
+        2516.041,
+        2551.562
+      ],
+      "session_update_us": [
+        572.916,
+        573.177,
+        577.084,
+        575.781,
+        625.312,
+        575.625,
+        572.865,
+        573.229
+      ]
+    },
+    {
+      "trial": 4,
+      "backend": "rust",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.834,
+        1.094,
+        0.938,
+        0.781,
+        0.781,
+        0.885,
+        0.937,
+        1.041
+      ],
+      "session_update_us": [
+        663.437,
+        573.02,
+        576.51,
+        572.813,
+        576.406,
+        572.813,
+        589.219,
+        610.0
+      ]
+    },
+    {
+      "trial": 4,
+      "backend": "dart",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.937,
+        1.198,
+        0.782,
+        1.25,
+        1.198,
+        0.885,
+        1.25,
+        0.677
+      ],
+      "session_update_us": [
+        814.948,
+        812.813,
+        819.843,
+        1206.562,
+        824.427,
+        813.021,
+        847.969,
+        813.125
+      ]
+    },
+    {
+      "trial": 4,
+      "backend": "dart",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2544.636,
+        2529.427,
+        2521.719,
+        2519.844,
+        2531.614,
+        2541.875,
+        2529.219,
+        2691.302
+      ],
+      "session_update_us": [
+        814.062,
+        812.032,
+        847.969,
+        812.396,
+        813.698,
+        813.23,
+        816.406,
+        810.104
+      ]
+    },
+    {
+      "trial": 5,
+      "backend": "dart",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.729,
+        0.781,
+        0.677,
+        0.73,
+        0.781,
+        0.781,
+        0.781,
+        0.781
+      ],
+      "session_update_us": [
+        823.489,
+        809.063,
+        814.844,
+        812.239,
+        814.635,
+        842.812,
+        812.969,
+        811.407
+      ]
+    },
+    {
+      "trial": 5,
+      "backend": "dart",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2536.667,
+        2514.531,
+        2513.75,
+        2511.406,
+        2552.708,
+        2516.667,
+        2540.417,
+        2520.625
+      ],
+      "session_update_us": [
+        811.093,
+        1019.636,
+        825.729,
+        812.656,
+        817.344,
+        818.125,
+        825.781,
+        818.125
+      ]
+    },
+    {
+      "trial": 5,
+      "backend": "rust",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2510.417,
+        2514.063,
+        2547.344,
+        2519.687,
+        2512.24,
+        2511.719,
+        2515.625,
+        2543.073
+      ],
+      "session_update_us": [
+        585.208,
+        572.969,
+        576.875,
+        576.875,
+        615.104,
+        575.312,
+        573.281,
+        573.281
+      ]
+    },
+    {
+      "trial": 5,
+      "backend": "rust",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.937,
+        0.833,
+        0.729,
+        0.729,
+        0.834,
+        0.938,
+        0.99,
+        1.042
+      ],
+      "session_update_us": [
+        577.917,
+        573.073,
+        576.25,
+        572.709,
+        576.094,
+        590.156,
+        572.968,
+        576.875
+      ]
+    },
+    {
+      "trial": 6,
+      "backend": "rust",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.781,
+        0.781,
+        0.885,
+        0.781,
+        0.782,
+        0.625,
+        0.938,
+        0.625
+      ],
+      "session_update_us": [
+        577.031,
+        572.656,
+        607.553,
+        614.532,
+        573.125,
+        576.407,
+        572.812,
+        576.719
+      ]
+    },
+    {
+      "trial": 6,
+      "backend": "rust",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2518.49,
+        2511.51,
+        2512.031,
+        2522.396,
+        2561.718,
+        2516.615,
+        2508.75,
+        2522.084
+      ],
+      "session_update_us": [
+        576.823,
+        612.865,
+        572.708,
+        573.698,
+        572.969,
+        575.312,
+        592.917,
+        575.625
+      ]
+    },
+    {
+      "trial": 6,
+      "backend": "dart",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2538.906,
+        2512.031,
+        2509.011,
+        2531.823,
+        2515.677,
+        2690.781,
+        2526.875,
+        2533.75
+      ],
+      "session_update_us": [
+        809.219,
+        817.5,
+        812.552,
+        810.99,
+        810.937,
+        810.0,
+        810.261,
+        827.031
+      ]
+    },
+    {
+      "trial": 6,
+      "backend": "dart",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.782,
+        0.781,
+        0.781,
+        0.781,
+        0.729,
+        0.625,
+        0.677,
+        0.781
+      ],
+      "session_update_us": [
+        812.343,
+        813.282,
+        813.75,
+        814.167,
+        821.927,
+        812.656,
+        811.98,
+        814.688
+      ]
+    },
+    {
+      "trial": 7,
+      "backend": "dart",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2520.365,
+        2508.334,
+        2508.854,
+        2510.312,
+        2593.594,
+        2524.375,
+        2551.094,
+        2521.093
+      ],
+      "session_update_us": [
+        812.344,
+        838.541,
+        822.239,
+        813.282,
+        810.885,
+        808.177,
+        808.125,
+        812.188
+      ]
+    },
+    {
+      "trial": 7,
+      "backend": "dart",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        0.886,
+        1.094,
+        0.73,
+        0.781,
+        0.73,
+        0.729,
+        0.781,
+        0.885
+      ],
+      "session_update_us": [
+        815.469,
+        820.573,
+        812.343,
+        810.573,
+        812.395,
+        813.281,
+        850.885,
+        810.052
+      ]
+    },
+    {
+      "trial": 7,
+      "backend": "rust",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        1.093,
+        1.25,
+        0.833,
+        0.938,
+        0.938,
+        0.677,
+        0.937,
+        0.937
+      ],
+      "session_update_us": [
+        576.98,
+        573.177,
+        577.031,
+        592.135,
+        624.843,
+        572.813,
+        576.823,
+        573.177
+      ]
+    },
+    {
+      "trial": 7,
+      "backend": "rust",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2514.687,
+        2509.844,
+        2570.573,
+        2521.666,
+        2599.115,
+        2511.302,
+        2522.864,
+        2572.552
+      ],
+      "session_update_us": [
+        594.219,
+        575.0,
+        576.771,
+        576.25,
+        580.469,
+        576.875,
+        573.125,
+        573.594
+      ]
+    },
+    {
+      "trial": 8,
+      "backend": "rust",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2511.25,
+        2567.656,
+        2520.729,
+        2531.406,
+        2516.146,
+        2530.834,
+        2541.406,
+        2527.344
+      ],
+      "session_update_us": [
+        576.406,
+        576.563,
+        576.771,
+        584.844,
+        573.541,
+        573.437,
+        576.875,
+        577.031
+      ]
+    },
+    {
+      "trial": 8,
+      "backend": "rust",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        1.25,
+        1.198,
+        0.938,
+        0.833,
+        0.885,
+        0.989,
+        0.937,
+        0.99
+      ],
+      "session_update_us": [
+        589.375,
+        572.657,
+        576.719,
+        573.854,
+        576.563,
+        572.917,
+        576.511,
+        664.687
+      ]
+    },
+    {
+      "trial": 8,
+      "backend": "dart",
+      "eligibility_mode": "incremental",
+      "eligibility_us": [
+        1.094,
+        0.937,
+        1.406,
+        0.885,
+        1.042,
+        0.937,
+        0.938,
+        0.729
+      ],
+      "session_update_us": [
+        817.656,
+        811.511,
+        811.094,
+        1147.552,
+        847.552,
+        850.521,
+        812.448,
+        809.271
+      ]
+    },
+    {
+      "trial": 8,
+      "backend": "dart",
+      "eligibility_mode": "full",
+      "eligibility_us": [
+        2529.687,
+        2539.062,
+        2508.125,
+        2512.813,
+        2539.687,
+        2518.698,
+        2536.667,
+        2520.781
+      ],
+      "session_update_us": [
+        812.188,
+        813.75,
+        823.907,
+        809.895,
+        812.917,
+        813.021,
+        815.833,
+        813.281
+      ]
+    }
+  ],
+  "compare_stream_eligibility": true,
+  "stage_clock_frequency_hz": 1000000000,
+  "prefill_utf16_units": 435200,
+  "appended_utf16_units": 16,
+  "measured_reparsed_utf16_units": [
+    46,
+    46,
+    46,
+    46,
+    46,
+    46,
+    46,
+    46
+  ],
+  "measured_retained_blocks": [
+    8001,
+    8002,
+    8003,
+    8004,
+    8005,
+    8006,
+    8007,
+    8008
+  ],
+  "profile_mode": true,
+  "platform": "CP2A.260605.016",
+  "render_comparison": [
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "eligibility_mode": "incremental",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 3401247,
+      "all_frame_timings": 247,
+      "content_build_timestamps_us": [
+        106111470602,
+        106111570596,
+        106111670518,
+        106111770408,
+        106111870367,
+        106111970088,
+        106112070043,
+        106112169910
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 3.664,
+        "p95_ms": 3.911,
+        "max_ms": 3.911,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.394,
+          3.507,
+          3.804,
+          3.82,
+          3.911,
+          3.664,
+          3.597,
+          2.579
+        ]
+      },
+      "raster": {
+        "median_ms": 0.913,
+        "p95_ms": 1.042,
+        "max_ms": 1.042,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.913,
+          0.741,
+          0.929,
+          0.592,
+          0.952,
+          0.842,
+          1.042,
+          0.678
+        ]
+      },
+      "total_span": {
+        "median_ms": 4.733,
+        "p95_ms": 5.23,
+        "max_ms": 5.23,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.626,
+          4.538,
+          5.0,
+          4.733,
+          5.23,
+          4.718,
+          4.89,
+          3.455
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "eligibility_mode": "full",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 3552828,
+      "all_frame_timings": 239,
+      "content_build_timestamps_us": [
+        106118555285,
+        106118664308,
+        106118771779,
+        106118879999,
+        106118988359,
+        106119096448,
+        106119205411,
+        106119312918
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 14.017,
+        "p95_ms": 15.674,
+        "max_ms": 15.674,
+        "over_16_67ms": 0,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          12.702,
+          13.352,
+          15.674,
+          14.017,
+          14.039,
+          13.345,
+          15.445,
+          11.704
+        ]
+      },
+      "raster": {
+        "median_ms": 1.005,
+        "p95_ms": 1.081,
+        "max_ms": 1.081,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.015,
+          0.967,
+          0.973,
+          1.003,
+          0.943,
+          1.081,
+          1.005,
+          1.021
+        ]
+      },
+      "total_span": {
+        "median_ms": 15.335,
+        "p95_ms": 17.35,
+        "max_ms": 17.35,
+        "over_16_67ms": 2,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          13.906,
+          15.335,
+          16.866,
+          15.225,
+          15.345,
+          14.627,
+          17.35,
+          12.937
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "eligibility_mode": "full",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 3479686,
+      "all_frame_timings": 237,
+      "content_build_timestamps_us": [
+        106125625325,
+        106125732445,
+        106125840545,
+        106125948738,
+        106126057130,
+        106126170226,
+        106126266076,
+        106126373292
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 12.455,
+        "p95_ms": 12.977,
+        "max_ms": 12.977,
+        "over_16_67ms": 0,
+        "over_8_33ms": 7,
+        "samples_ms": [
+          12.455,
+          10.929,
+          12.977,
+          12.524,
+          10.774,
+          2.472,
+          12.561,
+          12.407
+        ]
+      },
+      "raster": {
+        "median_ms": 0.967,
+        "p95_ms": 1.041,
+        "max_ms": 1.041,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.785,
+          0.755,
+          0.967,
+          0.531,
+          0.989,
+          0.382,
+          1.041,
+          0.968
+        ]
+      },
+      "total_span": {
+        "median_ms": 14.214,
+        "p95_ms": 41.469,
+        "max_ms": 41.469,
+        "over_16_67ms": 1,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          14.898,
+          12.112,
+          14.214,
+          13.356,
+          12.179,
+          41.469,
+          14.809,
+          13.593
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "eligibility_mode": "incremental",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 3286049,
+      "all_frame_timings": 232,
+      "content_build_timestamps_us": [
+        106132477054,
+        106132576634,
+        106132677379,
+        106132776448,
+        106132877073,
+        106132976272,
+        106133077100,
+        106133176220
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 5.136,
+        "p95_ms": 5.25,
+        "max_ms": 5.25,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.168,
+          5.136,
+          3.121,
+          5.099,
+          5.25,
+          3.814,
+          5.232,
+          5.22
+        ]
+      },
+      "raster": {
+        "median_ms": 1.278,
+        "p95_ms": 1.672,
+        "max_ms": 1.672,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.027,
+          1.278,
+          0.948,
+          1.275,
+          1.444,
+          1.077,
+          1.497,
+          1.672
+        ]
+      },
+      "total_span": {
+        "median_ms": 6.73,
+        "p95_ms": 7.87,
+        "max_ms": 7.87,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.862,
+          6.73,
+          5.23,
+          6.676,
+          7.705,
+          5.219,
+          7.87,
+          7.313
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "eligibility_mode": "incremental",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 3446694,
+      "all_frame_timings": 243,
+      "content_build_timestamps_us": [
+        106139604530,
+        106139704638,
+        106139806052,
+        106139905203,
+        106140004418,
+        106140104080,
+        106140204054,
+        106140304618
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 5.215,
+        "p95_ms": 5.321,
+        "max_ms": 5.321,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.215,
+          4.507,
+          5.256,
+          2.919,
+          5.321,
+          5.124,
+          5.23,
+          5.211
+        ]
+      },
+      "raster": {
+        "median_ms": 1.207,
+        "p95_ms": 1.608,
+        "max_ms": 1.608,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.171,
+          1.13,
+          1.436,
+          1.207,
+          1.245,
+          1.123,
+          1.608,
+          1.085
+        ]
+      },
+      "total_span": {
+        "median_ms": 7.069,
+        "p95_ms": 8.766,
+        "max_ms": 8.766,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          6.866,
+          6.179,
+          8.766,
+          4.793,
+          7.069,
+          6.594,
+          7.196,
+          7.31
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "eligibility_mode": "full",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 3634280,
+      "all_frame_timings": 233,
+      "content_build_timestamps_us": [
+        106146784167,
+        106146890764,
+        106147002631,
+        106147115679,
+        106147226781,
+        106147340458,
+        106147440476,
+        106147556866
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 16.302,
+        "p95_ms": 18.003,
+        "max_ms": 18.003,
+        "over_16_67ms": 3,
+        "over_8_33ms": 6,
+        "samples_ms": [
+          12.829,
+          16.679,
+          16.724,
+          16.302,
+          14.792,
+          7.27,
+          18.003,
+          6.657
+        ]
+      },
+      "raster": {
+        "median_ms": 0.992,
+        "p95_ms": 1.181,
+        "max_ms": 1.181,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.181,
+          0.975,
+          1.098,
+          1.081,
+          0.987,
+          0.98,
+          0.992,
+          0.939
+        ]
+      },
+      "total_span": {
+        "median_ms": 17.982,
+        "p95_ms": 21.804,
+        "max_ms": 21.804,
+        "over_16_67ms": 5,
+        "over_8_33ms": 7,
+        "samples_ms": [
+          15.979,
+          17.982,
+          21.804,
+          17.744,
+          19.019,
+          8.557,
+          19.401,
+          7.836
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "eligibility_mode": "full",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 3606254,
+      "all_frame_timings": 233,
+      "content_build_timestamps_us": [
+        106154019326,
+        106154129282,
+        106154244094,
+        106154352524,
+        106154468926,
+        106154577130,
+        106154695068,
+        106154810381
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 17.796,
+        "p95_ms": 19.663,
+        "max_ms": 19.663,
+        "over_16_67ms": 6,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          16.91,
+          18.094,
+          14.215,
+          17.796,
+          15.221,
+          17.833,
+          19.663,
+          17.63
+        ]
+      },
+      "raster": {
+        "median_ms": 1.039,
+        "p95_ms": 1.107,
+        "max_ms": 1.107,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.996,
+          1.039,
+          1.107,
+          1.08,
+          1.05,
+          0.978,
+          0.966,
+          1.038
+        ]
+      },
+      "total_span": {
+        "median_ms": 19.056,
+        "p95_ms": 22.23,
+        "max_ms": 22.23,
+        "over_16_67ms": 6,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          18.265,
+          21.217,
+          15.639,
+          19.294,
+          16.63,
+          19.056,
+          22.23,
+          18.969
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "eligibility_mode": "incremental",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 3460304,
+      "all_frame_timings": 243,
+      "content_build_timestamps_us": [
+        106161100609,
+        106161207016,
+        106161308525,
+        106161405947,
+        106161506039,
+        106161606131,
+        106161706399,
+        106161806660
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 6.823,
+        "p95_ms": 8.251,
+        "max_ms": 8.251,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          8.251,
+          6.823,
+          2.928,
+          2.192,
+          6.859,
+          6.414,
+          2.845,
+          7.062
+        ]
+      },
+      "raster": {
+        "median_ms": 1.065,
+        "p95_ms": 1.202,
+        "max_ms": 1.202,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.065,
+          1.154,
+          1.018,
+          0.944,
+          1.179,
+          0.918,
+          1.006,
+          1.202
+        ]
+      },
+      "total_span": {
+        "median_ms": 8.349,
+        "p95_ms": 12.269,
+        "max_ms": 12.269,
+        "over_16_67ms": 0,
+        "over_8_33ms": 4,
+        "samples_ms": [
+          12.269,
+          9.189,
+          6.617,
+          3.321,
+          8.349,
+          7.85,
+          4.627,
+          9.365
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "profile_mode": true,
+    "platform": "android",
+    "os": "CP2A.260605.016",
+    "physical_size": [
+      1080.0,
+      2400.0
+    ],
+    "device_pixel_ratio": 2.8125,
+    "same_incremental_ranges_and_retention_verified": true,
+    "same_inactive_ai_registry": true,
+    "same_highlighter_and_committed_widget_cache": true,
+    "content_frame_selection": "dirty stream element at engine draw-frame entry, inside build interval",
+    "publication_pacing_ms_after_layout": 90,
+    "prefill_and_three_warmup_updates_excluded": true,
+    "prefill_publications": 32,
+    "trials_per_backend_per_size": 2,
+    "full_check_control": "Same widget, layout and plugins; registry subclass uses the production full-scan fallback.",
+    "scroll_position": "top; legacy/paged external box scroll, sliver parent-owned viewport",
+    "no_parser_only_timings_in_frame_comparison": true
+  }
+}

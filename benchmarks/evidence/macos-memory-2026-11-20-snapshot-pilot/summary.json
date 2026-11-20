@@ -1,0 +1,249 @@
+{
+  "stream_435k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 114442240,
+        "min": 103481344,
+        "max": 118013952,
+        "samples": [
+          103481344,
+          114442240,
+          118013952
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 5699840,
+        "min": 5699840,
+        "max": 5699840,
+        "samples": [
+          5699840,
+          5699840,
+          5699840
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 24346624,
+        "min": 23068672,
+        "max": 24395776,
+        "samples": [
+          23068672,
+          24395776,
+          24346624
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 146096128,
+        "min": 138543104,
+        "max": 150978560,
+        "samples": [
+          138543104,
+          146096128,
+          150978560
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 27869184,
+        "min": 22904832,
+        "max": 32571392,
+        "samples": [
+          22904832,
+          27869184,
+          32571392
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 160,
+        "min": 160,
+        "max": 160,
+        "samples": [
+          160,
+          160,
+          160
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 19726336,
+        "min": 19660800,
+        "max": 23019520,
+        "samples": [
+          23019520,
+          19726336,
+          19660800
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 6897664,
+        "min": 6897664,
+        "max": 20529152,
+        "samples": [
+          6897664,
+          6897664,
+          20529152
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 32063488,
+        "min": 30736384,
+        "max": 34111488,
+        "samples": [
+          30736384,
+          32063488,
+          34111488
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 237392,
+        "min": 235376,
+        "max": 304336,
+        "samples": [
+          235376,
+          237392,
+          304336
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 106332160,
+        "min": 105873408,
+        "max": 109903872,
+        "samples": [
+          106332160,
+          109903872,
+          105873408
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 5674400,
+        "min": 5674400,
+        "max": 5674400,
+        "samples": [
+          5674400,
+          5674400,
+          5674400
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 18186240,
+        "min": 17760256,
+        "max": 18481152,
+        "samples": [
+          17760256,
+          18186240,
+          18481152
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 140591104,
+        "min": 136429568,
+        "max": 140902400,
+        "samples": [
+          140902400,
+          140591104,
+          136429568
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 24395776,
+        "min": 18677760,
+        "max": 25182208,
+        "samples": [
+          25182208,
+          24395776,
+          18677760
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 160,
+        "min": 160,
+        "max": 160,
+        "samples": [
+          160,
+          160,
+          160
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 18202624,
+        "min": 17776640,
+        "max": 18513920,
+        "samples": [
+          17776640,
+          18202624,
+          18513920
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 7864320,
+        "min": 7864320,
+        "max": 7864320,
+        "samples": [
+          7864320,
+          7864320,
+          7864320
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 29884416,
+        "min": 29736960,
+        "max": 33718272,
+        "samples": [
+          33718272,
+          29884416,
+          29736960
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 1527072,
+        "min": 1517184,
+        "max": 1547872,
+        "samples": [
+          1517184,
+          1547872,
+          1527072
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "created_utc": "2026-11-19T16:15:32.022678+00:00",
+    "trials_per_engine_per_case": 3,
+    "fresh_pids": [
+      64862,
+      64912,
+      64968,
+      65030,
+      65085,
+      65154
+    ],
+    "binary_sha256": "4aef2124336ab530d620ef92091a5c22903d1cace2d39b99562269e6c2154c34",
+    "payload_sha256": {
+      "Contents/MacOS/flutter_smooth_markdown_example": "4aef2124336ab530d620ef92091a5c22903d1cace2d39b99562269e6c2154c34",
+      "Contents/Frameworks/App.framework/Versions/A/App": "74e29f0d9e40ee4686ee883191a02de0d592883299bcc9fda7e8aea1f361d216",
+      "Contents/Frameworks/smooth_markdown_rust.framework/smooth_markdown_rust": "7a610a193a96871c810dc304b389e84fa2a0829cae10d76e3c8f018e951b6e08"
+    },
+    "resumed_saved_samples": 0,
+    "profile_mode": true,
+    "sample_count": 6
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "sustained_comparison": {
+    "source_utf16_units": 435200,
+    "publications": 1600,
+    "stride_utf16_units": 272,
+    "incremental_total_parsed_units": 619085,
+    "rust_transferred_input_units": 435200,
+    "timings": {
+      "dart_incremental": {
+        "median_us": 501766.5,
+        "p90_us": 508281.0,
+        "samples_us": [
+          501515.0,
+          502236.0,
+          501766.5,
+          501213.5,
+          508281.0,
+          502275.0,
+          501106.0,
+          501455.0,
+          503522.5
+        ],
+        "iterations": 2
+      },
+      "rust_incremental": {
+        "median_us": 431818.5,
+        "p90_us": 447497.0,
+        "samples_us": [
+          442189.0,
+          431818.5,
+          430365.5,
+          425637.0,
+          447497.0,
+          428134.0,
+          436516.0,
+          428711.0,
+          432381.0
+        ],
+        "iterations": 2
+      }
+    }
+  },
+  "metadata": {
+    "profile_mode": true,
+    "platform": "macos",
+    "os": "Version 27.2 (Build 26B123)",
+    "all_prefixes_preallocated": false,
+    "prefix_generation_included_in_timing": true,
+    "rollback_top_level_blocks": 2,
+    "same_source_ranges_verified_at_every_publication": true,
+    "own_batch_ast_checkpoints": [
+      1,
+      2,
+      320,
+      1600
+    ],
+    "session_creation_disposal_and_result_publication_included": true,
+    "warmup_sequences": 5,
+    "sample_groups": 9,
+    "iterations_per_group": 2
+  }
+}

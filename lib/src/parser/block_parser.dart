@@ -51,7 +51,20 @@ class BlockParser {
   static final _tableSeparatorPattern = RegExp(r'^\s*:?-+:?\s*$');
 
   /// Parses a markdown text into a list of block-level nodes
-  List<MarkdownNode> parse(String markdown) {
+  List<MarkdownNode> parse(String markdown) => _parse(markdown);
+
+  /// Package-internal source tracking for the hook-free incremental parser.
+  /// Starts address the original UTF-16 source, not reconstructed AST text.
+  List<MarkdownNode> parseWithBlockStarts(String markdown, List<int> starts) {
+    if (_plugins != null || _htmlParser != null) {
+      throw StateError(
+        'Source tracking requires hook-free, HTML-disabled parsing',
+      );
+    }
+    return _parse(markdown, starts: starts);
+  }
+
+  List<MarkdownNode> _parse(String markdown, {List<int>? starts}) {
     if (markdown.isEmpty) {
       return [];
     }
@@ -59,6 +72,8 @@ class BlockParser {
     final lines = markdown.split('\n');
     final nodes = <MarkdownNode>[];
     var i = 0;
+    var offsetLine = 0;
+    var sourceOffset = 0;
 
     while (i < lines.length) {
       final line = lines[i];
@@ -67,6 +82,13 @@ class BlockParser {
       if (line.trim().isEmpty) {
         i++;
         continue;
+      }
+
+      if (starts != null) {
+        while (offsetLine < i) {
+          sourceOffset += lines[offsetLine++].length + 1;
+        }
+        starts.add(sourceOffset);
       }
 
       // Try to parse different block types
@@ -829,8 +851,10 @@ class BlockParser {
   }
 
   bool _hasUnescapedPipe(String line) {
-    for (var index = 0; index < line.length; index++) {
-      if (line[index] == '|' && !_isEscaped(line, index)) return true;
+    var pipe = line.indexOf('|');
+    while (pipe >= 0) {
+      if (!_isEscaped(line, pipe)) return true;
+      pipe = line.indexOf('|', pipe + 1);
     }
     return false;
   }
