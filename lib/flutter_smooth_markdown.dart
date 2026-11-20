@@ -12,6 +12,11 @@ export 'src/config/syntax_theme.dart' show MarkdownSyntaxTheme;
 // Export editor
 export 'src/editor/document/markdown_document.dart';
 export 'src/editor/document/markdown_document_editor.dart';
+export 'src/editor/markdown_editor_clipboard.dart'
+    show
+        MarkdownClipboardImage,
+        MarkdownClipboardContent,
+        MarkdownPasteImageCallback;
 export 'src/editor/markdown_editor_command.dart';
 export 'src/editor/markdown_editor_controller.dart';
 export 'src/editor/markdown_editor_export.dart';
@@ -35,6 +40,8 @@ export 'src/parser/parser_plugin.dart';
 // Export built-in plugins
 export 'src/parser/plugins/admonition_plugin.dart';
 export 'src/parser/plugins/artifact_plugin.dart';
+export 'src/parser/plugins/citation_plugin.dart'
+    show MarkdownCitationNode, MarkdownCitationPlugin;
 export 'src/parser/plugins/emoji_plugin.dart';
 export 'src/parser/plugins/hashtag_plugin.dart';
 export 'src/parser/plugins/mention_plugin.dart';
@@ -60,6 +67,8 @@ export 'src/renderer/markdown_renderer.dart';
 export 'src/renderer/widget_builder.dart';
 
 // Export widgets
+export 'widgets/markdown_citations.dart';
+export 'widgets/markdown_chat_scroll.dart';
 export 'widgets/markdown_code_view.dart' show MarkdownCodeView;
 export 'widgets/markdown_diff_view.dart';
 export 'widgets/smooth_markdown.dart';

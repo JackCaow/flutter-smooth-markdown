@@ -2,6 +2,7 @@ import 'ast/markdown_node.dart';
 import 'html/html_block_parser.dart';
 import 'inline_parser.dart';
 import 'parser_plugin.dart';
+import 'plugins/citation_plugin.dart';
 
 /// Parser for block-level Markdown elements
 ///
@@ -53,12 +54,13 @@ class BlockParser {
   /// Parses a markdown text into a list of block-level nodes
   List<MarkdownNode> parse(String markdown) => _parse(markdown);
 
-  /// Package-internal source tracking for the hook-free incremental parser.
+  /// Package-internal source tracking for the incremental parser.
   /// Starts address the original UTF-16 source, not reconstructed AST text.
   List<MarkdownNode> parseWithBlockStarts(String markdown, List<int> starts) {
-    if (_plugins != null || _htmlParser != null) {
+    if ((_plugins != null && !isCitationStreamRegistry(_plugins)) ||
+        _htmlParser != null) {
       throw StateError(
-        'Source tracking requires hook-free, HTML-disabled parsing',
+        'Source tracking requires built-in incremental grammar without HTML',
       );
     }
     return _parse(markdown, starts: starts);

@@ -4,7 +4,13 @@ part of 'markdown_parser.dart';
 /// Callers use the shared eligibility gate before bypassing host plugins/HTML.
 /// Keeps the existing Dart grammar; it does not emulate Rust's AST semantics.
 class DartStreamParser implements RetainedCoreStream {
-  final _parser = MarkdownParser(backend: MarkdownParserBackend.legacyDart);
+  DartStreamParser({ParserPluginRegistry? plugins})
+    : _parser = MarkdownParser(
+        backend: MarkdownParserBackend.legacyDart,
+        plugins: plugins,
+      );
+
+  final MarkdownParser _parser;
   final _blocks = <({int start, MarkdownNode node})>[];
   String _source = '';
   bool _definitions = false;

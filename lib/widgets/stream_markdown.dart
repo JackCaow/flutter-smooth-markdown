@@ -6,8 +6,9 @@ import '../src/config/markdown_config.dart';
 import '../src/config/style_sheet.dart';
 import '../src/parser/ast/markdown_node.dart';
 import '../src/parser/markdown_parser.dart' show DartStreamParser;
-import '../src/parser/parser_plugin.dart';
 import '../src/parser/parser_compatibility.dart' show backendForSourceLength;
+import '../src/parser/parser_plugin.dart';
+import '../src/parser/plugins/citation_plugin.dart';
 import '../src/renderer/stream_block_cache.dart';
 import '../src/renderer/widget_builder.dart';
 import '../src/rust/core_types.dart';
@@ -351,6 +352,7 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
   Timer? _throttleTimer;
   Object? _error;
   CoreStream? _parserStream;
+  bool _citationSession = false;
   final _eligibility = StreamEligibility();
   final _blockWidgets = StreamBlockCache();
   String? _parsedSource;
@@ -662,20 +664,33 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
       plugins: widget.plugins,
       builderRegistry: widget.builderRegistry,
     );
+    // The built-in citation grammar is local to an inline span. It can run in
+    // a retained Dart session; arbitrary host plugins still use the full gate.
+    final registry = widget.plugins;
+    final citationOnly = isCitationStreamRegistry(registry);
+    if (_citationSession != citationOnly) {
+      _citationSession = citationOnly;
+      _parserStream?.dispose();
+      _parserStream = null;
+      _parsedNodes = null;
+      _eligibility.reset();
+    }
     final eligible =
         widget.config?.enableHtml != true &&
-        _eligibility.checkAppend(_currentText, widget.plugins);
+        _eligibility.checkAppend(_currentText, citationOnly ? null : registry);
     if (eligible) {
       final backend = backendForSourceLength(
         widget.config?.parserBackend ?? MarkdownParserBackend.automatic,
         _currentText.length,
       );
-      if (backend == MarkdownParserBackend.legacyDart &&
+      if ((citationOnly || backend == MarkdownParserBackend.legacyDart) &&
           _parserStream is! DartStreamParser) {
         // A native session can cross its input limit midway through a reply.
         // Start the Dart session from the current complete source once.
         _parserStream?.dispose();
-        _parserStream = DartStreamParser();
+        _parserStream = DartStreamParser(
+          plugins: citationOnly ? registry : null,
+        );
         _parsedNodes = null;
       }
       _parserStream ??=

@@ -99,6 +99,22 @@ class _CodeDiffDemoState extends State<CodeDiffDemo> {
   _Sample _sample = _Sample.dart;
   bool _numbers = true;
   bool _rawMarkdown = false;
+  bool _sideBySide = false;
+  bool _largeDiff = false;
+
+  // A contiguous synthetic patch lets the review tab exercise thousands of
+  // rows with the same viewport and controls as the small language samples.
+  static final String _largePatch = [
+    '--- a/routes.dart',
+    '+++ b/routes.dart',
+    '@@ -1,4000 +1,4000 @@',
+    for (var i = 1; i <= 4000; i++)
+      if (i % 7 == 0) ...[
+        "-const route$i = '/old/$i';",
+        "+const route$i = '/new/$i';",
+      ] else
+        " const route$i = '/api/$i';",
+  ].join('\n');
   bool? _darkOverride;
 
   @override
@@ -185,8 +201,10 @@ class _CodeDiffDemoState extends State<CodeDiffDemo> {
                                   child: Text(sample.label),
                                 ),
                             ],
-                            onSelected: (value) =>
-                                setState(() => _sample = value),
+                            onSelected: (value) => setState(() {
+                              _sample = value;
+                              _largeDiff = false;
+                            }),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -236,10 +254,46 @@ class _CodeDiffDemoState extends State<CodeDiffDemo> {
                             ),
                           ),
                           _FilePanel(
-                            filename: '${_sample.filename}.diff',
-                            child: MarkdownDiffView(
-                              patch: _sample.patch,
-                              language: _sample.name,
+                            filename: _largeDiff
+                                ? 'routes.dart.diff'
+                                : '${_sample.filename}.diff',
+                            sliver: true,
+                            action: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: _largeDiff
+                                      ? (zh ? '查看小补丁' : 'Show small patch')
+                                      : (zh
+                                            ? '查看 4,000 行补丁'
+                                            : 'Show 4,000-line patch'),
+                                  icon: const Icon(Icons.format_list_bulleted),
+                                  isSelected: _largeDiff,
+                                  onPressed: () =>
+                                      setState(() => _largeDiff = !_largeDiff),
+                                ),
+                                IconButton(
+                                  tooltip: _sideBySide
+                                      ? (zh ? '统一视图' : 'Show unified diff')
+                                      : (zh
+                                            ? '并排对照'
+                                            : 'Show side-by-side diff'),
+                                  icon: const Icon(
+                                    Icons.vertical_split_outlined,
+                                  ),
+                                  isSelected: _sideBySide,
+                                  onPressed: () => setState(
+                                    () => _sideBySide = !_sideBySide,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            child: MarkdownDiffView.sliver(
+                              patch: _largeDiff ? _largePatch : _sample.patch,
+                              language: _largeDiff ? 'dart' : _sample.name,
+                              layout: _sideBySide
+                                  ? MarkdownDiffLayout.sideBySide
+                                  : MarkdownDiffLayout.unified,
                               showLineNumbers: _numbers,
                             ),
                           ),
@@ -283,57 +337,73 @@ class _CodeDiffDemoState extends State<CodeDiffDemo> {
 }
 
 class _FilePanel extends StatelessWidget {
-  const _FilePanel({required this.filename, required this.child, this.action});
+  const _FilePanel({
+    required this.filename,
+    required this.child,
+    this.action,
+    this.sliver = false,
+  });
   final String filename;
   final Widget child;
   final Widget? action;
+  final bool sliver;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      child: Material(
-        color: colors.surface,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: colors.outlineVariant),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 46),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.description_outlined,
-                      size: 16,
-                      color: colors.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        filename,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    if (action != null) action!,
-                  ],
+    final header = Column(
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 46),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.description_outlined,
+                  size: 16,
+                  color: colors.onSurfaceVariant,
                 ),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    filename,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                if (action != null) action!,
+              ],
             ),
-            Divider(height: 1, color: colors.outlineVariant),
-            child,
-          ],
+          ),
         ),
-      ),
+        Divider(height: 1, color: colors.outlineVariant),
+      ],
     );
+    final panel = Material(
+      color: colors.surface,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
+      child: sliver
+          ? Column(
+              children: [
+                header,
+                Expanded(child: CustomScrollView(slivers: [child])),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [header, child],
+            ),
+    );
+    const padding = EdgeInsets.fromLTRB(16, 0, 16, 24);
+    return sliver
+        ? Padding(padding: padding, child: panel)
+        : SingleChildScrollView(padding: padding, child: panel);
   }
 }

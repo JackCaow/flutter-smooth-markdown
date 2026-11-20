@@ -60,7 +60,7 @@ class AIChatDemo extends StatefulWidget {
 class _AIChatDemoState extends State<AIChatDemo> {
   final List<ChatMessage> _messages = [];
   final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  final _scrollController = MarkdownChatScrollController();
   final FocusNode _focusNode = FocusNode();
 
   bool _isStreaming = false;
@@ -540,7 +540,7 @@ UserCard(
     });
 
     _controller.clear();
-    _scrollToBottom();
+    _scrollController.jumpToLatest();
 
     // Find matching quick prompt or generate generic response
     final matchingPrompt = _quickPrompts.firstWhere(
@@ -599,7 +599,6 @@ UserCard(
       ));
     });
 
-    _scrollToBottom();
 
     try {
       final request = buildDeepSeekChatRequest(
@@ -700,7 +699,6 @@ UserCard(
       ));
     });
 
-    _scrollToBottom();
 
     // Simulate streaming with realistic typing speed
     const chunkSize = 5;
@@ -722,18 +720,6 @@ UserCard(
         _isStreaming = false;
       });
     }
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 100,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   // DeepSeek Chat Completions API 支持的模型。
@@ -877,6 +863,16 @@ UserCard(
       data: isDark ? ThemeData.dark() : ThemeData.light(),
       child: Scaffold(
         backgroundColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+        floatingActionButton: ValueListenableBuilder<bool>(
+          valueListenable: _scrollController.following,
+          builder: (context, following, _) => following
+              ? const SizedBox.shrink()
+              : FloatingActionButton.small(
+                  tooltip: '回到最新消息',
+                  onPressed: _scrollController.jumpToLatest,
+                  child: const Icon(Icons.vertical_align_bottom),
+                ),
+        ),
         appBar: AppBar(
           backgroundColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
           elevation: 0,

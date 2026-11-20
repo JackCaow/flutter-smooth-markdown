@@ -153,7 +153,11 @@ class _StaticMarkdownSliverState extends State<_StaticMarkdownSliver> {
             Scrollable.maybeOf(context)?.axisDirection == AxisDirection.up)) {
       return const SliverToBoxAdapter(child: LinearProgressIndicator());
     }
-    return widget.document.renderSliverNodes(context, _nodes);
+    return widget.document.renderSliverNodes(
+      context,
+      _nodes,
+      complete: _wanted == null,
+    );
   }
 }
 
@@ -192,7 +196,8 @@ class _StaticMarkdownBoxState extends State<_StaticMarkdownBox> {
       _content = null;
     }
     _generation = SmoothMarkdown._cacheGeneration;
-    if (doc.styleSheet != old.styleSheet ||
+    if (doc.readerController != old.readerController ||
+        doc.styleSheet != old.styleSheet ||
         doc.config != old.config ||
         doc.useEnhancedComponents != old.useEnhancedComponents ||
         doc.useRepaintBoundary != old.useRepaintBoundary ||

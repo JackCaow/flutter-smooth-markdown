@@ -136,9 +136,29 @@ MarkdownDiffView(patch: unifiedDiff, language: 'dart');
 ```
 
 Both views accept `syntaxTheme`, `textStyle`, `showLineNumbers`, `selectable`,
-`tabWidth`, and `padding`. They scroll horizontally; place them inside a vertical
-scroll container for long content. They currently lay out all rows and are not
-virtualized editors. Diff views show unified rather than side-by-side patches.
+`tabWidth`, and `padding`. The source viewer and default unified diff scroll
+horizontally. For a two-column review, set `layout: MarkdownDiffLayout.sideBySide`.
+Each removal is aligned with its corresponding addition within the hunk.
+Unmatched lines leave an empty cell on the opposite side.
+
+For large patches, place the diff directly in a vertical `CustomScrollView`.
+The sliver builds unified rows or side-by-side row pairs in and near the
+viewport. Long lines wrap within the available width. Parsing and syntax
+highlighting still run on the complete patch to preserve multiline syntax.
+Use `selectable: true` to mount the complete patch for selection across
+offscreen rows.
+
+```dart
+CustomScrollView(
+  slivers: [
+    MarkdownDiffView.sliver(
+      patch: unifiedDiff,
+      language: 'dart',
+      layout: MarkdownDiffLayout.sideBySide,
+    ),
+  ],
+)
+```
 
 Normal and enhanced Markdown code blocks use the same highlighter. A fence
 whose info is `diff dart` renders a Dart-highlighted diff; `diff` alone produces

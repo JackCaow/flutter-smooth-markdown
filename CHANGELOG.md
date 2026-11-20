@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-20
+
+### Added
+
+- `MarkdownReaderController`, `MarkdownOutlineView` and `MarkdownReaderSearchBar` for static box and sliver readers. The outline tracks the active heading. Anchors and search results can reveal blocks outside the viewport.
+- `MarkdownChatScrollController` follows streamed content, pauses when the reader scrolls into history and can jump back to the latest answer. `MarkdownCitationPlugin` and `MarkdownCitationScope` connect numbered inline references to app-provided sources, including sources received after the text.
+- Side-by-side patch review and `MarkdownDiffView.sliver` for viewport-based row layout. Unified diffs and whole-patch selection remain available.
+- Editor find-and-replace for individual matches or all occurrences in a single undo step. HTML clipboard content converts to editable Markdown. Bitmap paste supports embedded data URIs and a host-provided `onPasteImage` callback.
+
+The new clipboard dependency requires Android API 23 or later. Flutter and Dart SDK constraints remain at 3.38 and 3.10 respectively.
+
 ## [0.11.0] - 2026-11-20
 
 The main upgrades from 0.10.0 are viewport-based rendering for long documents, incremental parsing for streamed replies, and an embeddable viewer for unified diffs.
@@ -583,7 +594,8 @@ None - All optimizations are opt-in or enabled by default without breaking exist
 - 87+ unit tests with comprehensive coverage
 - Flutter lints enabled for code quality
 
-[Unreleased]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.9.0...v0.10.0
 [0.8.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.7.4...v0.8.0

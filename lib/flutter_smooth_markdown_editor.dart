@@ -7,6 +7,11 @@ library;
 
 export 'src/config/markdown_config.dart';
 export 'src/config/style_sheet.dart';
+export 'src/editor/markdown_editor_clipboard.dart'
+    show
+        MarkdownClipboardImage,
+        MarkdownClipboardContent,
+        MarkdownPasteImageCallback;
 export 'src/editor/markdown_editor_command.dart';
 export 'src/editor/markdown_editor_controller.dart';
 export 'src/editor/markdown_editor_export.dart';

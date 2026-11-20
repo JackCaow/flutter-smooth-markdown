@@ -82,7 +82,13 @@ void main() {
       findRichText: true,
       skipOffstage: false,
     );
-    await tester.ensureVisible(snippet.first);
+    // Following the answer brings its final block into view. Scroll back to
+    // read the opening, which may have been released by the sliver.
+    await tester.scrollUntilVisible(
+      snippet,
+      -250,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     expect(
       find.textContaining('Start with the UI thread', findRichText: true),
@@ -93,6 +99,25 @@ void main() {
       findsWidgets,
     );
     expect(tester.takeException(), isNull);
+  });
+  testWidgets('a numbered citation opens the source used by the sample', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: AiAnswerScenario()));
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pumpAndSettle();
+    final citation = find.byTooltip('Long-document scroll profile');
+    await tester.scrollUntilVisible(
+      citation,
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(citation);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('60 Hz sample. UI P95 was 24 ms and Raster P95 was 4 ms.'),
+      findsOneWidget,
+    );
   });
   testWidgets('custom questions open chat and keep the offline answer paused', (
     tester,

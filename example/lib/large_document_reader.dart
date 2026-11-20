@@ -18,11 +18,17 @@ class LargeDocumentReader extends StatefulWidget {
 class _LargeDocumentReaderState extends State<LargeDocumentReader> {
   late final String _sample = buildLargeDocumentSample();
   final _controller = ScrollController();
+  final _reader = MarkdownReaderController();
+  bool _searching = false;
   String? _pasted;
 
   void _open(String? text) {
     if (_controller.hasClients) _controller.jumpTo(0);
-    setState(() => _pasted = text);
+    _reader.search('');
+    setState(() {
+      _pasted = text;
+      _searching = false;
+    });
   }
 
   Future<void> _paste(bool chinese) async {
@@ -47,6 +53,7 @@ class _LargeDocumentReaderState extends State<LargeDocumentReader> {
 
   @override
   void dispose() {
+    _reader.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -65,6 +72,38 @@ class _LargeDocumentReaderState extends State<LargeDocumentReader> {
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
+          IconButton(
+            tooltip: chinese ? '目录' : 'Table of contents',
+            icon: const Icon(Icons.toc),
+            onPressed: () => showModalBottomSheet<void>(
+              context: context,
+              showDragHandle: true,
+              builder: (sheet) => SafeArea(
+                child: Column(
+                  children: [
+                    Text(
+                      chinese ? '目录' : 'Table of contents',
+                      style: Theme.of(sheet).textTheme.titleLarge,
+                    ),
+                    Expanded(
+                      child: MarkdownOutlineView(
+                        controller: _reader,
+                        onSelected: (_) => Navigator.pop(sheet),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: chinese ? '在文档中查找' : 'Find in document',
+            icon: Icon(_searching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() => _searching = !_searching);
+              if (!_searching) _reader.search('');
+            },
+          ),
           if (_pasted != null)
             IconButton(
               tooltip: chinese ? '打开原始样本' : 'Reopen sample',
@@ -78,6 +117,21 @@ class _LargeDocumentReaderState extends State<LargeDocumentReader> {
             icon: const Icon(Icons.content_paste_go_outlined),
           ),
         ],
+        bottom: _searching
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(55),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: MarkdownReaderSearchBar(
+                    controller: _reader,
+                    autofocus: true,
+                    hintText: chinese ? '输入要查找的文字' : 'Find in document',
+                    previousLabel: chinese ? '上一个匹配项' : 'Previous match',
+                    nextLabel: chinese ? '下一个匹配项' : 'Next match',
+                  ),
+                ),
+              )
+            : null,
       ),
       body: SafeArea(
         top: false,
@@ -104,6 +158,7 @@ class _LargeDocumentReaderState extends State<LargeDocumentReader> {
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                     sliver: SmoothMarkdown.sliver(
                       data: source,
+                      readerController: _reader,
                       styleSheet:
                           widget.style ??
                           MarkdownStyleSheet.fromBrightness(

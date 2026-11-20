@@ -16,6 +16,7 @@ dependencies:
   http: ^1.2.0
 
 dev_dependencies:
+  super_clipboard: ^0.9.1
   ffi: ^2.1.4
   flutter_driver:
     sdk: flutter

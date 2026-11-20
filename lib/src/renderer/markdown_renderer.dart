@@ -138,6 +138,9 @@ class MarkdownRenderer {
   /// AST nodes. Its owner must invalidate it when styles/builders/context
   /// change, and prune removed nodes. Nested rendering never shares this cache.
   ///
+  /// [blockLayout] optionally places indexed top-level blocks in a custom
+  /// layout; each requested index uses the same builder registry and theme.
+  ///
   /// Example:
   ///
   /// ```dart
@@ -153,6 +156,7 @@ class MarkdownRenderer {
     Map<MarkdownNode, Widget>? blockCache,
     bool sliver = false,
     bool addRepaintBoundaries = true,
+    Widget Function(IndexedWidgetBuilder, int, double)? blockLayout,
   }) {
     // Create context with renderer references for nested rendering
     final baseContext = context ?? const MarkdownRenderContext();
@@ -188,6 +192,11 @@ class MarkdownRenderer {
       final block = _renderNode(node, renderContext);
       if (blockCache != null) blockCache[node] = block;
       return block;
+    }
+
+    if (blockLayout != null) {
+      return blockLayout((_, index) => renderBlock(nodes[index]), nodes.length,
+          styleSheet.blockSpacing ?? 16.0);
     }
 
     if (sliver) {
