@@ -77,11 +77,16 @@ int _headerCells(String line) {
   final text = line.trim();
   if (text.length <= 1) return 1;
   var count = 1;
+  var escaped = false;
   for (var i = 0; i < text.length; i++) {
-    if (text.codeUnitAt(i) == 124) count++;
+    final unit = text.codeUnitAt(i);
+    if (unit == 92) {
+      escaped = !escaped;
+      continue;
+    }
+    if (unit == 124 && !escaped && i > 0 && i < text.length - 1) count++;
+    escaped = false;
   }
-  if (text.startsWith('|')) count--;
-  if (text.endsWith('|')) count--;
   return count;
 }
 

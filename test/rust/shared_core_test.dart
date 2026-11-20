@@ -57,6 +57,12 @@ void main() {
     expect(MarkdownParser().parse('still works'), hasLength(1));
   });
 
+  test('automatic inline-only parsing preserves oversized input', () {
+    final source = 'x' * (8 * 1024 * 1024 + 1);
+    final node = MarkdownParser().parseInlineOnly(source).single as TextNode;
+    expect(node.content, source);
+  });
+
   test('inline entry point does not promote fragments to block syntax', () {
     final nodes = MarkdownParser().parseInlineOnly('# heading *emphasis*');
     expect(nodes.whereType<HeaderNode>(), isEmpty);

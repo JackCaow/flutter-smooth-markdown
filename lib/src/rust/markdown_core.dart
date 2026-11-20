@@ -15,6 +15,9 @@ export 'core_types.dart'
 /// Stable entry point for shared-core services. No wire IDs or native pointers
 /// appear in this API. Native names match the Android and iOS highlighting APIs.
 abstract final class MarkdownCore {
+  static bool _canHighlight(String source) =>
+      source.length <= maxNativeSourceUnits;
+
   /// Whether this target uses the shared Rust engine (false on Web).
   static bool get isNative => platform.nativeAvailable;
 
@@ -29,28 +32,39 @@ abstract final class MarkdownCore {
       platform.normalizedNativeLanguage(language) ?? fallbackLanguage(language);
 
   /// Whole-input semantic tokens in original UTF-16 coordinates.
+  /// Input beyond the shared core's capacity is displayed without styling.
   static List<MarkdownHighlightToken> highlightedCode(
     String source, {
     required String language,
-  }) =>
-      platform.nativeHighlightedCode(source, language) ??
-      fallbackCode(source, language);
+  }) {
+    if (!_canHighlight(source)) return const [];
+    return platform.nativeHighlightedCode(source, language) ??
+        fallbackCode(source, language);
+  }
 
   /// Highlights once, then splits into display lines with expanded tabs.
   static List<MarkdownHighlightedLine> highlightedLines(
     String source, {
     required String language,
     int tabWidth = 4,
-  }) =>
-      platform.nativeHighlightedLines(source, language, tabWidth) ??
-      fallbackLines(source, language, tabWidth);
+  }) {
+    if (!_canHighlight(source)) {
+      return fallbackLines(source, language, tabWidth, highlight: false);
+    }
+    return platform.nativeHighlightedLines(source, language, tabWidth) ??
+        fallbackLines(source, language, tabWidth);
+  }
 
   /// Unified diff rows, per-side syntax highlighting and paired word changes.
   static List<MarkdownDiffRow> highlightedDiff(
     String patch, {
     required String language,
     int tabWidth = 4,
-  }) =>
-      platform.nativeHighlightedDiff(patch, language, tabWidth) ??
-      fallbackDiff(patch, language, tabWidth);
+  }) {
+    if (!_canHighlight(patch)) {
+      return fallbackDiff(patch, language, tabWidth, highlight: false);
+    }
+    return platform.nativeHighlightedDiff(patch, language, tabWidth) ??
+        fallbackDiff(patch, language, tabWidth);
+  }
 }

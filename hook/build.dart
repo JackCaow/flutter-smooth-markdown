@@ -34,6 +34,13 @@ Future<void> main(List<String> args) async {
       final linker = compiler.compiler.resolve(
         '$prefix${config.android.targetNdkApi}-clang${Platform.isWindows ? '.cmd' : ''}',
       );
+      if (!File.fromUri(linker).existsSync()) {
+        throw StateError(
+          'Android NDK compiler for API ${config.android.targetNdkApi} '
+          'and $arch was not found at ${linker.toFilePath()}. '
+          'Install an NDK that supports this target API.',
+        );
+      }
       environment['CARGO_TARGET_${target.toUpperCase().replaceAll('-', '_')}_LINKER'] =
           linker.toFilePath();
     } else if (os == OS.iOS || os == OS.macOS) {

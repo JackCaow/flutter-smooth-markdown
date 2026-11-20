@@ -5,21 +5,16 @@ import 'dart:math';
 import 'package:flutter_smooth_markdown/src/parser/parser_compatibility.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// Independent reference for the previously shipped compatibility decision.
-bool previousTableDecision(String source) {
+// Independent line-based reference with escaped Markdown punctuation removed.
+bool referenceTableDecision(String source) {
   if (!source.contains('|')) return false;
   final lines = source.split('\n');
   final delimiter = RegExp(r'^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$');
   int cells(String line) {
-    final text = line.trim();
-    if (text.length <= 1) return 1;
-    var count = 1;
-    for (var i = 0; i < text.length; i++) {
-      if (text.codeUnitAt(i) == 124) count++;
-    }
-    if (text.startsWith('|')) count--;
-    if (text.endsWith('|')) count--;
-    return count;
+    var text = line.trim().replaceAll(RegExp(r'\\.'), 'x');
+    if (text.startsWith('|')) text = text.substring(1);
+    if (text.endsWith('|')) text = text.substring(0, text.length - 1);
+    return text.split('|').length;
   }
 
   for (var i = 1; i < lines.length; i++) {
@@ -52,7 +47,7 @@ void main() {
           final prefix = source.substring(0, end);
           expect(
             hasLegacyTable(prefix),
-            previousTableDecision(prefix),
+            referenceTableDecision(prefix),
             reason: prefix,
           );
         }
@@ -70,7 +65,7 @@ void main() {
         final source = 'a|b\n$char-$char';
         expect(
           hasLegacyTable(source),
-          previousTableDecision(source),
+          referenceTableDecision(source),
           reason: 'U+${unit.toRadixString(16)}',
         );
       }
@@ -87,7 +82,7 @@ void main() {
           final source = utf8.decode(base64.decode(line.split('\t')[1]));
           expect(
             hasLegacyTable(source),
-            previousTableDecision(source),
+            referenceTableDecision(source),
             reason: source,
           );
         }
@@ -114,7 +109,7 @@ void main() {
         ).join();
         expect(
           hasLegacyTable(source),
-          previousTableDecision(source),
+          referenceTableDecision(source),
           reason: source,
         );
       }

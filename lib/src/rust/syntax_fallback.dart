@@ -94,15 +94,25 @@ List<MarkdownHighlightToken> fallbackCode(String source, String language) {
   return List.unmodifiable(tokens);
 }
 
-List<MarkdownHighlightedLine> fallbackLines(
-  String source,
-  String language,
-  int tabWidth,
-) {
+void _checkTabWidth(int tabWidth) {
   if (tabWidth < 0 || tabWidth > 16) {
     throw RangeError.range(tabWidth, 0, 16, 'tabWidth');
   }
-  final tokens = fallbackCode(source, language);
+}
+
+String _expandTabs(String text, int tabWidth) =>
+    tabWidth == 0 ? text : text.replaceAll('\t', ' ' * tabWidth);
+
+List<MarkdownHighlightedLine> fallbackLines(
+  String source,
+  String language,
+  int tabWidth, {
+  bool highlight = true,
+}) {
+  _checkTabWidth(tabWidth);
+  final tokens = highlight
+      ? fallbackCode(source, language)
+      : const <MarkdownHighlightToken>[];
   final raw = source.endsWith('\n')
       ? source.substring(0, source.length - 1)
       : source;
@@ -111,6 +121,12 @@ List<MarkdownHighlightedLine> fallbackLines(
     raw.split('\n').map((text) {
       final physicalLength = text.length;
       if (text.endsWith('\r')) text = text.substring(0, text.length - 1);
+      if (tokens.isEmpty) {
+        return MarkdownHighlightedLine(
+          text: _expandTabs(text, tabWidth),
+          tokens: const [],
+        );
+      }
       final expanded = StringBuffer();
       final positions = <int>[0];
       for (final unit in text.codeUnits) {
@@ -147,8 +163,10 @@ List<MarkdownHighlightedLine> fallbackLines(
 List<MarkdownDiffRow> fallbackDiff(
   String patch,
   String language,
-  int tabWidth,
-) {
+  int tabWidth, {
+  bool highlight = true,
+}) {
+  _checkTabWidth(tabWidth);
   final rows = <MarkdownDiffRow>[];
   var oldLine = 0, newLine = 0, oldRemaining = 0, newRemaining = 0;
   for (final raw in patch.split(RegExp(r'\r?\n'))) {
@@ -156,10 +174,20 @@ List<MarkdownDiffRow> fallbackDiff(
       r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@',
     ).firstMatch(raw);
     if (hunk != null) {
-      oldLine = int.parse(hunk[1]!);
-      newLine = int.parse(hunk[3]!);
-      oldRemaining = int.parse(hunk[2] ?? '1');
-      newRemaining = int.parse(hunk[4] ?? '1');
+      final oldStart = int.tryParse(hunk[1]!);
+      final newStart = int.tryParse(hunk[3]!);
+      final oldCount = int.tryParse(hunk[2] ?? '1');
+      final newCount = int.tryParse(hunk[4] ?? '1');
+      if (oldStart == null ||
+          newStart == null ||
+          oldCount == null ||
+          newCount == null) {
+        continue;
+      }
+      oldLine = oldStart;
+      newLine = newStart;
+      oldRemaining = oldCount;
+      newRemaining = newCount;
       rows.add(
         MarkdownDiffRow(
           kind: MarkdownDiffKind.hunk,
@@ -187,11 +215,12 @@ List<MarkdownDiffRow> fallbackDiff(
       final newNumber = kind != MarkdownDiffKind.removed ? newLine++ : null;
       if (oldNumber != null) oldRemaining--;
       if (newNumber != null) newRemaining--;
+      final text = raw.substring(1);
       rows.add(
         MarkdownDiffRow(
           kind: kind,
           line: MarkdownHighlightedLine(
-            text: raw.substring(1),
+            text: highlight ? text : _expandTabs(text, tabWidth),
             tokens: const [],
           ),
           oldLineNumber: oldNumber,
@@ -200,6 +229,7 @@ List<MarkdownDiffRow> fallbackDiff(
       );
     }
   }
+  if (!highlight) return List.unmodifiable(rows);
   // Highlight each hunk's complete old and new sides, preserving lexer state.
   var begin = 0;
   while (begin < rows.length) {
@@ -216,7 +246,7 @@ List<MarkdownDiffRow> fallbackDiff(
             i,
       ];
       final lines = fallbackLines(
-        indices.map((i) => rows[i].line.text).join('\n') + '\n',
+        '${indices.map((i) => rows[i].line.text).join('\n')}\n',
         language,
         tabWidth,
       );

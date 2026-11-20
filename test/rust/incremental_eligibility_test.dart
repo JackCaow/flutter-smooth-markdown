@@ -59,6 +59,23 @@ void main() {
     }
   });
 
+  test('escaped header pipes do not add table columns at any chunk split', () {
+    const odd =
+        r'| A \| B | C |'
+        '\n| --- | --- | --- |\n| 1 | 2 |';
+    const even =
+        r'| A \\| B | C |'
+        '\n| --- | --- | --- |\n| 1 | 2 |';
+    for (final (source, eligible) in [(odd, false), (even, true)]) {
+      expect(canParseIncrementally(source, null), eligible);
+      for (var i = 0; i <= source.length; i++) {
+        final gate = StreamEligibility();
+        gate.checkAppend(source.substring(0, i), null);
+        expect(gate.checkAppend(source, null), eligible);
+      }
+    }
+  });
+
   test('open table delimiters may change the decision until the newline', () {
     final gate = StreamEligibility();
     final buffer = StringBuffer();

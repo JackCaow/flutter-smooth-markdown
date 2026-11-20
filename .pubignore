@@ -4,6 +4,10 @@
 .pub/
 build/
 coverage/
+*.log
+.env
+.env.*
+**/failures/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 

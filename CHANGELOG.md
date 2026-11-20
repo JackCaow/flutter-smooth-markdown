@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Dart and Rust streaming retain committed blocks and update the changing tail. Incremental eligibility checks handle table separators and plugin markers split across publications. Native snapshots share unchanged node pages.
 - Compatible large static documents can show initial blocks while parsing the full input on a worker isolate on native targets. Automatic parsing falls back to Dart above the native input limit, including streams that cross it during an append.
+- Code and diff viewers preserve partial diff snippets and oversized source text.
 - Improved Dart parsing of long aligned text and paragraphs containing CJK characters. Native parsing reduces UTF-16 transfers, intermediate allocations and repeated AST decoding.
 - The parser and editor preserve compatibility paths for HTML, disclosures, ragged tables and in-progress whitespace edits. The existing box constructors and editor HTML-copy behavior remain available.
 
