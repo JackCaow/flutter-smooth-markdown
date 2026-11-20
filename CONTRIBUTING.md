@@ -48,8 +48,8 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Prerequisites
 
-- Flutter SDK >= 3.0.0
-- Dart SDK >= 3.0.0
+- Flutter SDK 3.38.0 or later with Dart SDK 3.10.0 or later
+- For native tests and builds, install Rust and Cargo with the target for your platform. See the [native build instructions](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/docs/rust-core.md).
 
 ### Getting Started
 
