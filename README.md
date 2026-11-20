@@ -28,18 +28,20 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 
 <table>
 <tr>
-<td><img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/main.jpg" width="280" alt="Main Interface"></td>
-<td><img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/code.jpg" width="280" alt="Code Blocks"></td>
-<td><img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/latx.jpg" width="280" alt="LaTeX Math"></td>
+<td><img src="screenshots/main.jpg" width="280" alt="Example home with the Ridgeline field guide and developer tools"></td>
+<td><img src="screenshots/code.jpg" width="280" alt="Dart patch with line numbers and highlighted additions and deletions"></td>
+<td><img src="screenshots/latx.jpg" width="280" alt="Inline and display LaTeX, including the quadratic formula and Euler’s identity"></td>
 </tr>
 <tr>
-<td align="center">Main Interface</td>
-<td align="center">Code Blocks</td>
-<td align="center">LaTeX Math</td>
+<td align="center">Example home</td>
+<td align="center">Patch review</td>
+<td align="center">LaTeX formulas</td>
 </tr>
 </table>
 
-<img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/streaming.gif" width="600" alt="Real-time Streaming">
+**Streaming an answer on Android**
+
+<img src="screenshots/streaming.gif" width="340" alt="The Android example streams a numbered answer, then builds a Markdown table as a follow-up answer arrives">
 
 > Run the example app: `cd example && flutter run`
 >
