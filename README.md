@@ -14,7 +14,7 @@
 
 A high-performance Flutter markdown renderer with syntax highlighting, LaTeX math, tables, footnotes, SVG images, Mermaid diagrams, and real-time streaming support.
 
-## In development
+## New in 0.12.0
 
 | Use case | API | Try it in the example |
 | --- | --- | --- |
@@ -115,7 +115,7 @@ Building a native app? See the [iOS and Android API map](https://github.com/Jack
 
 ```yaml
 dependencies:
-  flutter_smooth_markdown: ^0.11.0
+  flutter_smooth_markdown: ^0.12.0
 ```
 
 ```bash
