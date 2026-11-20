@@ -4,4 +4,12 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Allows the device integration test to publish its own PNG fixture. -->
+    <application>
+        <provider
+            android:name="com.superlist.super_native_extensions.DataProvider"
+            android:authorities="${applicationId}.SuperClipboardDataProvider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+    </application>
 </manifest>
