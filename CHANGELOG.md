@@ -9,25 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.0] - 2026-11-20
 
+The main upgrades from 0.10.0 are viewport-based rendering for long documents, incremental parsing for streamed replies, and an embeddable viewer for unified diffs.
+
 ### Upgrade requirements
 
-- The minimum supported toolchain is Flutter 3.38 and Dart 3.10. Version 0.10.0 remains available for projects using earlier SDKs.
+- The minimum Flutter SDK rises from 3.0 to 3.38 and the minimum Dart SDK from 3.0 to 3.10. Projects using earlier SDKs can stay on 0.10.0.
 - Native source builds require Cargo, Rust and the target for each platform. The build hook compiles the vendored core offline. Web builds continue to use Dart.
 
 ### Added
 
 - `SmoothMarkdown.sliver` for static documents and `StreamMarkdown.sliver` for live responses in a parent-owned `CustomScrollView`. Eligible views build the visible blocks and nearby scroll cache. Whole-document selection keeps the existing complete tree.
 - Shared Rust core 0.2.0 for native batch and incremental parsing, host plugins, reference links, syntax highlighting, unified diffs and HTML export. Select `MarkdownParserBackend.legacyDart` to use the Dart parser.
-- `MarkdownCodeView`, `MarkdownDiffView` and `MarkdownSyntaxTheme`, including language-aware `diff dart` fenced blocks and custom code-builder precedence.
+- `MarkdownCodeView`, `MarkdownDiffView` and `MarkdownSyntaxTheme` extend the existing fenced-code highlighter with standalone source and patch views. Patches show old and new line numbers, syntax highlighting and word changes within paired lines. `diff dart` fences use the patch viewer, and custom code builders retain precedence.
 - An example gallery with a long-document reader, offline field guide, streamable AI answers and a two-file code review. The long-document reader accepts pasted Markdown and includes the 435,200-unit benchmark sample.
 
 ### Changed
 
-- Dart and Rust streaming retain committed blocks and update the changing tail. Incremental eligibility checks handle table separators and plugin markers split across publications. Native snapshots share unchanged node pages.
+- In 0.10.0, `StreamMarkdown` reparsed the accumulated source on each update. Eligible Dart and Rust streams now retain completed blocks and reparse the changing tail. Compatibility checks handle table separators and plugin markers split across chunks. Native snapshots share unchanged node pages.
 - Compatible large static documents can show initial blocks while parsing the full input on a worker isolate on native targets. Automatic parsing falls back to Dart above the native input limit, including streams that cross it during an append.
 - Code and diff viewers preserve partial diff snippets and oversized source text.
 - Improved Dart parsing of long aligned text and paragraphs containing CJK characters. Native parsing reduces UTF-16 transfers, intermediate allocations and repeated AST decoding.
 - The parser and editor preserve compatibility paths for HTML, disclosures, ragged tables and in-progress whitespace edits. The existing box constructors and editor HTML-copy behavior remain available.
+
+### Measured performance
+
+On iPhone 17, switching from `SmoothMarkdown` to `SmoothMarkdown.sliver` on a 435,200-unit, 8,000-block document reduced time to the first visible heading from 749 to 52 ms with Dart and from 731 to 64 ms with Rust. Both slivers initially mounted 15 blocks. The comparison used one fresh process per configuration in the same profile build of the release candidate. [Measurements and methodology](https://github.com/JackCaow/flutter-smooth-markdown/blob/5ef6d34c91f06c2674802926101dc46f4f277551/benchmarks/static-document-results.md)
 
 ## [0.10.0] - 2026-09-18
 

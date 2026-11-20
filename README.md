@@ -12,6 +12,18 @@
 
 A high-performance Flutter markdown renderer with syntax highlighting, LaTeX math, tables, footnotes, SVG images, Mermaid diagrams, and real-time streaming support.
 
+## Upgrading from 0.10.0 to 0.11.0
+
+| Use case | 0.10.0 | What changes in 0.11.0 |
+| --- | --- | --- |
+| Reading a long document | `SmoothMarkdown` builds the document in one box. | Use `SmoothMarkdown.sliver(data: text)` in a vertical `CustomScrollView` to build only the blocks in or near the viewport for eligible documents. Whole-document selection keeps the full layout. |
+| Streaming a chat answer | `StreamMarkdown` reparses the accumulated text as chunks arrive. | The existing widget reuses completed blocks on eligible Dart and Rust streams and reparses the changing tail. Use `StreamMarkdown.sliver(stream: chunks)` to also build blocks on demand. |
+| Reviewing code | Markdown code fences support syntax highlighting. | Embed `MarkdownCodeView` for source or `MarkdownDiffView` for a unified patch with old and new line numbers, highlighted additions and deletions, and highlighted word changes within paired lines. |
+
+On an iPhone 17, a document with 435,200 UTF-16 units and 8,000 blocks showed its first heading in **749 ms with the box and 52 ms with the sliver** using Dart, or **731 ms and 64 ms** using Rust. Both slivers initially mounted 15 blocks. Each configuration opened the document once in a fresh process of the same profile build of the release candidate. [Benchmark and raw samples](https://github.com/JackCaow/flutter-smooth-markdown/blob/5ef6d34c91f06c2674802926101dc46f4f277551/benchmarks/static-document-results.md)
+
+Existing box constructors remain available. The minimum SDKs rise from Flutter 3.0 and Dart 3.0 to **Flutter 3.38 and Dart 3.10**. Native builds also require Rust, Cargo and the target for the platform. Web uses Dart. [Build requirements and migration](https://github.com/JackCaow/flutter-smooth-markdown/blob/5ef6d34c91f06c2674802926101dc46f4f277551/docs/rust-core.md)
+
 ## Features
 
 | Category | Features |
@@ -51,18 +63,10 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 
 ## Shared core, source highlighting and diff
 
-Native builds now use the pinned [shared Rust core](https://github.com/JackCaow/smooth-rust-core)
-behind the existing Flutter parser and widget APIs. The package requires Flutter
-3.38+ and Dart 3.10+. Native builds also require Rust/Cargo and the appropriate
-Rust target. Web uses the Dart compatibility backend. See [build requirements and migration](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/docs/rust-core.md).
-Eligible `StreamMarkdown` updates use the same conservative incremental strategy
-with either backend. In a vertical `CustomScrollView`, use
-`SmoothMarkdown.sliver(data: text)` for an existing document or
-`StreamMarkdown.sliver(stream: chunks)` for an incoming response. These entries
-build top-level Markdown blocks in and near the viewport. Open **Long document
-reader** in the example to scroll the 435,200-unit sample or paste your own Markdown.
-See the [435k static opening and scrolling comparison](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/static-document-results.md),
-[435k streaming comparison](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/stream-eligibility-results.md),
+Native builds use the pinned Rust parser and highlighter behind the Flutter APIs. [Shared Rust core](https://github.com/JackCaow/smooth-rust-core)
+
+Open **Long document reader** in the example to scroll the benchmark sample or paste your own Markdown.
+See the [435k streaming comparison](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/stream-eligibility-results.md),
 [block layout comparison](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/block-layout-results.md),
 [CPU and memory results](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/sustained-rss-results.md)
 and [Dart/Rust incremental comparison](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/equal-incremental-results.md).
