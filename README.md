@@ -1,5 +1,7 @@
 # Flutter Smooth Markdown
 
+![A Markdown page with highlighted diff lines folds into a mountain ridge.](screenshots/readme-hero.webp)
+
 [![pub package](https://img.shields.io/pub/v/flutter_smooth_markdown.svg)](https://pub.dev/packages/flutter_smooth_markdown)
 [![popularity](https://img.shields.io/pub/popularity/flutter_smooth_markdown.svg)](https://pub.dev/packages/flutter_smooth_markdown/score)
 [![likes](https://img.shields.io/pub/likes/flutter_smooth_markdown.svg)](https://pub.dev/packages/flutter_smooth_markdown/score)
