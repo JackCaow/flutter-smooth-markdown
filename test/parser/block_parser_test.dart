@@ -567,6 +567,17 @@ Final paragraph.
         expect(table.rows[0].cells[0].length, greaterThan(0));
       });
 
+      test('finds the next unescaped table pipe after Unicode prose', () {
+        final prefix = '文字🙂' * 1024;
+        for (var escapes = 1; escapes <= 4; escapes++) {
+          final slashes = '\\' * escapes;
+          final rows = parser.parse('$prefix$slashes|乙\n---|---\n1|2');
+          expect(rows.whereType<TableNode>(), hasLength(escapes.isEven ? 1 : 0));
+        }
+        final nodes = parser.parse('$prefix\\|乙|丙\n---|---\n1|2');
+        expect((nodes.single as TableNode).headers, hasLength(2));
+      });
+
       test('should keep escaped pipes inside table cells', () {
         const markdown = r'''
 | Name | Description |

@@ -1,0 +1,252 @@
+{
+  "frames_legacyDart": {
+    "frame_count": 40,
+    "median_build_ms": 3.152,
+    "p95_build_ms": 4.785,
+    "average_build_ms": 3.3709,
+    "median_raster_ms": 0.72,
+    "p95_raster_ms": 1.277,
+    "average_raster_ms": 0.73085,
+    "build_over_16_7ms": 0
+  },
+  "frames_rust": {
+    "frame_count": 40,
+    "median_build_ms": 4.181,
+    "p95_build_ms": 5.564,
+    "average_build_ms": 3.9628249999999987,
+    "median_raster_ms": 0.663,
+    "p95_raster_ms": 1.309,
+    "average_raster_ms": 0.8017500000000002,
+    "build_over_16_7ms": 0
+  },
+  "stream_frames_legacyDart": {
+    "frame_count": 40,
+    "median_build_ms": 5.296,
+    "p95_build_ms": 11.468,
+    "average_build_ms": 6.211225000000001,
+    "median_raster_ms": 0.988,
+    "p95_raster_ms": 2.176,
+    "publications": 40,
+    "ai_registry": true
+  },
+  "stream_frames_rust": {
+    "frame_count": 40,
+    "median_build_ms": 3.252,
+    "p95_build_ms": 5.149,
+    "average_build_ms": 2.9608499999999998,
+    "median_raster_ms": 1.275,
+    "p95_raster_ms": 3.709,
+    "publications": 40,
+    "ai_registry": true
+  },
+  "metadata": {
+    "profile_mode": true,
+    "physical_size": [
+      646.0,
+      1200.0
+    ],
+    "device_pixel_ratio": 2.0,
+    "transport": "direct-flutter-ast",
+    "rust_opt_level": "3",
+    "platform": "macos",
+    "os": "Version 27.2 (Build 26B123)",
+    "render_utf16_units": 3264,
+    "note": "Single device, warm parses, no cache; parse includes FFI/decoding/Flutter adaptation. Frame tests use the same highlighter."
+  },
+  "parses": {
+    "small_message": {
+      "utf16_units": 60,
+      "rust_ffi_decode_adapt": {
+        "median_us": 4.31,
+        "p90_us": 5.52,
+        "iterations": 500,
+        "samples": [
+          4.122,
+          4.194,
+          4.208,
+          4.252,
+          4.31,
+          4.434,
+          4.434,
+          4.464,
+          5.52
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 3.498,
+        "p90_us": 3.614,
+        "iterations": 500,
+        "samples": [
+          3.33,
+          3.384,
+          3.454,
+          3.458,
+          3.498,
+          3.52,
+          3.522,
+          3.524,
+          3.614
+        ]
+      }
+    },
+    "mixed_document_12k": {
+      "utf16_units": 10880,
+      "rust_ffi_decode_adapt": {
+        "median_us": 805.8333333333334,
+        "p90_us": 823.9166666666666,
+        "iterations": 12,
+        "samples": [
+          801.0,
+          803.5,
+          804.4166666666666,
+          804.9166666666666,
+          805.8333333333334,
+          812.9166666666666,
+          813.75,
+          818.4166666666666,
+          823.9166666666666
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 625.0,
+        "p90_us": 628.0,
+        "iterations": 12,
+        "samples": [
+          614.8333333333334,
+          615.1666666666666,
+          619.25,
+          622.4166666666666,
+          625.0,
+          625.5,
+          625.8333333333334,
+          626.1666666666666,
+          628.0
+        ]
+      }
+    },
+    "mixed_document_48k": {
+      "utf16_units": 43520,
+      "rust_ffi_decode_adapt": {
+        "median_us": 3451.5833333333335,
+        "p90_us": 3564.6666666666665,
+        "iterations": 12,
+        "samples": [
+          3321.0,
+          3322.4166666666665,
+          3439.8333333333335,
+          3441.0,
+          3451.5833333333335,
+          3491.0,
+          3495.0833333333335,
+          3522.3333333333335,
+          3564.6666666666665
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 2570.5,
+        "p90_us": 2691.0,
+        "iterations": 12,
+        "samples": [
+          2513.75,
+          2516.9166666666665,
+          2542.0833333333335,
+          2554.8333333333335,
+          2570.5,
+          2572.1666666666665,
+          2574.1666666666665,
+          2686.25,
+          2691.0
+        ]
+      }
+    },
+    "single_paragraph_48k": {
+      "utf16_units": 50400,
+      "rust_ffi_decode_adapt": {
+        "median_us": 2247.3333333333335,
+        "p90_us": 2356.5833333333335,
+        "iterations": 12,
+        "samples": [
+          2207.75,
+          2222.5833333333335,
+          2234.5833333333335,
+          2238.6666666666665,
+          2247.3333333333335,
+          2256.75,
+          2279.25,
+          2307.75,
+          2356.5833333333335
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 2139.5,
+        "p90_us": 2157.3333333333335,
+        "iterations": 12,
+        "samples": [
+          2106.6666666666665,
+          2123.8333333333335,
+          2133.25,
+          2134.9166666666665,
+          2139.5,
+          2141.0833333333335,
+          2143.0833333333335,
+          2152.5833333333335,
+          2157.3333333333335
+        ]
+      }
+    }
+  },
+  "streams": {
+    "utf16_units": 14800,
+    "publications": 58,
+    "rust_batch": {
+      "median_us": 26429.0,
+      "p90_us": 26739.0,
+      "iterations": 2,
+      "samples": [
+        26353.0,
+        26401.5,
+        26406.0,
+        26422.5,
+        26429.0,
+        26519.5,
+        26550.5,
+        26590.0,
+        26739.0
+      ]
+    },
+    "dart_batch": {
+      "median_us": 22249.0,
+      "p90_us": 22366.0,
+      "iterations": 2,
+      "samples": [
+        22201.5,
+        22208.5,
+        22209.5,
+        22226.5,
+        22249.0,
+        22252.0,
+        22266.5,
+        22268.5,
+        22366.0
+      ]
+    },
+    "rust_incremental": {
+      "median_us": 2660.5,
+      "p90_us": 2727.5,
+      "iterations": 2,
+      "samples": [
+        2628.0,
+        2635.0,
+        2637.5,
+        2656.0,
+        2660.5,
+        2675.0,
+        2683.0,
+        2720.5,
+        2727.5
+      ]
+    }
+  },
+  "hardware": "Apple M4",
+  "measurement_status": "Successful Profile integration run after direct decoding, safe eligibility, retained blocks, and speed-oriented Rust build."
+}

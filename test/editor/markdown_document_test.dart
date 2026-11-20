@@ -27,6 +27,21 @@ void _expectUniqueDocumentIds(MarkdownDocument document) {
 
 void main() {
   group('MarkdownDocumentCodec', () {
+    test(
+      'keeps source-only definitions aligned with following editable blocks',
+      () {
+        const source =
+            '[guide]: https://example.com/manual\n\n[^note]: Remember me\n\n# Work';
+        final result = MarkdownDocumentCodec().parse(source).toMarkdown();
+        expect(result, contains('https://example.com/manual'));
+        expect(result, contains('[^note]: Remember me'));
+        expect(result, endsWith('# Work'));
+        expect(
+          result.indexOf('https://example.com/manual'),
+          lessThan(result.indexOf('[^note]')),
+        );
+      },
+    );
     test('parses Scratch-style markdown into editable blocks', () {
       final codec = MarkdownDocumentCodec();
       final document = codec.parse('''
@@ -81,7 +96,12 @@ E = mc^2
       expect(document.blocks, hasLength(1));
       final block = document.blocks.single as MarkdownBlockMathBlock;
       expect(block.latex, 'E = mc^2');
-      expect(document.toMarkdown(), r'$$' '\nE = mc^2\n' r'$$');
+      expect(
+        document.toMarkdown(),
+        r'$$'
+        '\nE = mc^2\n'
+        r'$$',
+      );
     });
 
     test('keeps wikilinks with closing brackets plain like Scratch', () {
@@ -148,21 +168,23 @@ E = mc^2
       expect(document.toMarkdown(), '- parent\n  - child\n  - sibling\n- next');
     });
 
-    test('preserves ordered list start indexes through editable round trip',
-        () {
-      final codec = MarkdownDocumentCodec();
-      final document = codec.parse('5. five\n6. six');
+    test(
+      'preserves ordered list start indexes through editable round trip',
+      () {
+        final codec = MarkdownDocumentCodec();
+        final document = codec.parse('5. five\n6. six');
 
-      final list = document.blocks.single as MarkdownListBlock;
-      expect(list.kind, MarkdownListKind.ordered);
-      expect(list.startIndex, 5);
-      expect(document.toMarkdown(), '5. five\n6. six');
+        final list = document.blocks.single as MarkdownListBlock;
+        expect(list.kind, MarkdownListKind.ordered);
+        expect(list.startIndex, 5);
+        expect(document.toMarkdown(), '5. five\n6. six');
 
-      final reparsed = codec.parse(document.toMarkdown());
-      final reparsedList = reparsed.blocks.single as MarkdownListBlock;
-      expect(reparsedList.startIndex, 5);
-      expect(reparsed.toMarkdown(), '5. five\n6. six');
-    });
+        final reparsed = codec.parse(document.toMarkdown());
+        final reparsedList = reparsed.blocks.single as MarkdownListBlock;
+        expect(reparsedList.startIndex, 5);
+        expect(reparsed.toMarkdown(), '5. five\n6. six');
+      },
+    );
 
     test('splits mixed task and bullet list blocks like Scratch', () {
       final codec = MarkdownDocumentCodec();
@@ -323,10 +345,7 @@ E = mc^2
               MarkdownText('.'),
             ],
           ),
-          MarkdownMermaidBlock(
-            id: 'm',
-            code: 'graph TD\n  A --> B',
-          ),
+          MarkdownMermaidBlock(id: 'm', code: 'graph TD\n  A --> B'),
         ],
       );
 
@@ -347,9 +366,7 @@ E = mc^2
         blocks: [
           MarkdownParagraphBlock(
             id: 'p',
-            children: [
-              MarkdownText('A&nbsp;B&#160;C${nonBreakingSpace}D'),
-            ],
+            children: [MarkdownText('A&nbsp;B&#160;C${nonBreakingSpace}D')],
           ),
           MarkdownTableBlock(
             id: 'table',
@@ -408,8 +425,10 @@ E = mc^2
       final reparsed = MarkdownDocumentCodec().parse(markdown);
       final table = reparsed.blocks.single as MarkdownTableBlock;
       expect(table.headers.single.single.plainText, 'Name | Value');
-      expect(table.rows.single.single.map((node) => node.plainText).join(),
-          'A | B and C | D');
+      expect(
+        table.rows.single.single.map((node) => node.plainText).join(),
+        'A | B and C | D',
+      );
     });
 
     test('parses standalone images as editable image blocks', () {
@@ -561,12 +580,14 @@ E = mc^2
       final registry = ParserPluginRegistry()
         ..register(const _CustomBlockPlugin());
       final codec = MarkdownDocumentCodec(plugins: registry);
-      const customBlock = ':::custom id=42\n'
+      const customBlock =
+          ':::custom id=42\n'
           'Raw *stars* [link](https://example.com)\n'
           '\n'
           '- plugin-owned list item\n'
           ':::';
-      const markdown = 'Intro **strong**\n\n'
+      const markdown =
+          'Intro **strong**\n\n'
           '$customBlock\n\n'
           'Outro';
 
@@ -583,9 +604,7 @@ E = mc^2
     test('serializes raw blocks without markdown normalization', () {
       const rawMarkdown = '<custom>&nbsp;*literal*</custom>';
       const document = MarkdownDocument(
-        blocks: [
-          MarkdownRawBlock(id: 'raw', markdown: rawMarkdown),
-        ],
+        blocks: [MarkdownRawBlock(id: 'raw', markdown: rawMarkdown)],
       );
 
       expect(document.toMarkdown(), rawMarkdown);
@@ -595,12 +614,14 @@ E = mc^2
       final registry = ParserPluginRegistry()
         ..register(const _CustomBlockPlugin());
       final codec = MarkdownDocumentCodec(plugins: registry);
-      const customBlock = ':::custom id=42\n'
+      const customBlock =
+          ':::custom id=42\n'
           'Raw *stars* [link](https://example.com)\n'
           '\n'
           '- plugin-owned list item\n'
           ':::';
-      const markdown = 'Intro\n\n'
+      const markdown =
+          'Intro\n\n'
           '$customBlock\n\n'
           'Outro';
 
@@ -608,9 +629,7 @@ E = mc^2
       final firstParagraph = document.blocks.first as MarkdownParagraphBlock;
 
       final edited = document.replaceBlock(
-        firstParagraph.copyWith(
-          children: const [MarkdownText('Changed')],
-        ),
+        firstParagraph.copyWith(children: const [MarkdownText('Changed')]),
       );
 
       expect(edited.blocks[1], isA<MarkdownRawBlock>());
@@ -629,10 +648,7 @@ E = mc^2
       final editor = MarkdownDocumentEditor(
         const MarkdownDocument(
           blocks: [
-            MarkdownFrontmatterBlock(
-              id: 'frontmatter',
-              content: 'title: Old',
-            ),
+            MarkdownFrontmatterBlock(id: 'frontmatter', content: 'title: Old'),
             MarkdownParagraphBlock(
               id: 'body',
               children: [MarkdownText('Body')],
@@ -679,10 +695,7 @@ E = mc^2
     test('converts typed markdown prefixes into semantic blocks', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -704,10 +717,7 @@ E = mc^2
     test('converts task markdown prefix into a task list', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -733,10 +743,7 @@ E = mc^2
       test('converts Scratch bullet marker "$marker" into a bullet list', () {
         const document = MarkdownDocument(
           blocks: [
-            MarkdownParagraphBlock(
-              id: 'p',
-              children: [MarkdownText('')],
-            ),
+            MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
           ],
         );
         final editor = MarkdownDocumentEditor(document);
@@ -764,55 +771,54 @@ E = mc^2
       '[X] ': true,
       '  [x] ': true,
     }.entries) {
-      test('converts Scratch task marker "${entry.key}" inside a list item',
-          () {
-        const document = MarkdownDocument(
-          blocks: [
-            MarkdownListBlock(
-              id: 'list',
-              kind: MarkdownListKind.bullet,
-              items: [
-                MarkdownListItem(
-                  id: 'item',
-                  blocks: [
-                    MarkdownParagraphBlock(
-                      id: 'item-p',
-                      children: [MarkdownText('')],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        );
-        final editor = MarkdownDocumentEditor(document);
-        addTearDown(editor.dispose);
+      test(
+        'converts Scratch task marker "${entry.key}" inside a list item',
+        () {
+          const document = MarkdownDocument(
+            blocks: [
+              MarkdownListBlock(
+                id: 'list',
+                kind: MarkdownListKind.bullet,
+                items: [
+                  MarkdownListItem(
+                    id: 'item',
+                    blocks: [
+                      MarkdownParagraphBlock(
+                        id: 'item-p',
+                        children: [MarkdownText('')],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+          final editor = MarkdownDocumentEditor(document);
+          addTearDown(editor.dispose);
 
-        final result = editor.applyInputRules(
-          blockId: 'item-p',
-          text: entry.key,
-          selectionOffset: entry.key.length,
-        );
+          final result = editor.applyInputRules(
+            blockId: 'item-p',
+            text: entry.key,
+            selectionOffset: entry.key.length,
+          );
 
-        expect(result, isNotNull);
-        expect(result!.activeBlockId, 'item-p');
-        final block = editor.document.blocks.single;
-        expect(block, isA<MarkdownListBlock>());
-        final list = block as MarkdownListBlock;
-        expect(list.kind, MarkdownListKind.task);
-        expect(list.items.single.checked, entry.value);
-        expect(list.items.single.plainText, '');
-        expect(editor.document.toMarkdown(), entry.value ? '- [x]' : '- [ ]');
-      });
+          expect(result, isNotNull);
+          expect(result!.activeBlockId, 'item-p');
+          final block = editor.document.blocks.single;
+          expect(block, isA<MarkdownListBlock>());
+          final list = block as MarkdownListBlock;
+          expect(list.kind, MarkdownListKind.task);
+          expect(list.items.single.checked, entry.value);
+          expect(list.items.single.plainText, '');
+          expect(editor.document.toMarkdown(), entry.value ? '- [x]' : '- [ ]');
+        },
+      );
     }
 
     test('keeps top-level Scratch task item marker as paragraph text', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -832,10 +838,7 @@ E = mc^2
     test('converts dot numbered prefix into an ordered list', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -875,10 +878,7 @@ E = mc^2
               ),
             ],
           ),
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -917,10 +917,7 @@ E = mc^2
               ),
             ],
           ),
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -957,10 +954,7 @@ E = mc^2
               ),
             ],
           ),
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -991,10 +985,7 @@ E = mc^2
               ),
             ],
           ),
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -1043,10 +1034,7 @@ E = mc^2
                       ),
                     ],
                   ),
-                  MarkdownParagraphBlock(
-                    id: 'p',
-                    children: [MarkdownText('')],
-                  ),
+                  MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
                 ],
               ),
             ],
@@ -1077,10 +1065,7 @@ E = mc^2
     test('does not convert paren numbered prefix like Scratch', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -1101,10 +1086,7 @@ E = mc^2
       test('converts Scratch horizontal rule input "$marker"', () {
         const document = MarkdownDocument(
           blocks: [
-            MarkdownParagraphBlock(
-              id: 'p',
-              children: [MarkdownText('')],
-            ),
+            MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
           ],
         );
         final editor = MarkdownDocumentEditor(document);
@@ -1120,7 +1102,9 @@ E = mc^2
         expect(result!.activeBlockId, 'p-after-hr');
         expect(editor.document.blocks, hasLength(2));
         expect(
-            editor.document.blocks.first, isA<MarkdownHorizontalRuleBlock>());
+          editor.document.blocks.first,
+          isA<MarkdownHorizontalRuleBlock>(),
+        );
         expect(editor.document.blocks.last, isA<MarkdownParagraphBlock>());
         expect(editor.document.toMarkdown(), '---');
       });
@@ -1169,10 +1153,7 @@ E = mc^2
       test('converts Scratch code fence input "$marker"', () {
         const document = MarkdownDocument(
           blocks: [
-            MarkdownParagraphBlock(
-              id: 'p',
-              children: [MarkdownText('')],
-            ),
+            MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
           ],
         );
         final editor = MarkdownDocumentEditor(document);
@@ -1203,10 +1184,7 @@ E = mc^2
       test('does not convert non-TipTap code fence input "$marker"', () {
         const document = MarkdownDocument(
           blocks: [
-            MarkdownParagraphBlock(
-              id: 'p',
-              children: [MarkdownText('')],
-            ),
+            MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
           ],
         );
         final editor = MarkdownDocumentEditor(document);
@@ -1227,10 +1205,7 @@ E = mc^2
       test('keeps empty Scratch block math input "$marker" as text', () {
         const document = MarkdownDocument(
           blocks: [
-            MarkdownParagraphBlock(
-              id: 'p',
-              children: [MarkdownText('')],
-            ),
+            MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
           ],
         );
         final editor = MarkdownDocumentEditor(document);
@@ -1249,37 +1224,34 @@ E = mc^2
     }
 
     for (final marker in ['> ', '  > ']) {
-      test('keeps nested quote paragraph active after "$marker" input rule',
-          () {
-        const document = MarkdownDocument(
-          blocks: [
-            MarkdownParagraphBlock(
-              id: 'p',
-              children: [MarkdownText('')],
-            ),
-          ],
-        );
-        final editor = MarkdownDocumentEditor(document);
-        addTearDown(editor.dispose);
+      test(
+        'keeps nested quote paragraph active after "$marker" input rule',
+        () {
+          const document = MarkdownDocument(
+            blocks: [
+              MarkdownParagraphBlock(id: 'p', children: [MarkdownText('')]),
+            ],
+          );
+          final editor = MarkdownDocumentEditor(document);
+          addTearDown(editor.dispose);
 
-        final result = editor.applyInputRules(
-          blockId: 'p',
-          text: marker,
-          selectionOffset: marker.length,
-        );
+          final result = editor.applyInputRules(
+            blockId: 'p',
+            text: marker,
+            selectionOffset: marker.length,
+          );
 
-        expect(result, isNotNull);
-        expect(result!.activeBlockId, 'p-quote-p');
-        final block = editor.document.blocks.single;
-        expect(block, isA<MarkdownBlockquoteBlock>());
-        expect(editor.document.toMarkdown(), '>');
-      });
+          expect(result, isNotNull);
+          expect(result!.activeBlockId, 'p-quote-p');
+          final block = editor.document.blocks.single;
+          expect(block, isA<MarkdownBlockquoteBlock>());
+          expect(editor.document.toMarkdown(), '>');
+        },
+      );
     }
 
     test('replaces a top-level block with parsed markdown blocks', () {
-      final controller = MarkdownEditorController(
-        text: 'placeholder\n\nTail',
-      );
+      final controller = MarkdownEditorController(text: 'placeholder\n\nTail');
       addTearDown(controller.dispose);
 
       final blockId = controller.document.blocks.first.id;
@@ -1462,14 +1434,8 @@ E = mc^2
     test('copies a top-level cross-block selection as markdown', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p1',
-            children: [MarkdownText('Alpha')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'p2',
-            children: [MarkdownText('Beta')],
-          ),
+          MarkdownParagraphBlock(id: 'p1', children: [MarkdownText('Alpha')]),
+          MarkdownParagraphBlock(id: 'p2', children: [MarkdownText('Beta')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -1526,18 +1492,9 @@ E = mc^2
     test('deletes a cross-block selection and joins endpoint text', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p1',
-            children: [MarkdownText('Hello ')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'p2',
-            children: [MarkdownText('world!')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'p3',
-            children: [MarkdownText('Keep')],
-          ),
+          MarkdownParagraphBlock(id: 'p1', children: [MarkdownText('Hello ')]),
+          MarkdownParagraphBlock(id: 'p2', children: [MarkdownText('world!')]),
+          MarkdownParagraphBlock(id: 'p3', children: [MarkdownText('Keep')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -1609,19 +1566,13 @@ E = mc^2
     test('does not delete across unsupported top-level block types', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p1',
-            children: [MarkdownText('Before')],
-          ),
+          MarkdownParagraphBlock(id: 'p1', children: [MarkdownText('Before')]),
           MarkdownImageBlock(
             id: 'image',
             url: 'assets/diagram.png',
             alt: 'Diagram',
           ),
-          MarkdownParagraphBlock(
-            id: 'p2',
-            children: [MarkdownText('After')],
-          ),
+          MarkdownParagraphBlock(id: 'p2', children: [MarkdownText('After')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -1635,15 +1586,12 @@ E = mc^2
       expect(editor.copySelectionAsMarkdown(selection), isNull);
       expect(editor.deleteSelection(selection), isNull);
       expect(
-        editor.replaceSelectionWithBlocks(
-          selection,
-          const [
-            MarkdownParagraphBlock(
-              id: 'replacement',
-              children: [MarkdownText('Replacement')],
-            ),
-          ],
-        ),
+        editor.replaceSelectionWithBlocks(selection, const [
+          MarkdownParagraphBlock(
+            id: 'replacement',
+            children: [MarkdownText('Replacement')],
+          ),
+        ]),
         isNull,
       );
       expect(
@@ -1666,18 +1614,9 @@ E = mc^2
     test('replaces a cross-block selection with parsed blocks', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p1',
-            children: [MarkdownText('BeforeX')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'p2',
-            children: [MarkdownText('YAfter')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'p3',
-            children: [MarkdownText('Tail')],
-          ),
+          MarkdownParagraphBlock(id: 'p1', children: [MarkdownText('BeforeX')]),
+          MarkdownParagraphBlock(id: 'p2', children: [MarkdownText('YAfter')]),
+          MarkdownParagraphBlock(id: 'p3', children: [MarkdownText('Tail')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -1717,14 +1656,8 @@ E = mc^2
     test('applies inline commands across top-level text blocks', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p1',
-            children: [MarkdownText('Alpha')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'p2',
-            children: [MarkdownText('Beta')],
-          ),
+          MarkdownParagraphBlock(id: 'p1', children: [MarkdownText('Alpha')]),
+          MarkdownParagraphBlock(id: 'p2', children: [MarkdownText('Beta')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -1783,14 +1716,8 @@ E = mc^2
     test('wraps selected top-level blocks into one bullet list', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p1',
-            children: [MarkdownText('One')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'p2',
-            children: [MarkdownText('Two')],
-          ),
+          MarkdownParagraphBlock(id: 'p1', children: [MarkdownText('One')]),
+          MarkdownParagraphBlock(id: 'p2', children: [MarkdownText('Two')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -1811,14 +1738,8 @@ E = mc^2
     test('wraps selected top-level blocks into one blockquote', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p1',
-            children: [MarkdownText('One')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'p2',
-            children: [MarkdownText('Two')],
-          ),
+          MarkdownParagraphBlock(id: 'p1', children: [MarkdownText('One')]),
+          MarkdownParagraphBlock(id: 'p2', children: [MarkdownText('Two')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -1866,14 +1787,8 @@ E = mc^2
       final editor = MarkdownDocumentEditor(document);
       addTearDown(editor.dispose);
 
-      expect(
-        editor.canMoveBlock(blockId: 'before', upward: true),
-        isFalse,
-      );
-      expect(
-        editor.canMoveBlock(blockId: 'inside', upward: false),
-        isTrue,
-      );
+      expect(editor.canMoveBlock(blockId: 'before', upward: true), isFalse);
+      expect(editor.canMoveBlock(blockId: 'inside', upward: false), isTrue);
 
       final result = editor.moveBlock(
         blockId: 'inside',
@@ -1900,73 +1815,75 @@ E = mc^2
       );
     });
 
-    test('moves the top-level block containing an active block to an index',
-        () {
-      const document = MarkdownDocument(
-        blocks: [
-          MarkdownParagraphBlock(
-            id: 'before',
-            children: [MarkdownText('Before')],
-          ),
-          MarkdownBlockquoteBlock(
-            id: 'quote',
-            blocks: [
-              MarkdownParagraphBlock(
-                id: 'inside',
-                children: [MarkdownText('Inside')],
-              ),
-            ],
-          ),
-          MarkdownParagraphBlock(
-            id: 'after',
-            children: [MarkdownText('After')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'scratch-trailing',
-            children: [MarkdownText('')],
-          ),
-        ],
-      );
-      final editor = MarkdownDocumentEditor(document);
-      addTearDown(editor.dispose);
+    test(
+      'moves the top-level block containing an active block to an index',
+      () {
+        const document = MarkdownDocument(
+          blocks: [
+            MarkdownParagraphBlock(
+              id: 'before',
+              children: [MarkdownText('Before')],
+            ),
+            MarkdownBlockquoteBlock(
+              id: 'quote',
+              blocks: [
+                MarkdownParagraphBlock(
+                  id: 'inside',
+                  children: [MarkdownText('Inside')],
+                ),
+              ],
+            ),
+            MarkdownParagraphBlock(
+              id: 'after',
+              children: [MarkdownText('After')],
+            ),
+            MarkdownParagraphBlock(
+              id: 'scratch-trailing',
+              children: [MarkdownText('')],
+            ),
+          ],
+        );
+        final editor = MarkdownDocumentEditor(document);
+        addTearDown(editor.dispose);
 
-      expect(
-        editor.canMoveBlockToIndex(blockId: 'inside', targetIndex: 0),
-        isTrue,
-      );
-      expect(
-        editor.canMoveBlockToIndex(blockId: 'inside', targetIndex: 1),
-        isFalse,
-      );
-      expect(
-        editor.canMoveBlockToIndex(blockId: 'inside', targetIndex: 3),
-        isFalse,
-      );
+        expect(
+          editor.canMoveBlockToIndex(blockId: 'inside', targetIndex: 0),
+          isTrue,
+        );
+        expect(
+          editor.canMoveBlockToIndex(blockId: 'inside', targetIndex: 1),
+          isFalse,
+        );
+        expect(
+          editor.canMoveBlockToIndex(blockId: 'inside', targetIndex: 3),
+          isFalse,
+        );
 
-      final result = editor.moveBlockToIndex(
-        blockId: 'inside',
-        targetIndex: 0,
-        selectionOffset: 3,
-      );
+        final result = editor.moveBlockToIndex(
+          blockId: 'inside',
+          targetIndex: 0,
+          selectionOffset: 3,
+        );
 
-      expect(result, isNotNull);
-      expect(result!.activeBlockId, 'inside');
-      expect(result.selectionOffset, 3);
-      expect(
-        editor.document.toMarkdown(),
-        '> Inside\n\n'
-        'Before\n\n'
-        'After',
-      );
+        expect(result, isNotNull);
+        expect(result!.activeBlockId, 'inside');
+        expect(result.selectionOffset, 3);
+        expect(
+          editor.document.toMarkdown(),
+          '> Inside\n\n'
+          'Before\n\n'
+          'After',
+        );
 
-      expect(editor.undo(), isTrue);
-      expect(
-        editor.document.toMarkdown(),
-        'Before\n\n'
-        '> Inside\n\n'
-        'After',
-      );
-    });
+        expect(editor.undo(), isTrue);
+        expect(
+          editor.document.toMarkdown(),
+          'Before\n\n'
+          '> Inside\n\n'
+          'After',
+        );
+      },
+    );
 
     test('splits a top-level paragraph at the caret', () {
       const document = MarkdownDocument(
@@ -1980,10 +1897,7 @@ E = mc^2
       final editor = MarkdownDocumentEditor(document);
       addTearDown(editor.dispose);
 
-      final result = editor.splitBlockAt(
-        blockId: 'p',
-        selectionOffset: 5,
-      );
+      final result = editor.splitBlockAt(blockId: 'p', selectionOffset: 5);
 
       expect(result, isNotNull);
       expect(result!.activeBlockId, 'p-split');
@@ -2006,10 +1920,7 @@ E = mc^2
       final editor = MarkdownDocumentEditor(document);
       addTearDown(editor.dispose);
 
-      final result = editor.splitBlockAt(
-        blockId: 'h',
-        selectionOffset: 5,
-      );
+      final result = editor.splitBlockAt(blockId: 'h', selectionOffset: 5);
 
       expect(result, isNotNull);
       expect(editor.document.blocks[0], isA<MarkdownHeadingBlock>());
@@ -2041,10 +1952,7 @@ E = mc^2
       final editor = MarkdownDocumentEditor(document);
       addTearDown(editor.dispose);
 
-      final result = editor.splitBlockAt(
-        blockId: 'item-p',
-        selectionOffset: 5,
-      );
+      final result = editor.splitBlockAt(blockId: 'item-p', selectionOffset: 5);
 
       expect(result, isNotNull);
       expect(result!.activeBlockId, 'item-p-split');
@@ -2144,10 +2052,7 @@ E = mc^2
 
       expect(result, isNotNull);
       expect(result!.activeBlockId, 'child-p-split');
-      expect(
-        editor.document.toMarkdown(),
-        '- parent\n  - child\n  - next',
-      );
+      expect(editor.document.toMarkdown(), '- parent\n  - child\n  - next');
     });
 
     test('enter on an empty nested list item outdents it one level', () {
@@ -2373,23 +2278,14 @@ E = mc^2
     test('backspace at paragraph start merges with previous text block', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'a',
-            children: [MarkdownText('Hello')],
-          ),
-          MarkdownParagraphBlock(
-            id: 'b',
-            children: [MarkdownText('World')],
-          ),
+          MarkdownParagraphBlock(id: 'a', children: [MarkdownText('Hello')]),
+          MarkdownParagraphBlock(id: 'b', children: [MarkdownText('World')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
       addTearDown(editor.dispose);
 
-      final result = editor.deleteBackwardAt(
-        blockId: 'b',
-        selectionOffset: 0,
-      );
+      final result = editor.deleteBackwardAt(blockId: 'b', selectionOffset: 0);
 
       expect(result, isNotNull);
       expect(result!.activeBlockId, 'a');
@@ -2445,64 +2341,66 @@ E = mc^2
       expect(editor.document.toMarkdown(), '- [x] firstsecond');
     });
 
-    test('backspace at nested list item start merges with previous nested item',
-        () {
-      const document = MarkdownDocument(
-        blocks: [
-          MarkdownListBlock(
-            id: 'list',
-            kind: MarkdownListKind.bullet,
-            items: [
-              MarkdownListItem(
-                id: 'parent',
-                blocks: [
-                  MarkdownParagraphBlock(
-                    id: 'parent-p',
-                    children: [MarkdownText('parent')],
-                  ),
-                  MarkdownListBlock(
-                    id: 'nested',
-                    kind: MarkdownListKind.bullet,
-                    items: [
-                      MarkdownListItem(
-                        id: 'child-1',
-                        blocks: [
-                          MarkdownParagraphBlock(
-                            id: 'child-1-p',
-                            children: [MarkdownText('child')],
-                          ),
-                        ],
-                      ),
-                      MarkdownListItem(
-                        id: 'child-2',
-                        blocks: [
-                          MarkdownParagraphBlock(
-                            id: 'child-2-p',
-                            children: [MarkdownText('next')],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      );
-      final editor = MarkdownDocumentEditor(document);
-      addTearDown(editor.dispose);
+    test(
+      'backspace at nested list item start merges with previous nested item',
+      () {
+        const document = MarkdownDocument(
+          blocks: [
+            MarkdownListBlock(
+              id: 'list',
+              kind: MarkdownListKind.bullet,
+              items: [
+                MarkdownListItem(
+                  id: 'parent',
+                  blocks: [
+                    MarkdownParagraphBlock(
+                      id: 'parent-p',
+                      children: [MarkdownText('parent')],
+                    ),
+                    MarkdownListBlock(
+                      id: 'nested',
+                      kind: MarkdownListKind.bullet,
+                      items: [
+                        MarkdownListItem(
+                          id: 'child-1',
+                          blocks: [
+                            MarkdownParagraphBlock(
+                              id: 'child-1-p',
+                              children: [MarkdownText('child')],
+                            ),
+                          ],
+                        ),
+                        MarkdownListItem(
+                          id: 'child-2',
+                          blocks: [
+                            MarkdownParagraphBlock(
+                              id: 'child-2-p',
+                              children: [MarkdownText('next')],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+        final editor = MarkdownDocumentEditor(document);
+        addTearDown(editor.dispose);
 
-      final result = editor.deleteBackwardAt(
-        blockId: 'child-2-p',
-        selectionOffset: 0,
-      );
+        final result = editor.deleteBackwardAt(
+          blockId: 'child-2-p',
+          selectionOffset: 0,
+        );
 
-      expect(result, isNotNull);
-      expect(result!.activeBlockId, 'child-1-p');
-      expect(result.selectionOffset, 5);
-      expect(editor.document.toMarkdown(), '- parent\n  - childnext');
-    });
+        expect(result, isNotNull);
+        expect(result!.activeBlockId, 'child-1-p');
+        expect(result.selectionOffset, 5);
+        expect(editor.document.toMarkdown(), '- parent\n  - childnext');
+      },
+    );
 
     test('backspace at first nested list item start outdents it', () {
       const document = MarkdownDocument(
@@ -2700,28 +2598,19 @@ E = mc^2
         MarkdownListItem(
           id: 'a',
           blocks: [
-            MarkdownParagraphBlock(
-              id: 'p1',
-              children: [MarkdownText('A')],
-            ),
+            MarkdownParagraphBlock(id: 'p1', children: [MarkdownText('A')]),
           ],
         ),
         MarkdownListItem(
           id: 'b',
           blocks: [
-            MarkdownParagraphBlock(
-              id: 'p2',
-              children: [MarkdownText('B')],
-            ),
+            MarkdownParagraphBlock(id: 'p2', children: [MarkdownText('B')]),
           ],
         ),
         MarkdownListItem(
           id: 'c',
           blocks: [
-            MarkdownParagraphBlock(
-              id: 'p3',
-              children: [MarkdownText('C')],
-            ),
+            MarkdownParagraphBlock(id: 'p3', children: [MarkdownText('C')]),
           ],
         ),
       ];
@@ -2807,142 +2696,146 @@ E = mc^2
       );
     });
 
-    test('deletes nested list item selections without deleting the parent list',
-        () {
-      final editor = MarkdownDocumentEditor(
-        const MarkdownDocument(
-          blocks: [
-            MarkdownListBlock(
-              id: 'list',
-              kind: MarkdownListKind.bullet,
-              items: [
-                MarkdownListItem(
-                  id: 'keep-before',
-                  blocks: [
-                    MarkdownParagraphBlock(
-                      id: 'before',
-                      children: [MarkdownText('Before')],
-                    ),
-                  ],
-                ),
-                MarkdownListItem(
-                  id: 'drop-one',
-                  blocks: [
-                    MarkdownParagraphBlock(
-                      id: 'one',
-                      children: [MarkdownText('One')],
-                    ),
-                  ],
-                ),
-                MarkdownListItem(
-                  id: 'drop-two',
-                  blocks: [
-                    MarkdownParagraphBlock(
-                      id: 'two',
-                      children: [MarkdownText('Two')],
-                    ),
-                  ],
-                ),
-                MarkdownListItem(
-                  id: 'keep-after',
-                  blocks: [
-                    MarkdownParagraphBlock(
-                      id: 'after',
-                      children: [MarkdownText('After')],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-      addTearDown(editor.dispose);
+    test(
+      'deletes nested list item selections without deleting the parent list',
+      () {
+        final editor = MarkdownDocumentEditor(
+          const MarkdownDocument(
+            blocks: [
+              MarkdownListBlock(
+                id: 'list',
+                kind: MarkdownListKind.bullet,
+                items: [
+                  MarkdownListItem(
+                    id: 'keep-before',
+                    blocks: [
+                      MarkdownParagraphBlock(
+                        id: 'before',
+                        children: [MarkdownText('Before')],
+                      ),
+                    ],
+                  ),
+                  MarkdownListItem(
+                    id: 'drop-one',
+                    blocks: [
+                      MarkdownParagraphBlock(
+                        id: 'one',
+                        children: [MarkdownText('One')],
+                      ),
+                    ],
+                  ),
+                  MarkdownListItem(
+                    id: 'drop-two',
+                    blocks: [
+                      MarkdownParagraphBlock(
+                        id: 'two',
+                        children: [MarkdownText('Two')],
+                      ),
+                    ],
+                  ),
+                  MarkdownListItem(
+                    id: 'keep-after',
+                    blocks: [
+                      MarkdownParagraphBlock(
+                        id: 'after',
+                        children: [MarkdownText('After')],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+        addTearDown(editor.dispose);
 
-      final result = editor.deleteListItemSelection(
-        const MarkdownListItemSelection(
-          listId: 'list',
-          anchorItemId: 'drop-one',
-          focusItemId: 'drop-two',
-        ),
-      );
+        final result = editor.deleteListItemSelection(
+          const MarkdownListItemSelection(
+            listId: 'list',
+            anchorItemId: 'drop-one',
+            focusItemId: 'drop-two',
+          ),
+        );
 
-      expect(result, isNotNull);
-      expect(result!.activeBlockId, 'after');
-      expect(
-        editor.document.toMarkdown(),
-        '- Before\n'
-        '- After',
-      );
-    });
+        expect(result, isNotNull);
+        expect(result!.activeBlockId, 'after');
+        expect(
+          editor.document.toMarkdown(),
+          '- Before\n'
+          '- After',
+        );
+      },
+    );
 
-    test('applies inline commands to selected list item primary text blocks',
-        () {
-      final editor = MarkdownDocumentEditor(
-        const MarkdownDocument(
-          blocks: [
-            MarkdownListBlock(
-              id: 'list',
-              kind: MarkdownListKind.task,
-              items: [
-                MarkdownListItem(
-                  id: 'one',
-                  blocks: [
-                    MarkdownParagraphBlock(
-                      id: 'p1',
-                      children: [MarkdownText('One')],
-                    ),
-                  ],
-                ),
-                MarkdownListItem(
-                  id: 'two',
-                  checked: true,
-                  blocks: [
-                    MarkdownParagraphBlock(
-                      id: 'p2',
-                      children: [MarkdownText('Two')],
-                    ),
-                    MarkdownListBlock(
-                      id: 'child',
-                      kind: MarkdownListKind.bullet,
-                      items: [
-                        MarkdownListItem(
-                          id: 'child-item',
-                          blocks: [
-                            MarkdownParagraphBlock(
-                              id: 'child-p',
-                              children: [MarkdownText('Child')],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-      addTearDown(editor.dispose);
+    test(
+      'applies inline commands to selected list item primary text blocks',
+      () {
+        final editor = MarkdownDocumentEditor(
+          const MarkdownDocument(
+            blocks: [
+              MarkdownListBlock(
+                id: 'list',
+                kind: MarkdownListKind.task,
+                items: [
+                  MarkdownListItem(
+                    id: 'one',
+                    blocks: [
+                      MarkdownParagraphBlock(
+                        id: 'p1',
+                        children: [MarkdownText('One')],
+                      ),
+                    ],
+                  ),
+                  MarkdownListItem(
+                    id: 'two',
+                    checked: true,
+                    blocks: [
+                      MarkdownParagraphBlock(
+                        id: 'p2',
+                        children: [MarkdownText('Two')],
+                      ),
+                      MarkdownListBlock(
+                        id: 'child',
+                        kind: MarkdownListKind.bullet,
+                        items: [
+                          MarkdownListItem(
+                            id: 'child-item',
+                            blocks: [
+                              MarkdownParagraphBlock(
+                                id: 'child-p',
+                                children: [MarkdownText('Child')],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+        addTearDown(editor.dispose);
 
-      final changed = editor.applyInlineCommandToListItemSelection(
-        const MarkdownListItemSelection(
-          listId: 'list',
-          anchorItemId: 'one',
-          focusItemId: 'two',
-        ),
-        MarkdownEditorCommand.bold,
-      );
+        final changed = editor.applyInlineCommandToListItemSelection(
+          const MarkdownListItemSelection(
+            listId: 'list',
+            anchorItemId: 'one',
+            focusItemId: 'two',
+          ),
+          MarkdownEditorCommand.bold,
+        );
 
-      expect(changed, isTrue);
-      expect(
-        editor.document.toMarkdown(),
-        '- [ ] **One**\n'
-        '- [x] **Two**\n'
-        '  - Child',
-      );
-    });
+        expect(changed, isTrue);
+        expect(
+          editor.document.toMarkdown(),
+          '- [ ] **One**\n'
+          '- [x] **Two**\n'
+          '  - Child',
+        );
+      },
+    );
 
     test('normalizes and contains table cell selections', () {
       const selection = MarkdownTableCellSelection(
@@ -3143,10 +3036,7 @@ E = mc^2
       );
       addTearDown(editor.dispose);
 
-      final link = editor.linkAtTextRange(
-        'p',
-        const TextRange.collapsed(6),
-      );
+      final link = editor.linkAtTextRange('p', const TextRange.collapsed(6));
 
       expect(link, isNotNull);
       expect(link!.url, 'https://old.example');
@@ -3327,10 +3217,7 @@ E = mc^2
     test('replaces a text range inside a semantic text block', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('/hea')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('/hea')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -3398,10 +3285,7 @@ E = mc^2
               ),
             ],
           ),
-          MarkdownParagraphBlock(
-            id: 'tail',
-            children: [MarkdownText('Tail')],
-          ),
+          MarkdownParagraphBlock(id: 'tail', children: [MarkdownText('Tail')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -3457,10 +3341,7 @@ E = mc^2
               ),
             ],
           ),
-          MarkdownParagraphBlock(
-            id: 'tail',
-            children: [MarkdownText('Tail')],
-          ),
+          MarkdownParagraphBlock(id: 'tail', children: [MarkdownText('Tail')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -3486,7 +3367,15 @@ E = mc^2
 
       final markdown = editor.document.toMarkdown();
       expect(markdown, startsWith('- before '));
-      expect(markdown, contains('  ' r'$$' '\n  x^2\n  ' r'$$'));
+      expect(
+        markdown,
+        contains(
+          '  '
+          r'$$'
+          '\n  x^2\n  '
+          r'$$',
+        ),
+      );
       expect(markdown, contains('after'));
       expect(markdown, endsWith('Tail'));
     });
@@ -3609,9 +3498,7 @@ E = mc^2
     });
 
     test('replaces an empty document with image and trailing paragraph', () {
-      final editor = MarkdownDocumentEditor(
-        const MarkdownDocument(blocks: []),
-      );
+      final editor = MarkdownDocumentEditor(const MarkdownDocument(blocks: []));
       addTearDown(editor.dispose);
 
       final result = editor.replaceEmptyDocumentWithImageBlock(
@@ -3663,10 +3550,7 @@ E = mc^2
     test('replaces a block with a custom table size', () {
       const document = MarkdownDocument(
         blocks: [
-          MarkdownParagraphBlock(
-            id: 'p',
-            children: [MarkdownText('table')],
-          ),
+          MarkdownParagraphBlock(id: 'p', children: [MarkdownText('table')]),
         ],
       );
       final editor = MarkdownDocumentEditor(document);
@@ -3817,10 +3701,10 @@ E = mc^2
         );
 
       var updated = editor.document.blocks.single as MarkdownTableBlock;
-      expect(
-        updated.alignments,
-        [MarkdownTableAlignment.left, MarkdownTableAlignment.center],
-      );
+      expect(updated.alignments, [
+        MarkdownTableAlignment.left,
+        MarkdownTableAlignment.center,
+      ]);
       expect(
         updated.toMarkdown(),
         '| A | B |\n'
@@ -3953,10 +3837,7 @@ E = mc^2
       final editor = MarkdownDocumentEditor(
         const MarkdownDocument(
           blocks: [
-            MarkdownParagraphBlock(
-              id: 'p',
-              children: [MarkdownText('Intro')],
-            ),
+            MarkdownParagraphBlock(id: 'p', children: [MarkdownText('Intro')]),
           ],
         ),
       );
@@ -4232,10 +4113,7 @@ E = mc^2
 }
 
 class _CustomBlockNode extends MarkdownNode {
-  const _CustomBlockNode({
-    required this.info,
-    required this.content,
-  });
+  const _CustomBlockNode({required this.info, required this.content});
 
   final String info;
   final String content;
@@ -4245,16 +4123,13 @@ class _CustomBlockNode extends MarkdownNode {
 
   @override
   Map<String, dynamic> toJson() => {
-        'type': type,
-        'info': info,
-        'content': content,
-      };
+    'type': type,
+    'info': info,
+    'content': content,
+  };
 
   @override
-  _CustomBlockNode copyWith({
-    String? info,
-    String? content,
-  }) {
+  _CustomBlockNode copyWith({String? info, String? content}) {
     return _CustomBlockNode(
       info: info ?? this.info,
       content: content ?? this.content,
@@ -4298,8 +4173,9 @@ class _CustomBlockPlugin extends BlockParserPlugin {
         info: firstLine.substring(':::custom'.length).trim(),
         content: contentLines.join('\n'),
       ),
-      linesConsumed:
-          index < lines.length ? index - startIndex + 1 : index - startIndex,
+      linesConsumed: index < lines.length
+          ? index - startIndex + 1
+          : index - startIndex,
     );
   }
 }

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show compute, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,6 +9,7 @@ import '../src/config/style_sheet.dart';
 import '../src/parser/ast/markdown_node.dart';
 import '../src/parser/markdown_parser.dart';
 import '../src/parser/parse_cache.dart';
+import '../src/parser/parser_compatibility.dart' show backendForSourceLength;
 import '../src/parser/parser_plugin.dart';
 import '../src/renderer/builders/artifact_builder.dart';
 import '../src/renderer/builders/block_math_builder.dart';
@@ -31,7 +35,10 @@ import '../src/renderer/builders/thinking_builder.dart';
 import '../src/renderer/builders/tool_call_builder.dart';
 import '../src/renderer/markdown_renderer.dart';
 import '../src/renderer/widget_builder.dart';
+import '../src/rust/stream_eligibility.dart';
 import 'smooth_selection_region.dart';
+
+part 'static_markdown_sliver.dart';
 
 /// A widget that renders Markdown content with high performance and customizable styling.
 ///
@@ -163,7 +170,7 @@ import 'smooth_selection_region.dart';
 /// - The widget uses an AST-based parser for efficient parsing
 /// - Rendering is optimized to minimize widget rebuilds
 /// - For real-time streaming content, use `StreamMarkdown` instead
-/// - Large documents (10k+ lines) may benefit from lazy loading techniques
+/// - For long documents in a vertical [CustomScrollView], use [SmoothMarkdown.sliver]
 ///
 /// See also:
 ///
@@ -219,7 +226,35 @@ class SmoothMarkdown extends StatelessWidget {
     this.selectableRegionKey,
     this.plugins,
     this.builderRegistry,
-  });
+  }) : _sliver = false;
+
+  /// Builds a sliver for a vertical [CustomScrollView]. The parent owns scrolling.
+  ///
+  /// Builds top-level blocks near the viewport. On native platforms, large
+  /// documents without active parser hooks finish parsing on a worker isolate.
+  /// Text selection and reverse scrolling keep their complete document layout.
+  /// Custom widget builders run as their blocks enter the viewport.
+  const SmoothMarkdown.sliver({
+    required this.data,
+    super.key,
+    this.styleSheet,
+    this.config,
+    this.onTapLink,
+    this.onTapImage,
+    this.imageBuilder,
+    this.codeBuilder,
+    this.useEnhancedComponents = false,
+    this.enableCache = true,
+    this.useRepaintBoundary = true,
+    this.selectable = false,
+    this.contextMenuBuilder,
+    this.selectionController,
+    this.selectableRegionKey,
+    this.plugins,
+    this.builderRegistry,
+  }) : _sliver = true;
+
+  final bool _sliver;
 
   /// The Markdown text to render.
   ///
@@ -562,8 +597,11 @@ class SmoothMarkdown extends StatelessWidget {
   /// ```
   ///
   /// Defaults to `null`.
-  final Widget Function(BuildContext context,
-      SmoothSelectionRegionState selectableRegionState)? contextMenuBuilder;
+  final Widget Function(
+    BuildContext context,
+    SmoothSelectionRegionState selectableRegionState,
+  )?
+  contextMenuBuilder;
 
   /// Controller for programmatic text selection.
   ///
@@ -665,32 +703,79 @@ class SmoothMarkdown extends StatelessWidget {
   /// One cache per HTML config keeps results isolated between widgets
   /// with different `enableHtml` settings without allocating a
   /// prefixed key string (an O(n) copy of the document) on every build.
+  static int _cacheGeneration = 0;
   static final _parseCache = MarkdownParseCache(maxSize: 100);
   static final _htmlParseCache = MarkdownParseCache(maxSize: 100);
 
+  MarkdownParserBackend get _backend =>
+      config?.parserBackend ?? MarkdownParserBackend.automatic;
+
+  MarkdownParseCache? get _cache {
+    if (!enableCache ||
+        plugins != null ||
+        _backend != MarkdownParserBackend.automatic) {
+      return null;
+    }
+    return config?.enableHtml == true ? _htmlParseCache : _parseCache;
+  }
+
+  List<MarkdownNode> _parse() {
+    final cache = _cache;
+    final hit = cache?.get(data);
+    if (hit != null) return hit;
+    final nodes = MarkdownParser(
+      plugins: plugins,
+      enableHtml: config?.enableHtml ?? false,
+      backend: _backend,
+    ).parse(data);
+    cache?.put(data, nodes);
+    return nodes;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Create parser (with plugins and HTML support if configured)
-    final enableHtml = config?.enableHtml ?? false;
-    final parser = MarkdownParser(plugins: plugins, enableHtml: enableHtml);
-
-    // Parse markdown with optional caching
-    // Note: When plugins are used, caching is based on data only.
-    // If plugin configuration changes, you should disable caching.
-    final cache = enableHtml ? _htmlParseCache : _parseCache;
-    final List<MarkdownNode> nodes;
-    if (enableCache && plugins == null) {
-      final cached = cache.get(data);
-      if (cached != null) {
-        nodes = cached;
-      } else {
-        nodes = parser.parse(data);
-        cache.put(data, nodes);
-      }
-    } else {
-      nodes = parser.parse(data);
+    if (_sliver) return _StaticMarkdownSliver(document: this);
+    if (data.length >= _largeDocumentUnits &&
+        enableCache &&
+        plugins == null &&
+        builderRegistry == null &&
+        imageBuilder == null &&
+        codeBuilder == null &&
+        !selectable) {
+      return _StaticMarkdownBox(document: this);
     }
+    return renderNodes(context, _parse());
+  }
 
+  /// Renders an existing AST with the same styles, builders and selection.
+  /// Used by streaming to avoid parsing the committed prefix again. Optional
+  /// [blockCache] follows [MarkdownRenderer.render] invalidation rules.
+  Widget renderNodes(
+    BuildContext context,
+    List<MarkdownNode> nodes, {
+    Map<MarkdownNode, Widget>? blockCache,
+  }) => _renderNodes(context, nodes, blockCache: blockCache);
+
+  /// Renders a retained stream AST in a CustomScrollView. Selection uses the
+  /// complete box tree so offscreen text retains existing selection semantics.
+  Widget renderSliverNodes(
+    BuildContext context,
+    List<MarkdownNode> nodes, {
+    Map<MarkdownNode, Widget>? blockCache,
+  }) =>
+      selectable ||
+          Scrollable.maybeOf(context)?.axisDirection == AxisDirection.up
+      ? SliverToBoxAdapter(
+          child: renderNodes(context, nodes, blockCache: blockCache),
+        )
+      : _renderNodes(context, nodes, blockCache: blockCache, sliver: true);
+
+  Widget _renderNodes(
+    BuildContext context,
+    List<MarkdownNode> nodes, {
+    Map<MarkdownNode, Widget>? blockCache,
+    bool sliver = false,
+  }) {
     // Create custom registry if enhanced components are enabled
     BuilderRegistry? customRegistry;
     if (useEnhancedComponents) {
@@ -750,9 +835,18 @@ class SmoothMarkdown extends StatelessWidget {
       imageBuilder: imageBuilder,
       codeBuilder: codeBuilder,
       selectable: selectable,
+      enableCodeHighlight: config?.enableCodeHighlight ?? true,
+      syntaxTheme: config?.syntaxTheme,
     );
 
-    final widget = renderer.render(nodes, context: renderContext);
+    final widget = renderer.render(
+      nodes,
+      context: renderContext,
+      blockCache: blockCache,
+      sliver: sliver,
+      addRepaintBoundaries: useRepaintBoundary,
+    );
+    if (sliver) return widget;
 
     // Wrap in SmoothSelectionRegion if selectable.
     //
@@ -791,6 +885,7 @@ class SmoothMarkdown extends StatelessWidget {
   /// }
   /// ```
   static void clearCache() {
+    _cacheGeneration++;
     _parseCache.clear();
     _htmlParseCache.clear();
   }

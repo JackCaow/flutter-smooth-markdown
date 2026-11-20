@@ -2,16 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_smooth_markdown/flutter_smooth_markdown.dart';
 
+import 'ai_answer_scenario.dart';
 import 'ai_chat_demo.dart';
+import 'code_diff_demo.dart';
 import 'chat_list_demo.dart';
 import 'footnote_demo.dart';
 import 'html_demo.dart';
+import 'field_guide_scenario.dart';
+import 'gallery_home.dart';
+import 'gallery_reader.dart';
+import 'gallery_library.dart';
 import 'l10n/app_localizations.dart';
 import 'conversation_list_demo.dart';
 import 'editor_demo.dart';
+import 'large_document_reader.dart';
 import 'math_demo.dart';
 import 'mermaid_demo.dart';
 import 'plugin_demo.dart';
+import 'review_scenario.dart';
 import 'streaming_demo.dart';
 
 void main() {
@@ -27,6 +35,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   Locale _locale = const Locale('zh');
+  MarkdownTheme? _appearance;
 
   void _changeLanguage(Locale locale) {
     setState(() {
@@ -38,11 +47,14 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Smooth Markdown Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData.dark(),
+      debugShowCheckedModeBanner: false,
+      theme: _appTheme(Brightness.light),
+      darkTheme: _appTheme(Brightness.dark),
+      themeMode: switch (_appearance?.brightness) {
+        Brightness.dark => ThemeMode.dark,
+        Brightness.light => ThemeMode.light,
+        null => ThemeMode.system,
+      },
       locale: _locale,
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -58,18 +70,54 @@ class _MyAppState extends State<MyApp> {
         Locale('fr'),
         Locale('ko'),
       ],
-      home: MarkdownDemoPage(onLanguageChange: _changeLanguage),
+      home: MarkdownDemoPage(
+        onLanguageChange: _changeLanguage,
+        appearance: _appearance,
+        onAppearanceChange: (value) => setState(() => _appearance = value),
+      ),
     );
   }
+}
+
+ThemeData _appTheme(Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  final paper = dark ? const Color(0xFF1E2025) : const Color(0xFFF8F6F2);
+  final scheme =
+      ColorScheme.fromSeed(
+        seedColor: const Color(0xFFB74C30),
+        brightness: brightness,
+      ).copyWith(
+        surface: paper,
+        primary: dark ? const Color(0xFFFFAB8F) : const Color(0xFFA64027),
+      );
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    scaffoldBackgroundColor: paper,
+    appBarTheme: AppBarTheme(
+      backgroundColor: paper,
+      foregroundColor: scheme.onSurface,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+    ),
+    dividerTheme: DividerThemeData(
+      color: scheme.outlineVariant.withValues(alpha: .55),
+      thickness: 1,
+    ),
+  );
 }
 
 class MarkdownDemoPage extends StatefulWidget {
   const MarkdownDemoPage({
     super.key,
     required this.onLanguageChange,
+    this.appearance,
+    this.onAppearanceChange,
   });
 
   final void Function(Locale) onLanguageChange;
+  final MarkdownTheme? appearance;
+  final ValueChanged<MarkdownTheme>? onAppearanceChange;
 
   @override
   State<MarkdownDemoPage> createState() => _MarkdownDemoPageState();
@@ -106,8 +154,16 @@ enum MarkdownTheme {
 }
 
 class _MarkdownDemoPageState extends State<MarkdownDemoPage> {
-  int _selectedIndex = 0;
-  MarkdownTheme _selectedTheme = MarkdownTheme.defaultLight;
+  final _scenarioProgress = PageStorageBucket();
+
+  MarkdownTheme? _localAppearance;
+
+  MarkdownTheme get _selectedTheme =>
+      widget.appearance ??
+      _localAppearance ??
+      (Theme.of(context).brightness == Brightness.dark
+          ? MarkdownTheme.defaultDark
+          : MarkdownTheme.defaultLight);
 
   // Mermaid plugin and builder for rendering mermaid diagrams
   final _mermaidPlugins = ParserPluginRegistry()
@@ -1005,9 +1061,9 @@ gantt
 8. **图片** - 网络图片加载，支持 PNG/JPEG/GIF/WebP/SVG
 9. **分隔线** - 水平分隔线
 10. **表格** - 完整的 GFM 表格支持，带对齐
-11. **流式渲染** - 实时内容更新（侧边栏"演示"部分查看）
-12. **数学公式** - LaTeX 数学表达式（侧边栏"演示"部分查看）
-13. **脚注** - 文档脚注支持，支持自定义样式（侧边栏"演示"部分查看）
+11. **流式渲染** - 实时内容更新（可在示例库中查看）
+12. **数学公式** - LaTeX 数学表达式（可在示例库中查看）
+13. **脚注** - 文档脚注支持，支持自定义样式（可在示例库中查看）
 14. **主题** - 6 种预设主题
 15. **Mermaid 图表** - 流程图、时序图、饼图、甘特图
 
@@ -1045,549 +1101,196 @@ gantt
     }
   }
 
-  void _openEditorPreview() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const EditorDemoPage(),
+  MarkdownStyleSheet? get _readerStyle =>
+      widget.appearance == null ? null : _getStyleSheet();
+
+  void _open(Widget page) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+  }
+
+  void _openScenario(Widget page) {
+    _open(PageStorage(bucket: _scenarioProgress, child: page));
+  }
+
+  void _read(MarkdownExample example, String title, {bool cover = false}) {
+    _open(
+      GalleryReader(
+        title: title,
+        markdown: example.markdown,
+        cover: cover,
+        style: _readerStyle,
+        plugins: _mermaidPlugins,
+        builders: _mermaidBuilders,
+      ),
+    );
+  }
+
+  void _openLibrary() {
+    final l = AppLocalizations.of(context);
+    final style = _getStyleSheet();
+    const sampleKeys = [
+      'example_basic',
+      'example_headers',
+      'example_lists',
+      'example_code',
+      'example_blockquotes',
+      'example_links',
+      'example_enhanced',
+      'example_theme',
+      'gallery_disclosure',
+      'example_complete',
+    ];
+    const sampleIcons = [
+      Icons.format_bold,
+      Icons.title,
+      Icons.format_list_bulleted,
+      Icons.code,
+      Icons.format_quote,
+      Icons.link,
+      Icons.widgets_outlined,
+      Icons.palette_outlined,
+      Icons.unfold_more,
+      Icons.article_outlined,
+    ];
+    GalleryEntry entry(String key, IconData icon, Widget page) =>
+        GalleryEntry(l.translate(key), icon, () => _open(page));
+    final article = ridgeArticle(Localizations.localeOf(context).languageCode);
+    final tools = [
+      entry('gallery_editor', Icons.edit_note, const EditorDemoPage()),
+      entry(
+        'demo_streaming',
+        Icons.waves,
+        StreamingMarkdownDemo(styleSheet: style),
+      ),
+      entry('gallery_diff', Icons.difference_outlined, const CodeDiffDemo()),
+      entry('demo_math', Icons.functions, MathDemo(styleSheet: style)),
+      entry('demo_footnote', Icons.notes, FootnoteDemo(styleSheet: style)),
+      entry('gallery_html', Icons.web_outlined, HtmlDemo(styleSheet: style)),
+      entry('gallery_chats', Icons.chat_bubble_outline, const ChatListDemo()),
+      entry('gallery_ai', Icons.auto_awesome_outlined, const AIChatDemo()),
+      entry(
+        'gallery_conversations',
+        Icons.forum_outlined,
+        const ConversationListDemo(),
+      ),
+      entry(
+        'gallery_plugins',
+        Icons.extension_outlined,
+        PluginDemo(styleSheet: style),
+      ),
+      entry(
+        'gallery_mermaid',
+        Icons.account_tree_outlined,
+        const MermaidDemo(),
+      ),
+    ];
+    _open(
+      GalleryLibrary(
+        tools: tools,
+        samples: [
+          GalleryEntry(
+            article.title,
+            Icons.terrain_outlined,
+            () => _read(
+              MarkdownExample(title: article.title, markdown: article.body),
+              article.title,
+              cover: true,
+            ),
+            searchAlias: 'Ridgeline notes',
+          ),
+          for (final (i, ex) in _examples.indexed)
+            GalleryEntry(
+              l.translate(sampleKeys[i]),
+              sampleIcons[i],
+              () => _read(ex, l.translate(sampleKeys[i])),
+              searchAlias: ex.title,
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _settings() {
+    final l = AppLocalizations.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l.translate('gallery_preferences'),
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 20),
+              Text(l.language, style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final lang in AppLanguage.values)
+                    ChoiceChip(
+                      label: Text(lang.nativeName),
+                      selected: l.locale.languageCode == lang.code,
+                      onSelected: (_) {
+                        Navigator.pop(sheetContext);
+                        widget.onLanguageChange(lang.locale);
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(
+                l.drawerTheme,
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final preset in MarkdownTheme.values)
+                    ChoiceChip(
+                      label: Text(preset.getLabel(context)),
+                      selected: _selectedTheme == preset,
+                      onSelected: (_) {
+                        Navigator.pop(sheetContext);
+                        setState(() => _localAppearance = preset);
+                        widget.onAppearanceChange?.call(preset);
+                      },
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final example = _examples[_selectedIndex];
-    final styleSheet = _getStyleSheet();
-    final isDark = _selectedTheme.brightness == Brightness.dark;
-
-    return Theme(
-      data: isDark ? ThemeData.dark() : ThemeData.light(),
-      child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0D1117) : Colors.white,
-        appBar: AppBar(
-          backgroundColor: isDark ? const Color(0xFF161B22) : null,
-          foregroundColor: isDark ? Colors.white : null,
-          elevation: 0,
-          title: const Text('Smooth Markdown Demo'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.edit_note),
-              tooltip: 'Open editor preview',
-              onPressed: _openEditorPreview,
-            ),
-            PopupMenuButton<MarkdownTheme>(
-              icon: const Icon(Icons.palette),
-              tooltip: AppLocalizations.of(context).translate('tooltip_theme'),
-              color: isDark ? const Color(0xFF161B22) : null,
-              onSelected: (theme) {
-                setState(() {
-                  _selectedTheme = theme;
-                });
-              },
-              itemBuilder: (context) => MarkdownTheme.values.map((theme) {
-                return PopupMenuItem(
-                  value: theme,
-                  child: Row(
-                    children: [
-                      Icon(
-                        theme == _selectedTheme
-                            ? Icons.check_circle
-                            : Icons.circle_outlined,
-                        size: 20,
-                        color: theme == _selectedTheme
-                            ? (isDark ? Colors.blue[300] : Colors.blue)
-                            : (isDark ? Colors.white70 : null),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        theme.getLabel(context),
-                        style: TextStyle(
-                          color: isDark ? Colors.white : null,
-                        ),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        theme.brightness == Brightness.dark
-                            ? Icons.dark_mode
-                            : Icons.light_mode,
-                        size: 16,
-                        color: isDark ? Colors.white70 : null,
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
-        drawer: Drawer(
-          backgroundColor: isDark ? const Color(0xFF0D1117) : null,
-          child: ListView(
-            children: [
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isDark
-                        ? [const Color(0xFF161B22), const Color(0xFF21262D)]
-                        : [Colors.blue, Colors.purple],
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    const Icon(Icons.article, size: 48, color: Colors.white),
-                    const SizedBox(height: 8),
-                    Text(
-                      AppLocalizations.of(context)
-                          .translate('drawer_header_title'),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.edit_note,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  'Markdown Editor',
-                  style: TextStyle(color: isDark ? Colors.white : null),
-                ),
-                subtitle: Text(
-                  'Scratch-style editing preview',
-                  style: TextStyle(color: isDark ? Colors.white54 : null),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _openEditorPreview();
-                },
-              ),
-              const Divider(),
-              ...List.generate(_examples.length, (index) {
-                return ListTile(
-                  leading: Icon(
-                    _getIconForExample(index),
-                    color: _selectedIndex == index
-                        ? (isDark ? Colors.blue[300] : Colors.blue)
-                        : (isDark ? Colors.white70 : null),
-                  ),
-                  title: Text(
-                    _examples[index].title,
-                    style: TextStyle(
-                      fontWeight: _selectedIndex == index
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: isDark ? Colors.white : null,
-                    ),
-                  ),
-                  selected: _selectedIndex == index,
-                  selectedTileColor: isDark ? const Color(0xFF161B22) : null,
-                  onTap: () {
-                    setState(() {
-                      _selectedIndex = index;
-                    });
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-              const Divider(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Text(
-                  AppLocalizations.of(context).drawerDemos,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white54 : Colors.grey,
-                  ),
-                ),
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.calculate,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  AppLocalizations.of(context).demoMath,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MathDemo(
-                        styleSheet: _getStyleSheet(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.stream,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  AppLocalizations.of(context).demoStreaming,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => StreamingMarkdownDemo(
-                        styleSheet: _getStyleSheet(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.note_add,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  AppLocalizations.of(context).demoFootnote,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FootnoteDemo(
-                        styleSheet: _getStyleSheet(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.code,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  'HTML Tags Demo',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                subtitle: Text(
-                  'Whitelisted HTML rendering',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white38 : Colors.grey,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => HtmlDemo(
-                        styleSheet: _getStyleSheet(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.chat,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  'Chat List Demo',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                subtitle: Text(
-                  'Performance optimizations',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white38 : Colors.grey,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ChatListDemo(),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.auto_awesome,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  'AI Chat Demo',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                subtitle: Text(
-                  'DeepSeek API + Thinking/Artifact/Tool',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white38 : Colors.grey,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AIChatDemo(),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.forum,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  'Conversation List',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                subtitle: Text(
-                  '长按菜单 · 滑动操作 · 多选',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white38 : Colors.grey,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ConversationListDemo(),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.extension,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  'Plugin System',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                subtitle: Text(
-                  '@mention #hashtag :emoji:',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white38 : Colors.grey,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PluginDemo(
-                        styleSheet: _getStyleSheet(),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.schema,
-                  color: isDark ? Colors.white70 : null,
-                ),
-                title: Text(
-                  'Mermaid 图表',
-                  style: TextStyle(
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                subtitle: Text(
-                  '流程图、时序图',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white38 : Colors.grey,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MermaidDemo(),
-                    ),
-                  );
-                },
-              ),
-              const Divider(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Text(
-                  AppLocalizations.of(context).language,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white54 : Colors.grey,
-                  ),
-                ),
-              ),
-              ...AppLanguage.values.map((lang) {
-                return ListTile(
-                  leading: Icon(
-                    Icons.language,
-                    color: isDark ? Colors.white70 : null,
-                  ),
-                  title: Text(
-                    lang.nativeName,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : null,
-                    ),
-                  ),
-                  onTap: () {
-                    widget.onLanguageChange(lang.locale);
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-            ],
-          ),
-        ),
-        body: Column(
-          children: [
-            Expanded(
-              child: Container(
-                color: isDark ? const Color(0xFF0D1117) : Colors.white,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: SmoothMarkdown(
-                    data: example.markdown,
-                    styleSheet: styleSheet,
-                    plugins: _mermaidPlugins,
-                    builderRegistry: _mermaidBuilders,
-                    onTapLink: (url) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Link tapped: $url'),
-                          duration: const Duration(seconds: 2),
-                          backgroundColor:
-                              isDark ? const Color(0xFF161B22) : null,
-                        ),
-                      );
-                    },
-                    // Enable enhanced code blocks with copy button
-                    useEnhancedComponents: true,
-                    selectable: true,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            showDialog<void>(
-              context: context,
-              builder: (context) => Theme(
-                data: isDark ? ThemeData.dark() : ThemeData.light(),
-                child: AlertDialog(
-                  backgroundColor:
-                      isDark ? const Color(0xFF161B22) : Colors.white,
-                  title: Text(
-                    'Markdown Source',
-                    style:
-                        TextStyle(color: isDark ? Colors.white : Colors.black),
-                  ),
-                  content: Container(
-                    width: 600,
-                    constraints: const BoxConstraints(maxHeight: 500),
-                    child: SingleChildScrollView(
-                      child: SelectableText(
-                        example.markdown,
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          color: isDark ? Colors.white70 : Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-          tooltip: 'View Markdown Source',
-          child: const Icon(Icons.code),
-        ),
-      ),
+    return GalleryHome(
+      onOpenReader: () => _openScenario(const FieldGuideScenario()),
+      onOpenStream: () => _open(const AiAnswerScenario()),
+      onOpenCode: () => _openScenario(const ReviewScenario()),
+      onOpenLibrary: _openLibrary,
+      onOpenEditor: () => _open(const EditorDemoPage()),
+      onOpenLargeDocument: (title) =>
+          _open(LargeDocumentReader(title: title, style: _readerStyle)),
+      onSettings: _settings,
     );
-  }
-
-  IconData _getIconForExample(int index) {
-    switch (index) {
-      case 0:
-        return Icons.format_bold;
-      case 1:
-        return Icons.title;
-      case 2:
-        return Icons.list;
-      case 3:
-        return Icons.code;
-      case 4:
-        return Icons.format_quote;
-      case 5:
-        return Icons.link;
-      case 6:
-        return Icons.auto_awesome; // Enhanced UI
-      case 7:
-        return Icons.palette; // Theme Showcase
-      case 8:
-        return Icons.dashboard; // Complex Example
-      default:
-        return Icons.article;
-    }
   }
 }
 
 class MarkdownExample {
-  const MarkdownExample({
-    required this.title,
-    required this.markdown,
-  });
+  const MarkdownExample({required this.title, required this.markdown});
 
   final String title;
   final String markdown;

@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Flutter Smooth Markdown** is a high-performance Flutter markdown renderer with syntax highlighting, LaTeX math, tables, footnotes, SVG images, and real-time streaming support. The package provides a custom AST-based parser and extensible widget builder system.
 
-- **Version**: 0.9.0
-- **Minimum SDK**: Dart >=3.0.0, Flutter >=3.0.0
+- The package version and SDK constraints are declared in `pubspec.yaml`.
+- Native builds also require Rust, Cargo and the target for the platform. See `docs/rust-core.md`.
 - **Repository**: https://github.com/JackCaow/flutter-smooth-markdown
 
 ## Development Commands

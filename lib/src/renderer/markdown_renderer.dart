@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../config/style_sheet.dart';
 import '../parser/ast/markdown_node.dart';
+import 'stream_block_cache.dart';
 import 'widget_builder.dart';
 
 /// Main renderer that converts Markdown AST nodes to Flutter widgets.
@@ -111,8 +112,8 @@ class MarkdownRenderer {
   MarkdownRenderer({
     MarkdownStyleSheet? styleSheet,
     BuilderRegistry? builderRegistry,
-  })  : styleSheet = styleSheet ?? MarkdownStyleSheet.light(),
-        _builderRegistry = builderRegistry ?? BuilderRegistry.defaults();
+  }) : styleSheet = styleSheet ?? MarkdownStyleSheet.light(),
+       _builderRegistry = builderRegistry ?? BuilderRegistry.defaults();
 
   /// The style sheet to use for rendering
   final MarkdownStyleSheet styleSheet;
@@ -133,6 +134,10 @@ class MarkdownRenderer {
   /// Returns a [Widget] (usually a [Column]) containing all rendered elements.
   /// Returns an empty [SizedBox.shrink] if the node list is empty.
   ///
+  /// An optional [blockCache] retains top-level widget identity for immutable
+  /// AST nodes. Its owner must invalidate it when styles/builders/context
+  /// change, and prune removed nodes. Nested rendering never shares this cache.
+  ///
   /// Example:
   ///
   /// ```dart
@@ -145,6 +150,9 @@ class MarkdownRenderer {
   Widget render(
     List<MarkdownNode> nodes, {
     MarkdownRenderContext? context,
+    Map<MarkdownNode, Widget>? blockCache,
+    bool sliver = false,
+    bool addRepaintBoundaries = true,
   }) {
     // Create context with renderer references for nested rendering
     final baseContext = context ?? const MarkdownRenderContext();
@@ -156,8 +164,7 @@ class MarkdownRenderer {
     Widget renderChildren(
       List<MarkdownNode> childNodes, {
       MarkdownRenderContext? context,
-    }) =>
-        render(childNodes, context: context ?? baseContext);
+    }) => render(childNodes, context: context ?? baseContext);
 
     final renderContext = baseContext.copyWith(
       inlineRenderer: (childNodes, baseStyle) =>
@@ -167,16 +174,43 @@ class MarkdownRenderer {
       styleSheet: styleSheet,
     );
 
-    final widgets = nodes
-        .map((node) => _renderNode(node, renderContext))
-        .where((widget) => widget != null)
-        .cast<Widget>()
-        .toList();
-
-    if (widgets.isEmpty) {
-      return const SizedBox.shrink();
+    if (blockCache is StreamBlockCache && !baseContext.selectable) {
+      return blockCache.layout(
+        (node) => _renderNode(node, renderContext),
+        styleSheet.blockSpacing ?? 16.0,
+        sliver: sliver,
+      );
     }
 
+    Widget renderBlock(MarkdownNode node) {
+      final previous = blockCache?[node];
+      if (previous != null) return previous;
+      final block = _renderNode(node, renderContext);
+      if (blockCache != null) blockCache[node] = block;
+      return block;
+    }
+
+    if (sliver) {
+      final spacing = styleSheet.blockSpacing ?? 16.0;
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final block = renderBlock(nodes[index]);
+            return index == 0
+                ? block
+                : Padding(
+                    padding: EdgeInsets.only(top: spacing),
+                    child: block,
+                  );
+          },
+          childCount: nodes.length,
+          addRepaintBoundaries: addRepaintBoundaries,
+        ),
+      );
+    }
+
+    final widgets = nodes.map(renderBlock).toList();
+    if (widgets.isEmpty) return const SizedBox.shrink();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -196,7 +230,7 @@ class MarkdownRenderer {
   };
 
   /// Renders a single node
-  Widget? _renderNode(MarkdownNode node, MarkdownRenderContext context) {
+  Widget _renderNode(MarkdownNode node, MarkdownRenderContext context) {
     // When selectable, a paragraph that contains only a single image should
     // be rendered as a block-level widget with a selectable overlay instead
     // of a Text.rich + WidgetSpan (whose handles can't anchor on the image).
@@ -256,8 +290,10 @@ class MarkdownRenderer {
           child: LayoutBuilder(
             builder: (context, constraints) {
               const fontSize = 14.0;
-              final rows =
-                  (constraints.maxHeight / fontSize).ceil().clamp(1, 200);
+              final rows = (constraints.maxHeight / fontSize).ceil().clamp(
+                1,
+                200,
+              );
               final line = '\u00A0' * 500;
               return IgnorePointer(
                 child: DefaultSelectionStyle(
@@ -322,27 +358,18 @@ class MarkdownRenderer {
       }
 
       // For non-text widgets (like images), wrap in WidgetSpan
-      return WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: widget,
-      );
+      return WidgetSpan(alignment: PlaceholderAlignment.middle, child: widget);
     }).toList();
 
     if (context.selectable) {
       return Text.rich(
-        TextSpan(
-          style: baseStyle,
-          children: spans,
-        ),
+        TextSpan(style: baseStyle, children: spans),
         textAlign: context.textAlign,
       );
     }
 
     return RichText(
-      text: TextSpan(
-        style: baseStyle,
-        children: spans,
-      ),
+      text: TextSpan(style: baseStyle, children: spans),
       textAlign: context.textAlign ?? TextAlign.start,
     );
   }
@@ -355,13 +382,14 @@ class MarkdownRenderer {
 
     final spacing = styleSheet.blockSpacing ?? 16.0;
     final result = <Widget>[];
+    final spacer = SizedBox(height: spacing);
 
     for (var i = 0; i < widgets.length; i++) {
       result.add(widgets[i]);
 
       // Add spacing between blocks (but not after the last one)
       if (i < widgets.length - 1) {
-        result.add(SizedBox(height: spacing));
+        result.add(spacer);
       }
     }
 

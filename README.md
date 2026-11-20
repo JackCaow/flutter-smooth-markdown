@@ -7,10 +7,22 @@
 [![GitHub forks](https://img.shields.io/github/forks/JackCaow/flutter-smooth-markdown?style=flat&logo=github)](https://github.com/JackCaow/flutter-smooth-markdown/network/members)
 [![GitHub issues](https://img.shields.io/github/issues/JackCaow/flutter-smooth-markdown)](https://github.com/JackCaow/flutter-smooth-markdown/issues)
 [![GitHub license](https://img.shields.io/github/license/JackCaow/flutter-smooth-markdown)](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/LICENSE)
-[![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.0.0-02569B?logo=flutter)](https://flutter.dev)
-[![Dart](https://img.shields.io/badge/Dart-%3E%3D3.0.0-0175C2?logo=dart)](https://dart.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.38.0-02569B?logo=flutter)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-%3E%3D3.10.0-0175C2?logo=dart)](https://dart.dev)
 
 A high-performance Flutter markdown renderer with syntax highlighting, LaTeX math, tables, footnotes, SVG images, Mermaid diagrams, and real-time streaming support.
+
+## Upgrading from 0.10.0 to 0.11.0
+
+| Use case | 0.10.0 | What changes in 0.11.0 |
+| --- | --- | --- |
+| Reading a long document | `SmoothMarkdown` builds the document in one box. | Use `SmoothMarkdown.sliver(data: text)` in a vertical `CustomScrollView` to build only the blocks in or near the viewport for eligible documents. Whole-document selection keeps the full layout. |
+| Streaming a chat answer | `StreamMarkdown` reparses the accumulated text as chunks arrive. | The existing widget reuses completed blocks on eligible Dart and Rust streams and reparses the changing tail. Use `StreamMarkdown.sliver(stream: chunks)` to also build blocks on demand. |
+| Reviewing code | Markdown code fences support syntax highlighting. | Embed `MarkdownCodeView` for source or `MarkdownDiffView` for a unified patch with old and new line numbers, highlighted additions and deletions, and highlighted word changes within paired lines. |
+
+On an iPhone 17, a document with 435,200 UTF-16 units and 8,000 blocks showed its first heading in **749 ms with the box and 52 ms with the sliver** using Dart, or **731 ms and 64 ms** using Rust. Both slivers initially mounted 15 blocks. Each configuration opened the document once in a fresh process of the same profile build of the release candidate. [Benchmark and raw samples](https://github.com/JackCaow/flutter-smooth-markdown/blob/5ef6d34c91f06c2674802926101dc46f4f277551/benchmarks/static-document-results.md)
+
+Existing box constructors remain available. The minimum SDKs rise from Flutter 3.0 and Dart 3.0 to **Flutter 3.38 and Dart 3.10**. Native builds also require Rust, Cargo and the target for the platform. Web uses Dart. [Build requirements and migration](https://github.com/JackCaow/flutter-smooth-markdown/blob/5ef6d34c91f06c2674802926101dc46f4f277551/docs/rust-core.md)
 
 ## Features
 
@@ -28,34 +40,56 @@ A high-performance Flutter markdown renderer with syntax highlighting, LaTeX mat
 
 <table>
 <tr>
-<td><img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/main.jpg" width="280" alt="Main Interface"></td>
-<td><img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/code.jpg" width="280" alt="Code Blocks"></td>
-<td><img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/latx.jpg" width="280" alt="LaTeX Math"></td>
+<td><img src="screenshots/main.jpg" width="280" alt="Example home with the Ridgeline field guide and developer tools"></td>
+<td><img src="screenshots/code.jpg" width="280" alt="Dart patch with line numbers and highlighted additions and deletions"></td>
+<td><img src="screenshots/latx.jpg" width="280" alt="Inline and display LaTeX, including the quadratic formula and Euler’s identity"></td>
 </tr>
 <tr>
-<td align="center">Main Interface</td>
-<td align="center">Code Blocks</td>
-<td align="center">LaTeX Math</td>
+<td align="center">Example home</td>
+<td align="center">Patch review</td>
+<td align="center">LaTeX formulas</td>
 </tr>
 </table>
 
-<img src="https://raw.githubusercontent.com/JackCaow/flutter-smooth-markdown/main/screenshots/streaming.gif" width="600" alt="Real-time Streaming">
+**Streaming an answer on Android**
+
+<img src="screenshots/streaming.gif" width="340" alt="The Android example streams a numbered answer, then builds a Markdown table as a follow-up answer arrives">
 
 > Run the example app: `cd example && flutter run`
 >
 > Run the editor preview directly in Chrome: `cd example && flutter run -d chrome -t lib/editor_preview_main.dart`
 >
-> The full example app also exposes the editor from the sidebar in `example/lib/editor_demo.dart`.
+> The example home screen opens the long-document reader and Markdown editor. The Library contains the syntax and plugin demos.
+
+## Shared core, source highlighting and diff
+
+Native builds use the pinned Rust parser and highlighter behind the Flutter APIs. [Shared Rust core](https://github.com/JackCaow/smooth-rust-core)
+
+Open **Long document reader** in the example to scroll the benchmark sample or paste your own Markdown.
+See the [435k streaming comparison](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/stream-eligibility-results.md),
+[block layout comparison](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/block-layout-results.md),
+[CPU and memory results](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/sustained-rss-results.md)
+and [Dart/Rust incremental comparison](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/benchmarks/equal-incremental-results.md).
+
+```dart
+MarkdownCodeView(code: source, language: 'dart');
+MarkdownDiffView(patch: unifiedDiff, language: 'dart');
+final tokens = MarkdownCore.highlightedCode(source, language: 'App.tsx');
+final rows = MarkdownCore.highlightedDiff(unifiedDiff, language: 'dart');
+```
+
+The example's **Code & Diff** page demonstrates both views, semantic colors,
+line numbers, dark themes, and `diff dart` fenced blocks.
 
 ## Quick Start
 
-Building a native app? See the [iOS and Android API map](docs/native-api-map.md) for equivalent entry points and current differences.
+Building a native app? See the [iOS and Android API map](https://github.com/JackCaow/flutter-smooth-markdown/blob/main/docs/native-api-map.md) for equivalent entry points and current differences.
 
 ### Installation
 
 ```yaml
 dependencies:
-  flutter_smooth_markdown: ^0.9.0
+  flutter_smooth_markdown: ^0.11.0
 ```
 
 ```bash

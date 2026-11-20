@@ -1,0 +1,75 @@
+{
+  "metadata": {
+    "trial": 2,
+    "fresh_process": true,
+    "same_small_warmup_for_both_backends": true,
+    "gc_method": "VM-service _collectAllGarbage twice at each retained snapshot",
+    "rss_high_watermark": "ProcessInfo.maxRss, includes pre-workload startup",
+    "dart_external_excludes_unregistered_rust_allocations": true
+  },
+  "preparation": {
+    "backend": "dart",
+    "case": "static_43k",
+    "mode": "batch",
+    "source_utf16_units": 43520,
+    "stride_utf16_units": 43520,
+    "publications": 1,
+    "source_prepared_before_baseline": true,
+    "all_prefixes_preallocated": false,
+    "platform": "macos",
+    "os": "Version 27.2 (Build 26B123)",
+    "pid": 89835,
+    "rss_bytes": 116817920,
+    "max_rss_bytes": 116834304,
+    "retained_flutter_blocks": 0
+  },
+  "baseline": {
+    "forced_gc": true,
+    "dart_heap_used_bytes": 3224368,
+    "dart_heap_capacity_bytes": 3817472,
+    "dart_external_tracked_bytes": 0,
+    "pid": 89835,
+    "rss_bytes": 117194752,
+    "max_rss_bytes": 117571584,
+    "retained_flutter_blocks": 0
+  },
+  "workload": {
+    "rss_after_each_update_bytes": [
+      120520704
+    ],
+    "pid": 89835,
+    "rss_bytes": 120520704,
+    "max_rss_bytes": 120520704,
+    "retained_flutter_blocks": 800
+  },
+  "before_gc": {
+    "forced_gc": false,
+    "dart_heap_used_bytes": 4262720,
+    "dart_heap_capacity_bytes": 4964352,
+    "dart_external_tracked_bytes": 0,
+    "pid": 89835,
+    "rss_bytes": 120537088,
+    "max_rss_bytes": 120537088,
+    "retained_flutter_blocks": 800
+  },
+  "retained_after_gc": {
+    "forced_gc": true,
+    "dart_heap_used_bytes": 3781344,
+    "dart_heap_capacity_bytes": 4964352,
+    "dart_external_tracked_bytes": 0,
+    "pid": 89835,
+    "rss_bytes": 120651776,
+    "max_rss_bytes": 120651776,
+    "retained_flutter_blocks": 800
+  },
+  "released_after_gc": {
+    "forced_gc": true,
+    "dart_heap_used_bytes": 3224368,
+    "dart_heap_capacity_bytes": 4440064,
+    "dart_external_tracked_bytes": 0,
+    "pid": 89835,
+    "rss_bytes": 120733696,
+    "max_rss_bytes": 120733696,
+    "retained_flutter_blocks": 0
+  }
+}

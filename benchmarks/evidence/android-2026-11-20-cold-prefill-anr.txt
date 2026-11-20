@@ -1,0 +1,4 @@
+Android ApplicationExitInfo for the single-publication 435,200-unit Profile attempt
+timestamp=2026-11-20 11:41:52.089 pid=30959 realUid=10488 packageUid=10488 definingUid=10488 user=0
+process=com.example.flutter_smooth_markdown_example reason=6 (ANR) subreason=0 (UNKNOWN) status=0
+description=user request after error: Input dispatching timed out (fece043 com.example.flutter_smooth_markdown_example/com.example.flutter_smooth_markdown_example.MainActivity is not responding. Waited 5000ms for MotionEvent(action=DOWN)).

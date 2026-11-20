@@ -1,0 +1,47 @@
+{
+  "stages": {
+    "sections_1": {
+      "prepare_us": 0,
+      "native_parse_and_wire_us": 14,
+      "copy_us": 0,
+      "decode_and_adapt_us": 7,
+      "adapt_us": 0,
+      "free_us": 0,
+      "total_us": 21,
+      "wire_bytes": 2984,
+      "wire_nodes": 46,
+      "flutter_blocks": 5,
+      "source_utf16_units": 272
+    },
+    "sections_40": {
+      "prepare_us": 22,
+      "native_parse_and_wire_us": 499,
+      "copy_us": 4,
+      "decode_and_adapt_us": 184,
+      "adapt_us": 0,
+      "free_us": 0,
+      "total_us": 726,
+      "wire_bytes": 116864,
+      "wire_nodes": 1801,
+      "flutter_blocks": 200,
+      "source_utf16_units": 10880
+    },
+    "sections_160": {
+      "prepare_us": 98,
+      "native_parse_and_wire_us": 2022,
+      "copy_us": 34,
+      "decode_and_adapt_us": 810,
+      "adapt_us": 0,
+      "free_us": 0,
+      "total_us": 3013,
+      "wire_bytes": 467264,
+      "wire_nodes": 7201,
+      "flutter_blocks": 800,
+      "source_utf16_units": 43520
+    }
+  },
+  "profile_mode": true,
+  "hardware": "Apple M4",
+  "transport": "direct-flutter-ast",
+  "rust_opt_level": "3"
+}

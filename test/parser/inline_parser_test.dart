@@ -30,6 +30,45 @@ void main() {
         expect(trailingSpaceBreak[1], isA<HardBreakNode>());
       });
 
+      test(
+        'preserves long padding and consumes it as a break only before a line ending',
+        () {
+          final padding = ' ' * 16384;
+          for (final newline in ['\n', '\r', '\r\n']) {
+            final result = parser.parse(
+              'one${padding}two$padding${newline}three$padding',
+            );
+            expect(result.map((node) => node.type), [
+              'text',
+              'hard_break',
+              'text',
+            ]);
+            expect((result.first as TextNode).content, 'one${padding}two');
+            expect((result.last as TextNode).content, 'three$padding');
+            expect(
+              (parser.parse('one ${newline}two').single as TextNode).content,
+              'one ${newline}two',
+            );
+          }
+        },
+      );
+
+      test('lets a space-trigger plugin match inside padding', () {
+        final registry = ParserPluginRegistry()
+          ..registerInline(_SpaceBeforeAt());
+        final custom = InlineParser(plugins: registry);
+        final result = custom.parse('one   @two   \r\nthree');
+        expect(result.map((node) => node.type), [
+          'text',
+          'inline_code',
+          'text',
+          'hard_break',
+          'text',
+        ]);
+        expect((result.first as TextNode).content, 'one  ');
+        expect((result[2] as TextNode).content, '@two');
+      });
+
       test('should handle empty string', () {
         final result = parser.parse('');
         expect(result, isEmpty);
@@ -281,4 +320,20 @@ void main() {
       });
     });
   });
+}
+
+class _SpaceBeforeAt extends InlineParserPlugin {
+  @override
+  String get id => 'space-before-at';
+  @override
+  String get name => 'Space before @';
+  @override
+  String get triggerCharacter => ' ';
+
+  @override
+  bool canParse(String text, int index) => text.startsWith(' @', index);
+
+  @override
+  InlineParseResult parse(String text, int startIndex) =>
+      const InlineParseResult(node: InlineCodeNode('space'), consumed: 1);
 }

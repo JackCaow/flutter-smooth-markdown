@@ -1,0 +1,33 @@
+Physical Android 17, 25019PNF3C, staged 32-part prefill, round 2
+timestamp=2026-11-20 13:38:23.261 pid=18515 realUid=10488 packageUid=10488 definingUid=10488 user=0
+process=com.example.flutter_smooth_markdown_example reason=6 (ANR) subreason=0 (UNKNOWN) status=0
+description=user request after error: Input dispatching timed out (10d3078 com.example.flutter_smooth_markdown_example/com.example.flutter_smooth_markdown_example.MainActivity is not responding. Waited 5000ms for MotionEvent(action=MOVE)).
+
+
+ANR captured at 13:38:11 +08:00, main thread TID 18515, state R.
+APK SHA-256 c2c74bef9f3e1a46a93e76d361b5833e0d2e663bebb03a717688c82a4f2a0b46
+Dart libapp.so build ID ea5eb4b3ef3c9eff6cf6de225e7e3cb2
+Rebuilt with symbols from matching app.dill, .text verified byte-for-byte, SHA-256 cb4fbba6a35f0beab61c3191bfbb3997db073d751d63652ece7f02265002c29b
+Main-thread sample, highest frames first:
+0x8a1f24
+_LazyListIterator.moveNext
+package:flutter/src/foundation/basic_types.dart:231
+0x8829f4
+WhereIterator.moveNext
+dart:_internal/iterable.dart:467
+0x6abe5c
+CachingIterable._fillNext
+package:flutter/src/foundation/basic_types.dart:206
+0x8a1f4c
+_LazyListIterator.moveNext
+package:flutter/src/foundation/basic_types.dart:236
+0x85f1a8
+Iterable.length
+dart:core/iterable.dart:544
+WidgetTester.dispatchEvent
+package:flutter_test/src/widget_tester.dart:974
+0x6a032c
+LiveTestWidgetsFlutterBinding.dispatchEvent
+package:flutter_test/src/binding.dart:2688
+GestureBinding._handlePointerEventImmediately
+package:flutter/src/gestures/binding.dart:437

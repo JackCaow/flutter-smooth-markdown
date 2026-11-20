@@ -1,34 +1,12 @@
-# Screenshots
+# Example screenshots
 
-This directory contains demo screenshots and GIFs for the README.
+The [package README](../README.md#demo) shows the release build of the example in English with the light theme.
 
-## Required Screenshots
+| File | Device | What to open in the example |
+| --- | --- | --- |
+| [main.jpg](main.jpg) | iPhone 17 | Home, with the field guide and developer tools |
+| [code.jpg](code.jpg) | iPhone 17 | **Review a patch** → **After** to compare the diff with the rendered result |
+| [latx.jpg](latx.jpg) | iPhone 17 | **Library** → **Math Formulas** for inline and display equations |
+| [streaming.gif](streaming.gif) | Xiaomi 15 Ultra | **Ask the assistant** → **Questions** → **How do I verify the improvement?** to stream the follow-up answer with a table |
 
-Please add the following screenshots to this directory:
-
-1. **basic-demo.png** - Screenshot showing basic markdown rendering
-   - Show headers, paragraphs, lists, and basic formatting
-
-2. **enhanced-demo.png** - Screenshot showing enhanced UI components
-   - Show code blocks with copy button
-   - Show beautiful blockquotes
-   - Show styled links and headers
-
-3. **streaming-demo.gif** - Animated GIF showing real-time streaming
-   - Demonstrate StreamMarkdown widget in action
-   - Show text appearing progressively
-
-## How to Create Screenshots
-
-1. Run the example app: `cd example && flutter run`
-2. Navigate to different demo pages
-3. Take screenshots or record screen for GIF
-4. Use tools like:
-   - macOS: Cmd+Shift+4 for screenshots
-   - Screen to GIF converters for animated demos
-   - Or use the built-in Flutter DevTools
-
-## Recommended Dimensions
-
-- Screenshots: 800x600 or similar 4:3 ratio
-- GIF: Keep file size under 5MB for faster README loading
+For a refresh, run `flutter run --release` from `example/` on the device. Capture the app at native resolution, crop the system bars, and keep the original aspect ratio. The stills are 720 pixels wide. Leave the completed answer visible at the end of the GIF so readers can read it before the next loop.

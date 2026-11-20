@@ -4,9 +4,20 @@
 .pub/
 build/
 coverage/
+*.log
+.env
+.env.*
+**/failures/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 
 pubspec.lock
 example/pubspec.lock
 example/macos/Podfile.lock
+
+rust-core/target/
+
+# Repository-only reports, migration history and maintainer scripts.
+/benchmarks/
+/docs/
+/tools/

@@ -1,0 +1,224 @@
+{
+  "frames_legacyDart": {
+    "frame_count": 40,
+    "median_build_ms": 4.766,
+    "p95_build_ms": 5.743,
+    "average_build_ms": 4.59955,
+    "median_raster_ms": 0.819,
+    "p95_raster_ms": 1.427,
+    "average_raster_ms": 1.07655,
+    "build_over_16_7ms": 0
+  },
+  "frames_rust": {
+    "frame_count": 40,
+    "median_build_ms": 3.311,
+    "p95_build_ms": 9.899,
+    "average_build_ms": 3.754599999999999,
+    "median_raster_ms": 0.58,
+    "p95_raster_ms": 1.878,
+    "average_raster_ms": 1.5246499999999998,
+    "build_over_16_7ms": 0
+  },
+  "metadata": {
+    "profile_mode": true,
+    "platform": "macos",
+    "os": "Version 27.2 (Build 26B123)",
+    "render_utf16_units": 3264,
+    "note": "Single device, warm parses, no cache; parse includes FFI/decoding/Flutter adaptation. Frame tests use the same highlighter."
+  },
+  "parses": {
+    "small_message": {
+      "utf16_units": 60,
+      "rust_ffi_decode_adapt": {
+        "median_us": 7.512,
+        "p90_us": 8.724,
+        "iterations": 500,
+        "samples": [
+          7.42,
+          7.432,
+          7.452,
+          7.502,
+          7.512,
+          7.792,
+          7.794,
+          7.868,
+          8.724
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 3.438,
+        "p90_us": 3.584,
+        "iterations": 500,
+        "samples": [
+          3.368,
+          3.382,
+          3.39,
+          3.426,
+          3.438,
+          3.466,
+          3.51,
+          3.524,
+          3.584
+        ]
+      }
+    },
+    "mixed_document_12k": {
+      "utf16_units": 10880,
+      "rust_ffi_decode_adapt": {
+        "median_us": 1443.8333333333333,
+        "p90_us": 1502.0833333333333,
+        "iterations": 12,
+        "samples": [
+          1423.1666666666667,
+          1433.5,
+          1436.75,
+          1440.3333333333333,
+          1443.8333333333333,
+          1452.9166666666667,
+          1453.0833333333333,
+          1460.8333333333333,
+          1502.0833333333333
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 615.75,
+        "p90_us": 624.8333333333334,
+        "iterations": 12,
+        "samples": [
+          611.5,
+          613.6666666666666,
+          614.0833333333334,
+          615.5,
+          615.75,
+          616.9166666666666,
+          618.6666666666666,
+          618.6666666666666,
+          624.8333333333334
+        ]
+      }
+    },
+    "mixed_document_48k": {
+      "utf16_units": 43520,
+      "rust_ffi_decode_adapt": {
+        "median_us": 6217.666666666667,
+        "p90_us": 6441.666666666667,
+        "iterations": 12,
+        "samples": [
+          6000.583333333333,
+          6073.666666666667,
+          6111.833333333333,
+          6196.416666666667,
+          6217.666666666667,
+          6251.25,
+          6335.5,
+          6367.583333333333,
+          6441.666666666667
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 2491.9166666666665,
+        "p90_us": 2585.0833333333335,
+        "iterations": 12,
+        "samples": [
+          2460.8333333333335,
+          2478.0833333333335,
+          2478.25,
+          2486.25,
+          2491.9166666666665,
+          2494.1666666666665,
+          2511.3333333333335,
+          2531.1666666666665,
+          2585.0833333333335
+        ]
+      }
+    },
+    "single_paragraph_48k": {
+      "utf16_units": 50400,
+      "rust_ffi_decode_adapt": {
+        "median_us": 4197.25,
+        "p90_us": 4389.666666666667,
+        "iterations": 12,
+        "samples": [
+          4142.5,
+          4166.0,
+          4172.666666666667,
+          4189.5,
+          4197.25,
+          4197.583333333333,
+          4208.75,
+          4257.25,
+          4389.666666666667
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 2102.3333333333335,
+        "p90_us": 2107.6666666666665,
+        "iterations": 12,
+        "samples": [
+          2099.1666666666665,
+          2100.3333333333335,
+          2101.5,
+          2101.8333333333335,
+          2102.3333333333335,
+          2104.4166666666665,
+          2105.0833333333335,
+          2107.25,
+          2107.6666666666665
+        ]
+      }
+    }
+  },
+  "streams": {
+    "utf16_units": 14800,
+    "publications": 58,
+    "rust_batch": {
+      "median_us": 47418.5,
+      "p90_us": 47592.5,
+      "iterations": 2,
+      "samples": [
+        46830.0,
+        47014.0,
+        47051.0,
+        47213.5,
+        47418.5,
+        47436.5,
+        47500.0,
+        47557.0,
+        47592.5
+      ]
+    },
+    "dart_batch": {
+      "median_us": 22521.5,
+      "p90_us": 27086.5,
+      "iterations": 2,
+      "samples": [
+        22265.5,
+        22287.5,
+        22347.5,
+        22442.0,
+        22521.5,
+        22616.0,
+        23120.0,
+        23443.0,
+        27086.5
+      ]
+    },
+    "rust_incremental": {
+      "median_us": 3419.0,
+      "p90_us": 3547.0,
+      "iterations": 2,
+      "samples": [
+        3305.0,
+        3376.5,
+        3376.5,
+        3406.5,
+        3419.0,
+        3422.5,
+        3430.5,
+        3458.5,
+        3547.0
+      ]
+    }
+  },
+  "measurement_status": "Measurements completed; final example-menu navigation failed after recording. Re-run follows with direct demo restoration."
+}

@@ -1,0 +1,59 @@
+--- a/src/inline.rs
++++ b/src/inline.rs
+@@ -15,6 +15,7 @@
+         .collect()
+ }
+ pub fn decode_text(source: &str) -> String {
++    if !source.contains(['\\', '&']) { return source.to_owned(); }
+     let mut out = String::new();
+     let mut i = 0;
+     while i < source.len() {
+@@ -853,6 +854,8 @@
+     active: bool,
+ }
+ fn resolve_emphasis(nodes: Vec<Node>, source: &str, offset: u32, gfm: bool) -> Vec<Node> {
++    // A single token cannot contain an emphasis pair or adjacent text to merge.
++    if nodes.len() < 2 { return nodes; }
+     let mut map = vec![0; utf16_len(source) as usize + 1];
+     let mut utf = 0;
+     for (byte, c) in source.char_indices() {
+@@ -945,15 +948,15 @@
+             };
+             let ot = delimiters[oi].token;
+             let ct = delimiters[ci].token;
+-            let open = tokens[ot].node.as_ref().unwrap().clone();
+-            let close = tokens[ct].node.as_ref().unwrap().clone();
++            let open = tokens[ot].node.as_ref().unwrap().span;
++            let close = tokens[ct].node.as_ref().unwrap().span;
+             let used = if delimiters[oi].count >= 2 && delimiters[ci].count >= 2 {
+                 2
+             } else {
+                 1
+             };
+-            let lower = open.span.end() - used;
+-            let upper = close.span.start + used;
++            let lower = open.end() - used;
++            let upper = close.start + used;
+             let spelling = |start: u32, end: u32| {
+                 source[map[(start - offset) as usize]..map[(end - offset) as usize]].to_owned()
+             };
+@@ -974,7 +977,7 @@
+                 if index == ct {
+                     break;
+                 }
+-                if let Some(node) = tokens[index].node.clone() {
++                if let Some(node) = tokens[index].node.take() {
+                     wrapper.children.push(node);
+                 }
+                 cursor = tokens[index].next;
+@@ -998,8 +1001,8 @@
+             } else {
+                 let mut n = Node::new(
+                     Kind::Text,
+-                    spelling(open.span.start, open.span.start + delimiters[oi].count),
+-                    open.span.start,
++                    spelling(open.start, open.start + delimiters[oi].count),
++                    open.start,
+                     delimiters[oi].count,
+                 );
+                 n.literal = Some(n.source.clone());

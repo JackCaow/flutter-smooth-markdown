@@ -1,6 +1,6 @@
 name: flutter_smooth_markdown
 description: High-performance Flutter markdown renderer and editor with syntax highlighting, LaTeX math, tables, footnotes, SVG images, and real-time streaming support.
-version: 0.10.0
+version: 0.11.0
 homepage: https://github.com/JackCaow/flutter-smooth-markdown
 repository: https://github.com/JackCaow/flutter-smooth-markdown
 issue_tracker: https://github.com/JackCaow/flutter-smooth-markdown/issues
@@ -13,8 +13,8 @@ topics:
   - mermaid
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
-  flutter: '>=3.0.0'
+  sdk: '>=3.10.0 <4.0.0'
+  flutter: '>=3.38.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -23,6 +23,9 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  code_assets: ^1.0.0
+  hooks: ^1.0.0
+  ffi: ^2.1.4
   flutter:
     sdk: flutter
 

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../config/style_sheet.dart';
+import '../config/syntax_theme.dart';
 import '../parser/ast/markdown_node.dart';
 import 'builders/block_math_builder.dart';
 import 'builders/blockquote_builder.dart';
@@ -127,6 +128,8 @@ class MarkdownRenderContext {
     this.styleSheet,
     this.selectable = false,
     this.textAlign,
+    this.enableCodeHighlight = true,
+    this.syntaxTheme,
   });
 
   /// Callback for link taps
@@ -185,6 +188,12 @@ class MarkdownRenderContext {
   /// `null` leaves alignment at the default (start/left).
   final TextAlign? textAlign;
 
+  /// Enable semantic highlighting in built-in code builders.
+  final bool enableCodeHighlight;
+
+  /// Optional semantic syntax style overrides.
+  final MarkdownSyntaxTheme? syntaxTheme;
+
   /// Creates a copy with updated fields
   MarkdownRenderContext copyWith({
     void Function(String url)? onTapLink,
@@ -198,6 +207,8 @@ class MarkdownRenderContext {
     MarkdownStyleSheet? styleSheet,
     bool? selectable,
     TextAlign? textAlign,
+    bool? enableCodeHighlight,
+    MarkdownSyntaxTheme? syntaxTheme,
   }) {
     return MarkdownRenderContext(
       onTapLink: onTapLink ?? this.onTapLink,
@@ -212,6 +223,8 @@ class MarkdownRenderContext {
       styleSheet: styleSheet ?? this.styleSheet,
       selectable: selectable ?? this.selectable,
       textAlign: textAlign ?? this.textAlign,
+      enableCodeHighlight: enableCodeHighlight ?? this.enableCodeHighlight,
+      syntaxTheme: syntaxTheme ?? this.syntaxTheme,
     );
   }
 }

@@ -1,0 +1,1177 @@
+{
+  "stream_14k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 108019712,
+        "min": 102957056,
+        "max": 117342208,
+        "samples": [
+          102957056,
+          108019712,
+          117342208
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 159536,
+        "min": 159536,
+        "max": 159536,
+        "samples": [
+          159536,
+          159536,
+          159536
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 2801664,
+        "min": 2801664,
+        "max": 2801664,
+        "samples": [
+          2801664,
+          2801664,
+          2801664
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 115703808,
+        "min": 115572736,
+        "max": 120061952,
+        "samples": [
+          115703808,
+          115572736,
+          120061952
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 2342912,
+        "samples": [
+          0,
+          0,
+          2342912
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 2883584,
+        "min": 2867200,
+        "max": 2883584,
+        "samples": [
+          2883584,
+          2867200,
+          2883584
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 524288,
+        "min": 524288,
+        "max": 524288,
+        "samples": [
+          524288,
+          524288,
+          524288
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 2703360,
+        "min": 2703360,
+        "max": 2719744,
+        "samples": [
+          2703360,
+          2719744,
+          2703360
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 3920,
+        "min": 3920,
+        "max": 8048,
+        "samples": [
+          3920,
+          8048,
+          3920
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 113623040,
+        "min": 108855296,
+        "max": 117194752,
+        "samples": [
+          113623040,
+          108855296,
+          117194752
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 147184,
+        "min": 147184,
+        "max": 147184,
+        "samples": [
+          147184,
+          147184,
+          147184
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 1441792,
+        "min": 1441792,
+        "max": 1523712,
+        "samples": [
+          1523712,
+          1441792,
+          1441792
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 115605504,
+        "min": 115507200,
+        "max": 118554624,
+        "samples": [
+          115507200,
+          115605504,
+          118554624
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 999424,
+        "samples": [
+          0,
+          0,
+          999424
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 1572864,
+        "min": 1540096,
+        "max": 1589248,
+        "samples": [
+          1589248,
+          1572864,
+          1540096
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 1048576,
+        "min": 1048576,
+        "max": 1048576,
+        "samples": [
+          1048576,
+          1048576,
+          1048576
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 1392640,
+        "min": 1359872,
+        "max": 1392640,
+        "samples": [
+          1359872,
+          1392640,
+          1392640
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 48848,
+        "min": 48848,
+        "max": 48848,
+        "samples": [
+          48848,
+          48848,
+          48848
+        ]
+      }
+    }
+  },
+  "stream_43k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 109527040,
+        "min": 104136704,
+        "max": 117473280,
+        "samples": [
+          109527040,
+          104136704,
+          117473280
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 590832,
+        "min": 590832,
+        "max": 590832,
+        "samples": [
+          590832,
+          590832,
+          590832
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 7847936,
+        "min": 7847936,
+        "max": 7880704,
+        "samples": [
+          7880704,
+          7847936,
+          7847936
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 117047296,
+        "min": 115752960,
+        "max": 124911616,
+        "samples": [
+          117047296,
+          115752960,
+          124911616
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 1523712,
+        "min": 0,
+        "max": 7094272,
+        "samples": [
+          1523712,
+          0,
+          7094272
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 7929856,
+        "min": 7929856,
+        "max": 7946240,
+        "samples": [
+          7946240,
+          7929856,
+          7929856
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 7438336,
+        "min": 7438336,
+        "max": 7962624,
+        "samples": [
+          7438336,
+          7438336,
+          7962624
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 7454720,
+        "min": 7438336,
+        "max": 7520256,
+        "samples": [
+          7454720,
+          7438336,
+          7520256
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 56528,
+        "min": 46944,
+        "max": 57120,
+        "samples": [
+          56528,
+          57120,
+          46944
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 109264896,
+        "min": 104218624,
+        "max": 117342208,
+        "samples": [
+          104218624,
+          109264896,
+          117342208
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 563216,
+        "min": 563216,
+        "max": 563216,
+        "samples": [
+          563216,
+          563216,
+          563216
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 5685248,
+        "min": 5668864,
+        "max": 5881856,
+        "samples": [
+          5685248,
+          5668864,
+          5881856
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 115654656,
+        "min": 115621888,
+        "max": 123043840,
+        "samples": [
+          115654656,
+          115621888,
+          123043840
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 5341184,
+        "samples": [
+          0,
+          0,
+          5341184
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 5799936,
+        "min": 5767168,
+        "max": 5947392,
+        "samples": [
+          5799936,
+          5767168,
+          5947392
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 2195456,
+        "min": 2195456,
+        "max": 2195456,
+        "samples": [
+          2195456,
+          2195456,
+          2195456
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 5521408,
+        "min": 5505024,
+        "max": 5701632,
+        "samples": [
+          5521408,
+          5505024,
+          5701632
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 238720,
+        "min": 238720,
+        "max": 239344,
+        "samples": [
+          238720,
+          238720,
+          239344
+        ]
+      }
+    }
+  },
+  "stream_435k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 108888064,
+        "min": 106479616,
+        "max": 118358016,
+        "samples": [
+          108888064,
+          106479616,
+          118358016
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 5889776,
+        "min": 5889776,
+        "max": 5889776,
+        "samples": [
+          5889776,
+          5889776,
+          5889776
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 18759680,
+        "min": 18513920,
+        "max": 19464192,
+        "samples": [
+          18513920,
+          19464192,
+          18759680
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 139296768,
+        "min": 135331840,
+        "max": 144736256,
+        "samples": [
+          139296768,
+          135331840,
+          144736256
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 24100864,
+        "min": 19677184,
+        "max": 26034176,
+        "samples": [
+          24100864,
+          19677184,
+          26034176
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 18710528,
+        "min": 18448384,
+        "max": 19415040,
+        "samples": [
+          18448384,
+          19415040,
+          18710528
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 11091968,
+        "min": 10567680,
+        "max": 11091968,
+        "samples": [
+          11091968,
+          10567680,
+          11091968
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 28033024,
+        "min": 25411584,
+        "max": 29507584,
+        "samples": [
+          28033024,
+          25411584,
+          29507584
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 330848,
+        "min": 321072,
+        "max": 359712,
+        "samples": [
+          321072,
+          330848,
+          359712
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 108920832,
+        "min": 108756992,
+        "max": 118013952,
+        "samples": [
+          108920832,
+          108756992,
+          118013952
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 5610960,
+        "min": 5610960,
+        "max": 5610960,
+        "samples": [
+          5610960,
+          5610960,
+          5610960
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 17907712,
+        "min": 17694720,
+        "max": 18661376,
+        "samples": [
+          18661376,
+          17907712,
+          17694720
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 143704064,
+        "min": 142147584,
+        "max": 148897792,
+        "samples": [
+          143704064,
+          142147584,
+          148897792
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 27688960,
+        "min": 26361856,
+        "max": 30507008,
+        "samples": [
+          27688960,
+          26361856,
+          30507008
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 17842176,
+        "min": 17629184,
+        "max": 18628608,
+        "samples": [
+          18628608,
+          17842176,
+          17629184
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 6373376,
+        "min": 6373376,
+        "max": 6897664,
+        "samples": [
+          6373376,
+          6373376,
+          6897664
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 32522240,
+        "min": 30081024,
+        "max": 33931264,
+        "samples": [
+          33931264,
+          32522240,
+          30081024
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 1558512,
+        "min": 1548416,
+        "max": 1619280,
+        "samples": [
+          1558512,
+          1548416,
+          1619280
+        ]
+      }
+    }
+  },
+  "static_43k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 117145600,
+        "min": 108576768,
+        "max": 117293056,
+        "samples": [
+          108576768,
+          117145600,
+          117293056
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 556976,
+        "min": 556976,
+        "max": 556976,
+        "samples": [
+          556976,
+          556976,
+          556976
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 3489792,
+        "min": 3227648,
+        "max": 3768320,
+        "samples": [
+          3489792,
+          3768320,
+          3227648
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 120438784,
+        "min": 115163136,
+        "max": 120815616,
+        "samples": [
+          115163136,
+          120815616,
+          120438784
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 2785280,
+        "min": 0,
+        "max": 3342336,
+        "samples": [
+          0,
+          3342336,
+          2785280
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 3571712,
+        "min": 3309568,
+        "max": 3866624,
+        "samples": [
+          3571712,
+          3866624,
+          3309568
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 1671168,
+        "min": 1146880,
+        "max": 1671168,
+        "samples": [
+          1146880,
+          1671168,
+          1671168
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 3342336,
+        "min": 3145728,
+        "max": 3670016,
+        "samples": [
+          3342336,
+          3670016,
+          3145728
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 46096,
+        "min": 35296,
+        "max": 55744,
+        "samples": [
+          46096,
+          35296,
+          55744
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 108019712,
+        "min": 102531072,
+        "max": 117243904,
+        "samples": [
+          108019712,
+          102531072,
+          117243904
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 556192,
+        "min": 556192,
+        "max": 556192,
+        "samples": [
+          556192,
+          556192,
+          556192
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 2162688,
+        "min": 1769472,
+        "max": 2211840,
+        "samples": [
+          2162688,
+          2211840,
+          1769472
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 116736000,
+        "min": 115671040,
+        "max": 118931456,
+        "samples": [
+          116736000,
+          115671040,
+          118931456
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 1294336,
+        "samples": [
+          0,
+          0,
+          1294336
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 2260992,
+        "min": 1851392,
+        "max": 2293760,
+        "samples": [
+          2260992,
+          2293760,
+          1851392
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 1048576,
+        "min": 1048576,
+        "max": 1048576,
+        "samples": [
+          1048576,
+          1048576,
+          1048576
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 2080768,
+        "min": 1687552,
+        "max": 2129920,
+        "samples": [
+          2129920,
+          1687552,
+          2080768
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 3712,
+        "min": 3712,
+        "max": 3712,
+        "samples": [
+          3712,
+          3712,
+          3712
+        ]
+      }
+    }
+  },
+  "static_435k": {
+    "dart": {
+      "baseline_rss_bytes": {
+        "median": 118063104,
+        "min": 108756992,
+        "max": 118456320,
+        "samples": [
+          108756992,
+          118456320,
+          118063104
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 5568176,
+        "min": 5568176,
+        "max": 5568176,
+        "samples": [
+          5568176,
+          5568176,
+          5568176
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 24363008,
+        "min": 24264704,
+        "max": 24412160,
+        "samples": [
+          24412160,
+          24264704,
+          24363008
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 142639104,
+        "min": 133480448,
+        "max": 142999552,
+        "samples": [
+          133480448,
+          142999552,
+          142639104
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 24182784,
+        "min": 17563648,
+        "max": 24215552,
+        "samples": [
+          17563648,
+          24182784,
+          24215552
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 24428544,
+        "min": 24330240,
+        "max": 24510464,
+        "samples": [
+          24510464,
+          24330240,
+          24428544
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 12058624,
+        "min": 11534336,
+        "max": 12058624,
+        "samples": [
+          12058624,
+          12058624,
+          11534336
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 24297472,
+        "min": 24264704,
+        "max": 24444928,
+        "samples": [
+          24444928,
+          24264704,
+          24297472
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 55520,
+        "min": 44688,
+        "max": 96480,
+        "samples": [
+          44688,
+          55520,
+          96480
+        ]
+      }
+    },
+    "rust": {
+      "baseline_rss_bytes": {
+        "median": 117915648,
+        "min": 108625920,
+        "max": 118226944,
+        "samples": [
+          108625920,
+          118226944,
+          117915648
+        ]
+      },
+      "retained_dart_heap_delta_bytes": {
+        "median": 5544096,
+        "min": 5544096,
+        "max": 5544096,
+        "samples": [
+          5544096,
+          5544096,
+          5544096
+        ]
+      },
+      "retained_rss_delta_bytes": {
+        "median": 21053440,
+        "min": 20922368,
+        "max": 21512192,
+        "samples": [
+          21512192,
+          20922368,
+          21053440
+        ]
+      },
+      "workload_max_rss_bytes": {
+        "median": 138903552,
+        "min": 130072576,
+        "max": 139067392,
+        "samples": [
+          130072576,
+          139067392,
+          138903552
+        ]
+      },
+      "workload_max_rss_growth_bytes": {
+        "median": 20480000,
+        "min": 14417920,
+        "max": 20627456,
+        "samples": [
+          14417920,
+          20480000,
+          20627456
+        ]
+      },
+      "released_heap_delta_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "released_rss_delta_bytes": {
+        "median": 21102592,
+        "min": 20971520,
+        "max": 21561344,
+        "samples": [
+          21561344,
+          20971520,
+          21102592
+        ]
+      },
+      "dart_external_tracked_bytes": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "samples": [
+          0,
+          0,
+          0
+        ]
+      },
+      "retained_dart_heap_capacity_delta_bytes": {
+        "median": 6291456,
+        "min": 6291456,
+        "max": 6291456,
+        "samples": [
+          6291456,
+          6291456,
+          6291456
+        ]
+      },
+      "sampled_workload_peak_rss_growth_bytes": {
+        "median": 20987904,
+        "min": 20840448,
+        "max": 21446656,
+        "samples": [
+          20840448,
+          20987904,
+          21446656
+        ]
+      },
+      "retained_malloc_in_use_delta_bytes": {
+        "median": 21520,
+        "min": 20928,
+        "max": 21520,
+        "samples": [
+          21520,
+          21520,
+          20928
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "created_utc": "2026-11-19T16:20:59.294141+00:00",
+    "trials_per_engine_per_case": 3,
+    "fresh_pids": [
+      67585,
+      67686,
+      67740,
+      67786,
+      67850,
+      67900,
+      67953,
+      68004,
+      68050,
+      68126,
+      68177,
+      68229,
+      68277,
+      68327,
+      68409,
+      68465,
+      68523,
+      68579,
+      68632,
+      68680,
+      68730,
+      68787,
+      68836,
+      68884,
+      68940,
+      68993,
+      69040,
+      69092,
+      69143,
+      69195
+    ],
+    "binary_sha256": "4aef2124336ab530d620ef92091a5c22903d1cace2d39b99562269e6c2154c34",
+    "payload_sha256": {
+      "Contents/MacOS/flutter_smooth_markdown_example": "4aef2124336ab530d620ef92091a5c22903d1cace2d39b99562269e6c2154c34",
+      "Contents/Frameworks/App.framework/Versions/A/App": "87c889788a4aea67eb05a1f65d1c276caa6e07935c93f2fa782a63d54c504ab8",
+      "Contents/Frameworks/smooth_markdown_rust.framework/smooth_markdown_rust": "7a610a193a96871c810dc304b389e84fa2a0829cae10d76e3c8f018e951b6e08"
+    },
+    "resumed_saved_samples": 0,
+    "profile_mode": true,
+    "sample_count": 30
+  }
+}

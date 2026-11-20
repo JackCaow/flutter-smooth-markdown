@@ -62,3 +62,7 @@ AGENTS.md
 !pubspec.lock
 !example/pubspec.lock
 !example/macos/Podfile.lock
+
+# Shared Rust core build products.
+/rust-core/target/
+!/rust-core/Cargo.lock

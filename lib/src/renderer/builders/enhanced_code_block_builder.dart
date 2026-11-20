@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_highlight/themes/github.dart' as highlight_github;
-import 'package:flutter_highlight/themes/vs2015.dart' as highlight_dark;
-import 'package:highlight/highlight.dart' show highlight, Node;
 
 import '../../config/style_sheet.dart';
+import '../../config/syntax_theme.dart';
+import '../../rust/markdown_core.dart';
+import '../../../widgets/markdown_diff_view.dart';
 import '../../parser/ast/markdown_node.dart';
 import '../widget_builder.dart';
 
@@ -37,10 +37,7 @@ class EnhancedCodeBlockBuilder extends MarkdownWidgetBuilder {
 
     // Use custom builder if provided
     if (context.codeBuilder != null) {
-      return context.codeBuilder!(
-        codeBlockNode.code,
-        codeBlockNode.language,
-      );
+      return context.codeBuilder!(codeBlockNode.code, codeBlockNode.language);
     }
 
     return _EnhancedCodeBlockWidget(
@@ -49,7 +46,9 @@ class EnhancedCodeBlockBuilder extends MarkdownWidgetBuilder {
       styleSheet: styleSheet,
       showCopyButton: showCopyButton,
       showLanguageTag: showLanguageTag,
-      enableSyntaxHighlighting: enableSyntaxHighlighting,
+      enableSyntaxHighlighting: enableSyntaxHighlighting && context.enableCodeHighlight,
+      syntaxTheme: context.syntaxTheme,
+      info: codeBlockNode.info,
       selectable: context.selectable,
     );
   }
@@ -64,6 +63,8 @@ class _EnhancedCodeBlockWidget extends StatefulWidget {
     required this.showLanguageTag,
     required this.enableSyntaxHighlighting,
     this.selectable = false,
+    this.syntaxTheme,
+    this.info,
   });
 
   final String code;
@@ -73,6 +74,8 @@ class _EnhancedCodeBlockWidget extends StatefulWidget {
   final bool showLanguageTag;
   final bool enableSyntaxHighlighting;
   final bool selectable;
+  final MarkdownSyntaxTheme? syntaxTheme;
+  final String? info;
 
   @override
   State<_EnhancedCodeBlockWidget> createState() =>
@@ -83,20 +86,6 @@ class _EnhancedCodeBlockWidgetState extends State<_EnhancedCodeBlockWidget> {
   bool _copied = false;
   bool _isHovered = false;
   Timer? _copyResetTimer;
-
-  /// Get the appropriate highlight theme based on the brightness
-  Map<String, TextStyle> _getHighlightTheme(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final backgroundColor = widget.styleSheet.codeBlockDecoration?.color;
-
-    // Determine if we're in a dark theme
-    if (brightness == Brightness.dark ||
-        (backgroundColor != null && backgroundColor.computeLuminance() < 0.5)) {
-      return highlight_dark.vs2015Theme;
-    }
-
-    return highlight_github.githubTheme;
-  }
 
   Future<void> _copyToClipboard() async {
     await Clipboard.setData(ClipboardData(text: widget.code));
@@ -122,13 +111,28 @@ class _EnhancedCodeBlockWidgetState extends State<_EnhancedCodeBlockWidget> {
   }
 
   Widget _buildCodeContent(BuildContext context) {
+    if (widget.enableSyntaxHighlighting && widget.language == 'diff') {
+      final parts = widget.info?.split(RegExp(r'\s+')) ?? [];
+      return MarkdownDiffView(patch: widget.code,
+        language: parts.length > 1 ? parts[1] : 'plaintext',
+        selectable: false, syntaxTheme: widget.syntaxTheme,
+        textStyle: widget.styleSheet.codeBlockStyle, padding: EdgeInsets.zero);
+    }
     final hasHighlighting =
         widget.enableSyntaxHighlighting && widget.language != null;
 
     if (hasHighlighting) {
-      final theme = _getHighlightTheme(context);
-      final result = highlight.parse(widget.code, language: widget.language!);
-      final spans = _convertNodes(result.nodes ?? [], theme);
+      final tokens = MarkdownCore.highlightedCode(
+        widget.code,
+        language: widget.language!,
+      );
+      final spans =
+          highlightedCodeSpan(
+            widget.code,
+            tokens,
+            widget.syntaxTheme ?? MarkdownSyntaxTheme.fromBrightness(Theme.of(context).brightness),
+          ).children ??
+          [];
       final textSpan = TextSpan(
         style: widget.styleSheet.codeBlockStyle,
         children: spans,
@@ -141,39 +145,18 @@ class _EnhancedCodeBlockWidgetState extends State<_EnhancedCodeBlockWidget> {
     }
 
     if (widget.selectable) {
-      return Text.rich(TextSpan(text: widget.code, style: widget.styleSheet.codeBlockStyle));
+      return Text.rich(
+        TextSpan(text: widget.code, style: widget.styleSheet.codeBlockStyle),
+      );
     }
     return Text(widget.code, style: widget.styleSheet.codeBlockStyle);
-  }
-
-  List<TextSpan> _convertNodes(
-    List<Node> nodes,
-    Map<String, TextStyle> theme,
-  ) {
-    final spans = <TextSpan>[];
-    for (final node in nodes) {
-      if (node.value != null) {
-        spans.add(
-          node.className == null
-              ? TextSpan(text: node.value)
-              : TextSpan(text: node.value, style: theme[node.className!]),
-        );
-      } else if (node.children != null) {
-        spans.add(
-          TextSpan(
-            children: _convertNodes(node.children!, theme),
-            style: theme[node.className!],
-          ),
-        );
-      }
-    }
-    return spans;
   }
 
   @override
   Widget build(BuildContext context) {
     // On mobile platforms, always show the copy button (no hover support)
-    final isMobile = defaultTargetPlatform == TargetPlatform.android ||
+    final isMobile =
+        defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
 
     return MouseRegion(
@@ -217,10 +200,9 @@ class _EnhancedCodeBlockWidgetState extends State<_EnhancedCodeBlockWidget> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primaryContainer
-                            .withValues(alpha: 0.3),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -263,10 +245,8 @@ class _EnhancedCodeBlockWidgetState extends State<_EnhancedCodeBlockWidget> {
                                   size: 16,
                                   color: _copied
                                       ? Colors.green[700]
-                                      : Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.6),
+                                      : Theme.of(context).colorScheme.onSurface
+                                            .withValues(alpha: 0.6),
                                 ),
                                 if (_copied) ...[
                                   const SizedBox(width: 4),

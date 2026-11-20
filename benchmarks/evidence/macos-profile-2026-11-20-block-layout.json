@@ -1,0 +1,3857 @@
+{
+  "render_comparison": [
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 168179,
+      "all_frame_timings": 126,
+      "content_build_timestamps_us": [
+        174586173055,
+        174586290040,
+        174586389938,
+        174586489740,
+        174586589336,
+        174586690145,
+        174586806570,
+        174586923239
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 2.738,
+        "p95_ms": 3.337,
+        "max_ms": 3.337,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.086,
+          2.738,
+          2.529,
+          3.337,
+          2.852,
+          2.644,
+          2.72,
+          1.661
+        ]
+      },
+      "raster": {
+        "median_ms": 2.135,
+        "p95_ms": 5.006,
+        "max_ms": 5.006,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.006,
+          2.129,
+          2.135,
+          1.613,
+          1.855,
+          2.16,
+          2.266,
+          1.026
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.632,
+        "p95_ms": 8.561,
+        "max_ms": 8.561,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          8.561,
+          5.632,
+          5.433,
+          5.508,
+          4.918,
+          5.789,
+          5.656,
+          3.36
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 171273,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174589905964,
+        174590005936,
+        174590105972,
+        174590205973,
+        174590305966,
+        174590405977,
+        174590505955,
+        174590605998
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.954,
+        "p95_ms": 1.783,
+        "max_ms": 1.783,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.783,
+          0.665,
+          0.913,
+          0.87,
+          0.975,
+          1.032,
+          0.854,
+          0.954
+        ]
+      },
+      "raster": {
+        "median_ms": 0.873,
+        "p95_ms": 1.065,
+        "max_ms": 1.065,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.028,
+          0.82,
+          0.873,
+          0.734,
+          0.894,
+          1.065,
+          0.714,
+          0.809
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.945,
+        "p95_ms": 2.966,
+        "max_ms": 2.966,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.966,
+          1.593,
+          1.945,
+          1.744,
+          2.022,
+          2.256,
+          1.71,
+          1.921
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 163720,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174593589355,
+        174593689745,
+        174593789731,
+        174593889790,
+        174593989523,
+        174594089674,
+        174594189599,
+        174594289641
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.485,
+        "p95_ms": 0.613,
+        "max_ms": 0.613,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.436,
+          0.426,
+          0.443,
+          0.492,
+          0.42,
+          0.485,
+          0.613,
+          0.502
+        ]
+      },
+      "raster": {
+        "median_ms": 0.946,
+        "p95_ms": 1.099,
+        "max_ms": 1.099,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.819,
+          0.78,
+          0.776,
+          0.973,
+          0.946,
+          1.099,
+          0.97,
+          0.879
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.832,
+        "p95_ms": 2.073,
+        "max_ms": 2.073,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.411,
+          1.751,
+          1.74,
+          2.064,
+          1.748,
+          2.073,
+          1.96,
+          1.832
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 181645,
+      "all_frame_timings": 125,
+      "content_build_timestamps_us": [
+        174597323256,
+        174597422652,
+        174597522695,
+        174597622677,
+        174597723524,
+        174597839443,
+        174597956356,
+        174598073111
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 2.853,
+        "p95_ms": 3.789,
+        "max_ms": 3.789,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.853,
+          2.812,
+          2.769,
+          3.789,
+          3.474,
+          2.799,
+          3.256,
+          1.792
+        ]
+      },
+      "raster": {
+        "median_ms": 2.049,
+        "p95_ms": 5.024,
+        "max_ms": 5.024,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.024,
+          2.049,
+          1.993,
+          1.882,
+          1.719,
+          2.199,
+          2.072,
+          1.312
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.851,
+        "p95_ms": 8.655,
+        "max_ms": 8.655,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          8.655,
+          5.103,
+          5.044,
+          5.956,
+          6.331,
+          5.306,
+          5.851,
+          3.768
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 169063,
+      "all_frame_timings": 125,
+      "content_build_timestamps_us": [
+        174601072894,
+        174601172562,
+        174601272649,
+        174601372628,
+        174601472703,
+        174601572518,
+        174601672622,
+        174601772506
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.989,
+        "p95_ms": 2.275,
+        "max_ms": 2.275,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.275,
+          0.989,
+          1.034,
+          0.891,
+          1.266,
+          0.89,
+          0.874,
+          0.906
+        ]
+      },
+      "raster": {
+        "median_ms": 1.081,
+        "p95_ms": 1.399,
+        "max_ms": 1.399,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.205,
+          1.088,
+          1.081,
+          0.932,
+          1.399,
+          0.715,
+          0.906,
+          0.97
+        ]
+      },
+      "total_span": {
+        "median_ms": 2.266,
+        "p95_ms": 3.904,
+        "max_ms": 3.904,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.904,
+          2.266,
+          2.382,
+          2.101,
+          2.974,
+          1.762,
+          2.034,
+          2.02
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 168256,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174604756161,
+        174604856350,
+        174604956632,
+        174605056188,
+        174605156174,
+        174605256207,
+        174605356206,
+        174605456097
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.482,
+        "p95_ms": 0.647,
+        "max_ms": 0.647,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.451,
+          0.391,
+          0.647,
+          0.375,
+          0.482,
+          0.468,
+          0.495,
+          0.499
+        ]
+      },
+      "raster": {
+        "median_ms": 0.987,
+        "p95_ms": 1.468,
+        "max_ms": 1.468,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.718,
+          0.993,
+          1.468,
+          0.568,
+          0.764,
+          0.987,
+          0.962,
+          1.088
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.904,
+        "p95_ms": 2.981,
+        "max_ms": 2.981,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.587,
+          2.04,
+          2.981,
+          1.356,
+          1.684,
+          1.9,
+          1.904,
+          1.962
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 300764,
+      "all_frame_timings": 131,
+      "content_build_timestamps_us": [
+        174608672477,
+        174608822404,
+        174608955737,
+        174609089063,
+        174609222380,
+        174609355704,
+        174609472360,
+        174609605718
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 7.855,
+        "p95_ms": 20.14,
+        "max_ms": 20.14,
+        "over_16_67ms": 1,
+        "over_8_33ms": 3,
+        "samples_ms": [
+          20.14,
+          8.343,
+          7.855,
+          10.337,
+          7.344,
+          5.826,
+          6.089,
+          6.31
+        ]
+      },
+      "raster": {
+        "median_ms": 1.335,
+        "p95_ms": 6.913,
+        "max_ms": 6.913,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          6.913,
+          1.516,
+          1.335,
+          1.353,
+          1.209,
+          0.896,
+          0.977,
+          1.023
+        ]
+      },
+      "total_span": {
+        "median_ms": 9.264,
+        "p95_ms": 27.174,
+        "max_ms": 27.174,
+        "over_16_67ms": 1,
+        "over_8_33ms": 5,
+        "samples_ms": [
+          27.174,
+          9.979,
+          9.264,
+          11.786,
+          8.631,
+          6.782,
+          7.121,
+          7.402
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 462330,
+      "all_frame_timings": 124,
+      "content_build_timestamps_us": [
+        174612972528,
+        174613122366,
+        174613238987,
+        174613355687,
+        174613472398,
+        174613589058,
+        174613705738,
+        174613822397
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.788,
+        "p95_ms": 1.906,
+        "max_ms": 1.906,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.906,
+          0.975,
+          0.669,
+          0.662,
+          1.286,
+          0.717,
+          0.687,
+          0.788
+        ]
+      },
+      "raster": {
+        "median_ms": 0.533,
+        "p95_ms": 1.956,
+        "max_ms": 1.956,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.956,
+          0.785,
+          0.461,
+          0.531,
+          0.533,
+          0.478,
+          0.294,
+          0.534
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.466,
+        "p95_ms": 4.037,
+        "max_ms": 4.037,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.037,
+          1.848,
+          1.199,
+          1.276,
+          1.942,
+          1.346,
+          1.089,
+          1.466
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 156055,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174616839088,
+        174616939181,
+        174617039168,
+        174617139079,
+        174617239014,
+        174617339023,
+        174617439038,
+        174617539058
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 1.013,
+        "p95_ms": 1.508,
+        "max_ms": 1.508,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.013,
+          1.508,
+          1.434,
+          1.083,
+          0.728,
+          0.555,
+          0.774,
+          0.734
+        ]
+      },
+      "raster": {
+        "median_ms": 0.945,
+        "p95_ms": 1.179,
+        "max_ms": 1.179,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.923,
+          0.945,
+          1.107,
+          1.041,
+          0.461,
+          0.476,
+          1.179,
+          0.609
+        ]
+      },
+      "total_span": {
+        "median_ms": 2.094,
+        "p95_ms": 2.707,
+        "max_ms": 2.707,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.083,
+          2.62,
+          2.707,
+          2.296,
+          1.317,
+          1.136,
+          2.094,
+          1.462
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 346491,
+      "all_frame_timings": 132,
+      "content_build_timestamps_us": [
+        174620772401,
+        174620922302,
+        174621055637,
+        174621188913,
+        174621305612,
+        174621438937,
+        174621572366,
+        174621705679
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 8.324,
+        "p95_ms": 19.313,
+        "max_ms": 19.313,
+        "over_16_67ms": 1,
+        "over_8_33ms": 3,
+        "samples_ms": [
+          19.313,
+          8.437,
+          8.713,
+          7.677,
+          7.788,
+          6.882,
+          7.608,
+          8.324
+        ]
+      },
+      "raster": {
+        "median_ms": 1.321,
+        "p95_ms": 2.655,
+        "max_ms": 2.655,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.655,
+          1.321,
+          1.38,
+          1.256,
+          1.146,
+          1.011,
+          1.146,
+          1.46
+        ]
+      },
+      "total_span": {
+        "median_ms": 9.846,
+        "p95_ms": 22.09,
+        "max_ms": 22.09,
+        "over_16_67ms": 1,
+        "over_8_33ms": 7,
+        "samples_ms": [
+          22.09,
+          9.846,
+          10.18,
+          8.997,
+          9.034,
+          7.978,
+          8.899,
+          9.914
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 300879,
+      "all_frame_timings": 129,
+      "content_build_timestamps_us": [
+        174624922509,
+        174625072235,
+        174625188874,
+        174625305639,
+        174625422232,
+        174625539013,
+        174625672201,
+        174625788911
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.787,
+        "p95_ms": 2.32,
+        "max_ms": 2.32,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.32,
+          0.787,
+          0.583,
+          0.676,
+          0.787,
+          1.028,
+          0.696,
+          0.729
+        ]
+      },
+      "raster": {
+        "median_ms": 0.486,
+        "p95_ms": 1.631,
+        "max_ms": 1.631,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.631,
+          0.755,
+          0.399,
+          0.409,
+          0.486,
+          0.856,
+          0.314,
+          0.423
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.359,
+        "p95_ms": 4.237,
+        "max_ms": 4.237,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.237,
+          1.625,
+          1.039,
+          1.203,
+          1.359,
+          2.064,
+          1.082,
+          1.223
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 171789,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174628805622,
+        174628905617,
+        174629005729,
+        174629105629,
+        174629205616,
+        174629305672,
+        174629405735,
+        174629505716
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.828,
+        "p95_ms": 1.652,
+        "max_ms": 1.652,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.753,
+          0.825,
+          0.987,
+          0.727,
+          0.828,
+          0.825,
+          1.652,
+          0.93
+        ]
+      },
+      "raster": {
+        "median_ms": 1.001,
+        "p95_ms": 1.403,
+        "max_ms": 1.403,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.899,
+          0.947,
+          1.403,
+          0.712,
+          1.045,
+          0.844,
+          1.149,
+          1.001
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.994,
+        "p95_ms": 3.013,
+        "max_ms": 3.013,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.791,
+          1.903,
+          2.549,
+          1.577,
+          1.994,
+          1.854,
+          3.013,
+          2.113
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1546356,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174634838861,
+        174635255568,
+        174635638847,
+        174636038822,
+        174636422159,
+        174636805501,
+        174637172099,
+        174637605511
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 62.096,
+        "p95_ms": 83.382,
+        "max_ms": 83.382,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          61.423,
+          59.617,
+          80.549,
+          59.921,
+          73.464,
+          54.975,
+          83.382,
+          62.096
+        ]
+      },
+      "raster": {
+        "median_ms": 5.4,
+        "p95_ms": 6.201,
+        "max_ms": 6.201,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.924,
+          5.173,
+          5.678,
+          5.484,
+          5.037,
+          5.011,
+          5.4,
+          6.201
+        ]
+      },
+      "total_span": {
+        "median_ms": 68.443,
+        "p95_ms": 88.871,
+        "max_ms": 88.871,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          66.459,
+          64.95,
+          86.354,
+          65.509,
+          78.628,
+          60.13,
+          88.871,
+          68.443
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1609103,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174643405535,
+        174643805417,
+        174644172108,
+        174644605424,
+        174644938775,
+        174645338697,
+        174645688806,
+        174646088667
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 3.281,
+        "p95_ms": 6.758,
+        "max_ms": 6.758,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          6.758,
+          3.077,
+          3.281,
+          3.224,
+          3.113,
+          3.307,
+          3.151,
+          3.31
+        ]
+      },
+      "raster": {
+        "median_ms": 1.794,
+        "p95_ms": 3.009,
+        "max_ms": 3.009,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.009,
+          1.722,
+          1.92,
+          1.736,
+          1.766,
+          1.794,
+          1.698,
+          2.159
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.175,
+        "p95_ms": 9.976,
+        "max_ms": 9.976,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          9.976,
+          4.9,
+          5.354,
+          5.06,
+          4.999,
+          5.175,
+          5.005,
+          5.535
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 187241,
+      "all_frame_timings": 126,
+      "content_build_timestamps_us": [
+        174649622269,
+        174649738777,
+        174649838817,
+        174649938854,
+        174650055588,
+        174650155499,
+        174650255504,
+        174650355606
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 6.073,
+        "p95_ms": 7.911,
+        "max_ms": 7.911,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          7.911,
+          5.181,
+          5.38,
+          7.149,
+          5.53,
+          7.197,
+          6.055,
+          6.073
+        ]
+      },
+      "raster": {
+        "median_ms": 0.977,
+        "p95_ms": 1.009,
+        "max_ms": 1.009,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.992,
+          0.869,
+          0.777,
+          0.977,
+          0.595,
+          1.009,
+          0.916,
+          0.991
+        ]
+      },
+      "total_span": {
+        "median_ms": 7.327,
+        "p95_ms": 9.128,
+        "max_ms": 9.128,
+        "over_16_67ms": 0,
+        "over_8_33ms": 3,
+        "samples_ms": [
+          9.128,
+          6.17,
+          6.364,
+          8.386,
+          6.378,
+          8.474,
+          7.225,
+          7.327
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1558740,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174655705378,
+        174656188766,
+        174656571973,
+        174657005323,
+        174657405279,
+        174657821994,
+        174658221971,
+        174658638640
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 73.338,
+        "p95_ms": 104.414,
+        "max_ms": 104.414,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          104.414,
+          53.811,
+          81.842,
+          54.868,
+          73.338,
+          53.902,
+          73.749,
+          53.863
+        ]
+      },
+      "raster": {
+        "median_ms": 5.183,
+        "p95_ms": 7.789,
+        "max_ms": 7.789,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          7.789,
+          4.891,
+          5.226,
+          5.218,
+          5.001,
+          5.122,
+          5.112,
+          5.183
+        ]
+      },
+      "total_span": {
+        "median_ms": 78.451,
+        "p95_ms": 112.351,
+        "max_ms": 112.351,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          112.351,
+          58.924,
+          87.204,
+          60.236,
+          78.451,
+          59.162,
+          79.016,
+          59.179
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1530134,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174664205228,
+        174664588634,
+        174664888477,
+        174665238537,
+        174665538584,
+        174665905178,
+        174666205298,
+        174666555251
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 3.018,
+        "p95_ms": 4.472,
+        "max_ms": 4.472,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.472,
+          3.028,
+          3.052,
+          2.953,
+          2.938,
+          3.004,
+          2.938,
+          3.018
+        ]
+      },
+      "raster": {
+        "median_ms": 1.851,
+        "p95_ms": 2.791,
+        "max_ms": 2.791,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.791,
+          1.825,
+          2.004,
+          1.737,
+          1.924,
+          1.801,
+          1.715,
+          1.851
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.002,
+        "p95_ms": 7.376,
+        "max_ms": 7.376,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          7.376,
+          5.005,
+          5.116,
+          4.793,
+          5.002,
+          4.876,
+          4.827,
+          4.998
+        ]
+      }
+    },
+    {
+      "trial": 1,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 188381,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174670038640,
+        174670138634,
+        174670238624,
+        174670338612,
+        174670438623,
+        174670538619,
+        174670638613,
+        174670738617
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 5.005,
+        "p95_ms": 5.586,
+        "max_ms": 5.586,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.586,
+          5.344,
+          5.387,
+          5.005,
+          4.79,
+          4.999,
+          4.943,
+          4.883
+        ]
+      },
+      "raster": {
+        "median_ms": 0.847,
+        "p95_ms": 0.981,
+        "max_ms": 0.981,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.981,
+          0.774,
+          0.875,
+          0.853,
+          0.791,
+          0.69,
+          0.786,
+          0.847
+        ]
+      },
+      "total_span": {
+        "median_ms": 6.083,
+        "p95_ms": 6.723,
+        "max_ms": 6.723,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          6.723,
+          6.349,
+          6.496,
+          6.083,
+          5.811,
+          5.894,
+          5.923,
+          5.92
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 165569,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174673722007,
+        174673821868,
+        174673922031,
+        174674021926,
+        174674121985,
+        174674221929,
+        174674322089,
+        174674421956
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.59,
+        "p95_ms": 0.729,
+        "max_ms": 0.729,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.664,
+          0.59,
+          0.592,
+          0.491,
+          0.575,
+          0.518,
+          0.729,
+          0.546
+        ]
+      },
+      "raster": {
+        "median_ms": 1.141,
+        "p95_ms": 1.371,
+        "max_ms": 1.371,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.371,
+          1.141,
+          1.144,
+          0.906,
+          1.094,
+          0.835,
+          1.166,
+          0.992
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.916,
+        "p95_ms": 2.24,
+        "max_ms": 2.24,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.24,
+          1.916,
+          2.003,
+          1.526,
+          1.849,
+          1.521,
+          2.137,
+          1.743
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 176133,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174677421898,
+        174677538597,
+        174677638593,
+        174677738524,
+        174677838631,
+        174677938446,
+        174678038710,
+        174678138539
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 1.039,
+        "p95_ms": 1.715,
+        "max_ms": 1.715,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.715,
+          1.073,
+          1.017,
+          0.925,
+          1.285,
+          1.039,
+          1.002,
+          0.665
+        ]
+      },
+      "raster": {
+        "median_ms": 0.932,
+        "p95_ms": 1.399,
+        "max_ms": 1.399,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.675,
+          0.891,
+          0.788,
+          0.932,
+          1.399,
+          1.088,
+          1.013,
+          0.68
+        ]
+      },
+      "total_span": {
+        "median_ms": 2.248,
+        "p95_ms": 2.936,
+        "max_ms": 2.936,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.627,
+          2.184,
+          2.038,
+          2.03,
+          2.936,
+          2.248,
+          2.256,
+          1.544
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 172756,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174681138483,
+        174681238468,
+        174681338468,
+        174681438576,
+        174681538428,
+        174681655360,
+        174681755467,
+        174681855106
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 3.359,
+        "p95_ms": 4.183,
+        "max_ms": 4.183,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.389,
+          2.215,
+          1.91,
+          3.521,
+          3.359,
+          4.183,
+          3.428,
+          2.764
+        ]
+      },
+      "raster": {
+        "median_ms": 1.891,
+        "p95_ms": 4.545,
+        "max_ms": 4.545,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.545,
+          1.383,
+          1.411,
+          1.765,
+          2.383,
+          1.79,
+          1.891,
+          1.961
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.838,
+        "p95_ms": 7.095,
+        "max_ms": 7.095,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          7.095,
+          3.794,
+          3.485,
+          5.517,
+          5.912,
+          6.214,
+          5.838,
+          4.894
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 161974,
+      "all_frame_timings": 126,
+      "content_build_timestamps_us": [
+        174684838439,
+        174684938370,
+        174685038453,
+        174685138508,
+        174685238393,
+        174685338812,
+        174685438431,
+        174685538472
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.37,
+        "p95_ms": 0.678,
+        "max_ms": 0.678,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.37,
+          0.271,
+          0.428,
+          0.47,
+          0.332,
+          0.678,
+          0.355,
+          0.367
+        ]
+      },
+      "raster": {
+        "median_ms": 0.818,
+        "p95_ms": 1.033,
+        "max_ms": 1.033,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.885,
+          0.524,
+          1.011,
+          1.033,
+          0.582,
+          0.715,
+          0.818,
+          0.769
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.401,
+        "p95_ms": 1.737,
+        "max_ms": 1.737,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.401,
+          0.886,
+          1.564,
+          1.7,
+          1.018,
+          1.737,
+          1.313,
+          1.337
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 185473,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174688555181,
+        174688655176,
+        174688755165,
+        174688855150,
+        174688955125,
+        174689055161,
+        174689155205,
+        174689255169
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 1.27,
+        "p95_ms": 2.038,
+        "max_ms": 2.038,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.038,
+          1.368,
+          1.236,
+          1.322,
+          1.038,
+          0.864,
+          1.27,
+          1.076
+        ]
+      },
+      "raster": {
+        "median_ms": 1.413,
+        "p95_ms": 1.498,
+        "max_ms": 1.498,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.057,
+          1.413,
+          1.498,
+          1.454,
+          1.187,
+          1.074,
+          1.436,
+          0.958
+        ]
+      },
+      "total_span": {
+        "median_ms": 3.012,
+        "p95_ms": 3.256,
+        "max_ms": 3.256,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.256,
+          3.076,
+          3.012,
+          3.091,
+          2.439,
+          2.208,
+          2.972,
+          2.284
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 175552,
+      "all_frame_timings": 126,
+      "content_build_timestamps_us": [
+        174692271741,
+        174692371647,
+        174692471729,
+        174692588435,
+        174692688421,
+        174692788423,
+        174692888434,
+        174692988430
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 2.081,
+        "p95_ms": 3.054,
+        "max_ms": 3.054,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.966,
+          2.951,
+          3.054,
+          2.016,
+          2.081,
+          1.679,
+          2.015,
+          1.861
+        ]
+      },
+      "raster": {
+        "median_ms": 1.206,
+        "p95_ms": 4.666,
+        "max_ms": 4.666,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.666,
+          2.088,
+          2.159,
+          1.115,
+          1.206,
+          1.056,
+          0.953,
+          1.046
+        ]
+      },
+      "total_span": {
+        "median_ms": 3.481,
+        "p95_ms": 7.767,
+        "max_ms": 7.767,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          7.767,
+          5.183,
+          5.439,
+          3.32,
+          3.481,
+          2.941,
+          3.169,
+          3.108
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 165819,
+      "all_frame_timings": 118,
+      "content_build_timestamps_us": [
+        174695988425,
+        174696088345,
+        174696188504,
+        174696288344,
+        174696388631,
+        174696488486,
+        174696588482,
+        174696688465
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 1.16,
+        "p95_ms": 1.751,
+        "max_ms": 1.751,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.866,
+          0.783,
+          1.16,
+          0.686,
+          1.751,
+          1.49,
+          1.198,
+          1.061
+        ]
+      },
+      "raster": {
+        "median_ms": 1.077,
+        "p95_ms": 1.45,
+        "max_ms": 1.45,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.036,
+          0.914,
+          1.078,
+          0.693,
+          1.418,
+          1.45,
+          0.957,
+          1.077
+        ]
+      },
+      "total_span": {
+        "median_ms": 2.386,
+        "p95_ms": 3.576,
+        "max_ms": 3.576,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.115,
+          1.83,
+          2.478,
+          1.511,
+          3.576,
+          3.162,
+          2.386,
+          2.341
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 327775,
+      "all_frame_timings": 132,
+      "content_build_timestamps_us": [
+        174699888497,
+        174700038196,
+        174700154980,
+        174700271611,
+        174700388320,
+        174700504842,
+        174700621550,
+        174700738210
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.706,
+        "p95_ms": 2.464,
+        "max_ms": 2.464,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.464,
+          0.706,
+          0.625,
+          0.672,
+          0.677,
+          0.648,
+          0.782,
+          0.725
+        ]
+      },
+      "raster": {
+        "median_ms": 0.384,
+        "p95_ms": 1.959,
+        "max_ms": 1.959,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.959,
+          0.4,
+          0.384,
+          0.278,
+          0.384,
+          0.37,
+          0.314,
+          0.304
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.184,
+        "p95_ms": 4.614,
+        "max_ms": 4.614,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.614,
+          1.171,
+          1.184,
+          1.117,
+          1.255,
+          1.088,
+          1.209,
+          1.143
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 310982,
+      "all_frame_timings": 124,
+      "content_build_timestamps_us": [
+        174704021887,
+        174704154956,
+        174704288185,
+        174704404831,
+        174704538279,
+        174704671509,
+        174704804842,
+        174704938177
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 7.8,
+        "p95_ms": 12.803,
+        "max_ms": 12.803,
+        "over_16_67ms": 0,
+        "over_8_33ms": 2,
+        "samples_ms": [
+          12.803,
+          8.022,
+          7.767,
+          7.8,
+          9.833,
+          7.7,
+          6.817,
+          7.579
+        ]
+      },
+      "raster": {
+        "median_ms": 1.278,
+        "p95_ms": 5.751,
+        "max_ms": 5.751,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.751,
+          1.294,
+          1.278,
+          1.259,
+          1.5,
+          1.128,
+          1.231,
+          1.2
+        ]
+      },
+      "total_span": {
+        "median_ms": 9.174,
+        "p95_ms": 18.721,
+        "max_ms": 18.721,
+        "over_16_67ms": 1,
+        "over_8_33ms": 7,
+        "samples_ms": [
+          18.721,
+          9.506,
+          9.13,
+          9.174,
+          11.528,
+          8.928,
+          8.158,
+          8.862
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 155846,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174707955118,
+        174708054900,
+        174708155042,
+        174708254964,
+        174708354883,
+        174708454974,
+        174708554906,
+        174708654931
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 1.023,
+        "p95_ms": 2.632,
+        "max_ms": 2.632,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.632,
+          0.808,
+          1.229,
+          0.885,
+          0.817,
+          1.023,
+          0.86,
+          1.417
+        ]
+      },
+      "raster": {
+        "median_ms": 0.82,
+        "p95_ms": 1.395,
+        "max_ms": 1.395,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.139,
+          0.506,
+          1.395,
+          0.608,
+          0.645,
+          0.82,
+          0.73,
+          1.308
+        ]
+      },
+      "total_span": {
+        "median_ms": 2.031,
+        "p95_ms": 4.03,
+        "max_ms": 4.03,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.03,
+          1.487,
+          2.825,
+          1.69,
+          1.57,
+          2.031,
+          1.72,
+          2.922
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 328965,
+      "all_frame_timings": 129,
+      "content_build_timestamps_us": [
+        174711838134,
+        174711988199,
+        174712104782,
+        174712221499,
+        174712354763,
+        174712471575,
+        174712588238,
+        174712704869
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.741,
+        "p95_ms": 1.697,
+        "max_ms": 1.697,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.697,
+          0.762,
+          0.671,
+          0.809,
+          0.741,
+          0.724,
+          0.672,
+          0.669
+        ]
+      },
+      "raster": {
+        "median_ms": 0.526,
+        "p95_ms": 1.695,
+        "max_ms": 1.695,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.695,
+          0.742,
+          0.755,
+          0.526,
+          0.404,
+          0.3,
+          0.369,
+          0.34
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.49,
+        "p95_ms": 3.506,
+        "max_ms": 3.506,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.506,
+          1.707,
+          1.547,
+          1.49,
+          1.226,
+          1.235,
+          1.263,
+          1.195
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 375635,
+      "all_frame_timings": 130,
+      "content_build_timestamps_us": [
+        174716004747,
+        174716138103,
+        174716271470,
+        174716404767,
+        174716538055,
+        174716671379,
+        174716804688,
+        174716938041
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 7.928,
+        "p95_ms": 10.262,
+        "max_ms": 10.262,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          7.332,
+          10.262,
+          6.581,
+          8.015,
+          7.951,
+          7.928,
+          7.84,
+          7.818
+        ]
+      },
+      "raster": {
+        "median_ms": 1.239,
+        "p95_ms": 3.321,
+        "max_ms": 3.321,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.321,
+          1.113,
+          0.91,
+          1.311,
+          1.236,
+          1.264,
+          1.239,
+          1.183
+        ]
+      },
+      "total_span": {
+        "median_ms": 9.293,
+        "p95_ms": 11.496,
+        "max_ms": 11.496,
+        "over_16_67ms": 0,
+        "over_8_33ms": 7,
+        "samples_ms": [
+          10.758,
+          11.496,
+          7.64,
+          9.469,
+          9.293,
+          9.28,
+          9.166,
+          9.082
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 207450,
+      "all_frame_timings": 125,
+      "content_build_timestamps_us": [
+        174720104872,
+        174720204836,
+        174720304891,
+        174720404863,
+        174720504772,
+        174720604809,
+        174720704857,
+        174720804860
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 5.312,
+        "p95_ms": 6.25,
+        "max_ms": 6.25,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.015,
+          5.647,
+          5.312,
+          6.25,
+          2.943,
+          4.667,
+          5.427,
+          5.253
+        ]
+      },
+      "raster": {
+        "median_ms": 0.612,
+        "p95_ms": 1.045,
+        "max_ms": 1.045,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.545,
+          0.858,
+          0.601,
+          1.045,
+          0.385,
+          0.612,
+          0.704,
+          0.479
+        ]
+      },
+      "total_span": {
+        "median_ms": 6.189,
+        "p95_ms": 7.566,
+        "max_ms": 7.566,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.81,
+          6.715,
+          6.189,
+          7.566,
+          3.506,
+          5.418,
+          6.434,
+          5.947
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1613758,
+      "all_frame_timings": 89,
+      "content_build_timestamps_us": [
+        174726004661,
+        174726354718,
+        174726687979,
+        174727071377,
+        174727437988,
+        174727871297,
+        174728187926,
+        174728571407
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 3.286,
+        "p95_ms": 3.437,
+        "max_ms": 3.437,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.341,
+          3.232,
+          3.286,
+          3.308,
+          3.437,
+          3.198,
+          3.141,
+          3.132
+        ]
+      },
+      "raster": {
+        "median_ms": 1.858,
+        "p95_ms": 2.183,
+        "max_ms": 2.183,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.183,
+          1.831,
+          1.998,
+          1.858,
+          1.808,
+          1.9,
+          1.857,
+          1.809
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.345,
+        "p95_ms": 5.659,
+        "max_ms": 5.659,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.659,
+          5.22,
+          5.378,
+          5.345,
+          5.359,
+          5.19,
+          5.067,
+          5.129
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "rust",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1540739,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174734304637,
+        174734771207,
+        174735154561,
+        174735554557,
+        174735937973,
+        174736354574,
+        174736737969,
+        174737137949
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 72.688,
+        "p95_ms": 84.13,
+        "max_ms": 84.13,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          84.13,
+          54.194,
+          72.688,
+          53.877,
+          77.706,
+          54.026,
+          72.704,
+          55.341
+        ]
+      },
+      "raster": {
+        "median_ms": 5.125,
+        "p95_ms": 8.142,
+        "max_ms": 8.142,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          8.142,
+          5.12,
+          5.087,
+          5.124,
+          5.227,
+          5.125,
+          5.103,
+          5.294
+        ]
+      },
+      "total_span": {
+        "median_ms": 77.903,
+        "p95_ms": 92.375,
+        "max_ms": 92.375,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          92.375,
+          59.386,
+          77.903,
+          59.116,
+          83.143,
+          59.266,
+          78.016,
+          60.822
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 186749,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174740671274,
+        174740771282,
+        174740871315,
+        174740971292,
+        174741071374,
+        174741171287,
+        174741271284,
+        174741371300
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 5.217,
+        "p95_ms": 5.736,
+        "max_ms": 5.736,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.736,
+          5.217,
+          5.51,
+          5.107,
+          5.306,
+          4.488,
+          3.187,
+          3.943
+        ]
+      },
+      "raster": {
+        "median_ms": 0.846,
+        "p95_ms": 1.035,
+        "max_ms": 1.035,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.929,
+          0.775,
+          1.035,
+          0.846,
+          0.858,
+          0.598,
+          0.44,
+          0.459
+        ]
+      },
+      "total_span": {
+        "median_ms": 6.226,
+        "p95_ms": 6.881,
+        "max_ms": 6.881,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          6.881,
+          6.226,
+          6.76,
+          6.163,
+          6.44,
+          5.302,
+          3.821,
+          4.627
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1598131,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174746587849,
+        174747004579,
+        174747354447,
+        174747704564,
+        174748021237,
+        174748421111,
+        174748754492,
+        174749171132
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 3.741,
+        "p95_ms": 7.758,
+        "max_ms": 7.758,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          7.758,
+          3.706,
+          3.874,
+          3.741,
+          3.67,
+          3.602,
+          3.693,
+          3.831
+        ]
+      },
+      "raster": {
+        "median_ms": 1.969,
+        "p95_ms": 4.45,
+        "max_ms": 4.45,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.45,
+          1.847,
+          1.969,
+          1.781,
+          2.052,
+          1.766,
+          1.802,
+          2.024
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.948,
+        "p95_ms": 12.352,
+        "max_ms": 12.352,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          12.352,
+          5.745,
+          5.948,
+          5.75,
+          5.954,
+          5.458,
+          5.637,
+          5.999
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "backend": "legacyDart",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1486734,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174755071077,
+        174755554399,
+        174755954393,
+        174756370989,
+        174756804334,
+        174757237786,
+        174757654381,
+        174758087780
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 69.814,
+        "p95_ms": 86.951,
+        "max_ms": 86.951,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          86.951,
+          59.082,
+          69.814,
+          57.754,
+          78.395,
+          58.295,
+          83.231,
+          55.675
+        ]
+      },
+      "raster": {
+        "median_ms": 5.461,
+        "p95_ms": 8.596,
+        "max_ms": 8.596,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          8.596,
+          5.398,
+          5.016,
+          5.588,
+          5.104,
+          5.778,
+          5.461,
+          5.17
+        ]
+      },
+      "total_span": {
+        "median_ms": 74.976,
+        "p95_ms": 95.638,
+        "max_ms": 95.638,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          95.638,
+          64.627,
+          74.976,
+          63.409,
+          83.57,
+          64.254,
+          88.848,
+          61.039
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "legacyDart",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 165108,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174761621122,
+        174761721178,
+        174761821079,
+        174761921151,
+        174762021101,
+        174762121098,
+        174762221103,
+        174762321032
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 2.876,
+        "p95_ms": 3.165,
+        "max_ms": 3.165,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.896,
+          2.73,
+          2.587,
+          2.794,
+          2.004,
+          2.952,
+          3.165,
+          2.876
+        ]
+      },
+      "raster": {
+        "median_ms": 1.478,
+        "p95_ms": 4.519,
+        "max_ms": 4.519,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.519,
+          1.383,
+          0.985,
+          1.273,
+          0.939,
+          1.538,
+          1.982,
+          1.478
+        ]
+      },
+      "total_span": {
+        "median_ms": 4.523,
+        "p95_ms": 7.547,
+        "max_ms": 7.547,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          7.547,
+          4.49,
+          3.767,
+          4.32,
+          3.153,
+          4.681,
+          5.37,
+          4.523
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "legacyDart",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 167977,
+      "all_frame_timings": 123,
+      "content_build_timestamps_us": [
+        174765320958,
+        174765437892,
+        174765537697,
+        174765637714,
+        174765737729,
+        174765837674,
+        174765937648,
+        174766092420
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.571,
+        "p95_ms": 15.649,
+        "max_ms": 15.649,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          15.649,
+          1.729,
+          0.452,
+          0.571,
+          0.515,
+          0.373,
+          0.418,
+          1.237
+        ]
+      },
+      "raster": {
+        "median_ms": 0.615,
+        "p95_ms": 1.186,
+        "max_ms": 1.186,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.637,
+          1.186,
+          0.525,
+          0.615,
+          0.492,
+          0.898,
+          0.34,
+          0.412
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.402,
+        "p95_ms": 73.197,
+        "max_ms": 73.197,
+        "over_16_67ms": 1,
+        "over_8_33ms": 2,
+        "samples_ms": [
+          16.422,
+          3.25,
+          1.153,
+          1.358,
+          1.19,
+          1.402,
+          0.891,
+          73.197
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 162313,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174769070956,
+        174769171041,
+        174769271044,
+        174769370957,
+        174769471031,
+        174769570939,
+        174769671008,
+        174769771023
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.307,
+        "p95_ms": 0.447,
+        "max_ms": 0.447,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.304,
+          0.447,
+          0.355,
+          0.284,
+          0.307,
+          0.221,
+          0.299,
+          0.438
+        ]
+      },
+      "raster": {
+        "median_ms": 0.599,
+        "p95_ms": 1.061,
+        "max_ms": 1.061,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.758,
+          1.061,
+          0.599,
+          0.457,
+          0.521,
+          0.34,
+          0.43,
+          0.964
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.138,
+        "p95_ms": 1.654,
+        "max_ms": 1.654,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.185,
+          1.654,
+          1.138,
+          0.865,
+          1.016,
+          0.66,
+          0.897,
+          1.542
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 184762,
+      "all_frame_timings": 126,
+      "content_build_timestamps_us": [
+        174772770955,
+        174772887745,
+        174773004437,
+        174773104359,
+        174773221020,
+        174773337704,
+        174773437661,
+        174773537716
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 3.555,
+        "p95_ms": 4.082,
+        "max_ms": 4.082,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.667,
+          3.832,
+          3.423,
+          4.082,
+          3.555,
+          2.08,
+          3.112,
+          3.243
+        ]
+      },
+      "raster": {
+        "median_ms": 1.884,
+        "p95_ms": 5.112,
+        "max_ms": 5.112,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.112,
+          1.884,
+          1.763,
+          1.943,
+          2.099,
+          1.382,
+          1.558,
+          1.01
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.816,
+        "p95_ms": 8.953,
+        "max_ms": 8.953,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          8.953,
+          5.898,
+          5.414,
+          6.276,
+          5.816,
+          3.683,
+          4.851,
+          4.578
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 174900,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174776554264,
+        174776654278,
+        174776754318,
+        174776854223,
+        174776954142,
+        174777054253,
+        174777154374,
+        174777254299
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.599,
+        "p95_ms": 1.213,
+        "max_ms": 1.213,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.213,
+          0.599,
+          0.585,
+          0.347,
+          0.286,
+          0.572,
+          1.093,
+          0.729
+        ]
+      },
+      "raster": {
+        "median_ms": 0.533,
+        "p95_ms": 0.738,
+        "max_ms": 0.738,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.605,
+          0.639,
+          0.477,
+          0.257,
+          0.157,
+          0.533,
+          0.738,
+          0.479
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.4,
+        "p95_ms": 2.046,
+        "max_ms": 2.046,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.956,
+          1.4,
+          1.269,
+          0.725,
+          0.505,
+          1.241,
+          2.046,
+          1.406
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 3264,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 166241,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174780237641,
+        174780337547,
+        174780437622,
+        174780537566,
+        174780637515,
+        174780737641,
+        174780837610,
+        174780937688
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.514,
+        "p95_ms": 0.637,
+        "max_ms": 0.637,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.637,
+          0.429,
+          0.562,
+          0.297,
+          0.287,
+          0.457,
+          0.514,
+          0.6
+        ]
+      },
+      "raster": {
+        "median_ms": 0.801,
+        "p95_ms": 1.168,
+        "max_ms": 1.168,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.168,
+          0.774,
+          0.801,
+          0.557,
+          0.575,
+          0.554,
+          1.135,
+          1.104
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.523,
+        "p95_ms": 1.993,
+        "max_ms": 1.993,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.993,
+          1.328,
+          1.523,
+          1.007,
+          0.97,
+          1.238,
+          1.812,
+          1.958
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "legacyDart",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 334791,
+      "all_frame_timings": 125,
+      "content_build_timestamps_us": [
+        174784187571,
+        174784320752,
+        174784454183,
+        174784587441,
+        174784720752,
+        174784854100,
+        174784987475,
+        174785120773
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 7.778,
+        "p95_ms": 17.989,
+        "max_ms": 17.989,
+        "over_16_67ms": 1,
+        "over_8_33ms": 3,
+        "samples_ms": [
+          17.989,
+          7.778,
+          9.282,
+          7.472,
+          7.216,
+          7.319,
+          7.02,
+          8.501
+        ]
+      },
+      "raster": {
+        "median_ms": 1.165,
+        "p95_ms": 3.461,
+        "max_ms": 3.461,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.461,
+          1.093,
+          1.409,
+          1.165,
+          1.092,
+          1.087,
+          1.063,
+          1.294
+        ]
+      },
+      "total_span": {
+        "median_ms": 8.978,
+        "p95_ms": 21.596,
+        "max_ms": 21.596,
+        "over_16_67ms": 1,
+        "over_8_33ms": 7,
+        "samples_ms": [
+          21.596,
+          8.978,
+          10.843,
+          8.733,
+          8.39,
+          8.498,
+          8.207,
+          9.884
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "legacyDart",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 311596,
+      "all_frame_timings": 130,
+      "content_build_timestamps_us": [
+        174788354276,
+        174788487506,
+        174788604190,
+        174788720814,
+        174788837400,
+        174788954150,
+        174789087431,
+        174789204143
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.769,
+        "p95_ms": 2.549,
+        "max_ms": 2.549,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.549,
+          0.776,
+          0.652,
+          0.712,
+          0.718,
+          0.798,
+          0.769,
+          0.628
+        ]
+      },
+      "raster": {
+        "median_ms": 0.529,
+        "p95_ms": 1.604,
+        "max_ms": 1.604,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.604,
+          0.643,
+          0.307,
+          0.342,
+          0.346,
+          0.787,
+          0.529,
+          0.32
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.406,
+        "p95_ms": 4.407,
+        "max_ms": 4.407,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.407,
+          1.6,
+          1.149,
+          1.216,
+          1.152,
+          1.784,
+          1.406,
+          1.113
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 162989,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174792237613,
+        174792337605,
+        174792437555,
+        174792537487,
+        174792637523,
+        174792737536,
+        174792837503,
+        174792937593
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 1.585,
+        "p95_ms": 1.741,
+        "max_ms": 1.741,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.621,
+          1.741,
+          0.914,
+          0.871,
+          0.925,
+          1.585,
+          0.841,
+          1.599
+        ]
+      },
+      "raster": {
+        "median_ms": 0.937,
+        "p95_ms": 1.504,
+        "max_ms": 1.504,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.734,
+          0.839,
+          1.504,
+          0.862,
+          1.441,
+          0.937,
+          1.335,
+          0.93
+        ]
+      },
+      "total_span": {
+        "median_ms": 2.64,
+        "p95_ms": 2.851,
+        "max_ms": 2.851,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.615,
+          2.851,
+          2.64,
+          1.899,
+          2.51,
+          2.712,
+          2.319,
+          2.749
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 368413,
+      "all_frame_timings": 125,
+      "content_build_timestamps_us": [
+        174796204117,
+        174796354059,
+        174796487483,
+        174796620737,
+        174796754133,
+        174796870601,
+        174796987326,
+        174797103963
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 6.94,
+        "p95_ms": 23.129,
+        "max_ms": 23.129,
+        "over_16_67ms": 1,
+        "over_8_33ms": 3,
+        "samples_ms": [
+          23.129,
+          8.356,
+          8.8,
+          6.935,
+          6.94,
+          6.796,
+          6.928,
+          6.248
+        ]
+      },
+      "raster": {
+        "median_ms": 1.185,
+        "p95_ms": 4.676,
+        "max_ms": 4.676,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.676,
+          1.526,
+          1.431,
+          1.185,
+          1.043,
+          0.985,
+          1.066,
+          0.926
+        ]
+      },
+      "total_span": {
+        "median_ms": 8.281,
+        "p95_ms": 27.966,
+        "max_ms": 27.966,
+        "over_16_67ms": 1,
+        "over_8_33ms": 3,
+        "samples_ms": [
+          27.966,
+          10.039,
+          10.422,
+          8.281,
+          8.203,
+          7.854,
+          8.121,
+          7.248
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 324078,
+      "all_frame_timings": 130,
+      "content_build_timestamps_us": [
+        174800337408,
+        174800487310,
+        174800603980,
+        174800720719,
+        174800837358,
+        174800954036,
+        174801087420,
+        174801203996
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 0.703,
+        "p95_ms": 1.565,
+        "max_ms": 1.565,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.565,
+          0.686,
+          0.779,
+          0.7,
+          0.7,
+          0.763,
+          0.691,
+          0.703
+        ]
+      },
+      "raster": {
+        "median_ms": 0.438,
+        "p95_ms": 1.944,
+        "max_ms": 1.944,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.944,
+          0.538,
+          0.438,
+          0.343,
+          0.468,
+          0.431,
+          0.272,
+          0.268
+        ]
+      },
+      "total_span": {
+        "median_ms": 1.329,
+        "p95_ms": 3.682,
+        "max_ms": 3.682,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          3.682,
+          1.351,
+          1.329,
+          1.223,
+          1.298,
+          1.374,
+          1.18,
+          1.124
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 43520,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 157433,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174804220744,
+        174804320700,
+        174804420882,
+        174804520697,
+        174804620651,
+        174804720812,
+        174804820834,
+        174804920737
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 1.015,
+        "p95_ms": 1.728,
+        "max_ms": 1.728,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.842,
+          1.015,
+          1.728,
+          0.762,
+          0.773,
+          1.656,
+          1.063,
+          0.994
+        ]
+      },
+      "raster": {
+        "median_ms": 1.068,
+        "p95_ms": 1.37,
+        "max_ms": 1.37,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          1.0,
+          0.998,
+          1.37,
+          0.875,
+          0.916,
+          1.318,
+          1.145,
+          1.068
+        ]
+      },
+      "total_span": {
+        "median_ms": 2.216,
+        "p95_ms": 3.403,
+        "max_ms": 3.403,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.05,
+          2.162,
+          3.403,
+          1.767,
+          1.804,
+          3.177,
+          2.505,
+          2.216
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "legacyDart",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1527528,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174810403889,
+        174810853948,
+        174811254163,
+        174811653979,
+        174812037164,
+        174812453920,
+        174812837168,
+        174813270614
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 62.8,
+        "p95_ms": 93.79,
+        "max_ms": 93.79,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          93.79,
+          52.736,
+          62.8,
+          53.176,
+          73.58,
+          56.078,
+          73.406,
+          56.095
+        ]
+      },
+      "raster": {
+        "median_ms": 5.213,
+        "p95_ms": 10.222,
+        "max_ms": 10.222,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          10.222,
+          4.848,
+          5.326,
+          4.972,
+          4.967,
+          5.308,
+          5.029,
+          5.213
+        ]
+      },
+      "total_span": {
+        "median_ms": 68.561,
+        "p95_ms": 104.111,
+        "max_ms": 104.111,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          104.111,
+          57.747,
+          68.561,
+          58.348,
+          78.658,
+          61.545,
+          78.553,
+          61.544
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "legacyDart",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1436814,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174818903830,
+        174819287262,
+        174819620503,
+        174819987156,
+        174820303900,
+        174820703904,
+        174821037081,
+        174821470483
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 3.187,
+        "p95_ms": 7.589,
+        "max_ms": 7.589,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          7.589,
+          3.089,
+          3.243,
+          3.051,
+          3.094,
+          3.086,
+          3.616,
+          3.187
+        ]
+      },
+      "raster": {
+        "median_ms": 1.958,
+        "p95_ms": 4.116,
+        "max_ms": 4.116,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          4.116,
+          1.792,
+          1.958,
+          1.724,
+          1.898,
+          1.696,
+          2.165,
+          2.098
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.367,
+        "p95_ms": 11.824,
+        "max_ms": 11.824,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          11.824,
+          5.091,
+          5.367,
+          4.908,
+          5.197,
+          5.001,
+          5.874,
+          5.471
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "legacyDart",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 188981,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174824953894,
+        174825053888,
+        174825153798,
+        174825253818,
+        174825353836,
+        174825453858,
+        174825553828,
+        174825653891
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 5.427,
+        "p95_ms": 7.3,
+        "max_ms": 7.3,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          6.132,
+          7.3,
+          5.183,
+          3.776,
+          4.555,
+          5.596,
+          4.871,
+          5.427
+        ]
+      },
+      "raster": {
+        "median_ms": 0.446,
+        "p95_ms": 1.077,
+        "max_ms": 1.077,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.945,
+          1.077,
+          0.558,
+          0.379,
+          0.392,
+          0.38,
+          0.372,
+          0.446
+        ]
+      },
+      "total_span": {
+        "median_ms": 6.063,
+        "p95_ms": 8.661,
+        "max_ms": 8.661,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          7.276,
+          8.661,
+          5.926,
+          4.335,
+          5.181,
+          6.159,
+          5.469,
+          6.063
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "layout_mode": "legacy",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1576653,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174831170386,
+        174831637122,
+        174832037072,
+        174832453624,
+        174832853689,
+        174833303714,
+        174833720286,
+        174834153802
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 73.53,
+        "p95_ms": 98.345,
+        "max_ms": 98.345,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          98.345,
+          53.382,
+          73.53,
+          57.501,
+          79.009,
+          57.89,
+          73.978,
+          53.633
+        ]
+      },
+      "raster": {
+        "median_ms": 5.245,
+        "p95_ms": 8.783,
+        "max_ms": 8.783,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          8.783,
+          5.017,
+          5.004,
+          5.245,
+          5.041,
+          5.44,
+          5.301,
+          5.155
+        ]
+      },
+      "total_span": {
+        "median_ms": 78.738,
+        "p95_ms": 107.249,
+        "max_ms": 107.249,
+        "over_16_67ms": 8,
+        "over_8_33ms": 8,
+        "samples_ms": [
+          107.249,
+          58.617,
+          78.738,
+          62.82,
+          84.196,
+          63.49,
+          79.382,
+          59.039
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "layout_mode": "paged",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 1502452,
+      "all_frame_timings": 88,
+      "content_build_timestamps_us": [
+        174839870270,
+        174840270262,
+        174840636919,
+        174841053569,
+        174841420274,
+        174841870352,
+        174842203625,
+        174842586918
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 3.104,
+        "p95_ms": 5.829,
+        "max_ms": 5.829,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.829,
+          3.14,
+          3.246,
+          2.986,
+          3.038,
+          3.104,
+          2.944,
+          2.93
+        ]
+      },
+      "raster": {
+        "median_ms": 1.887,
+        "p95_ms": 2.961,
+        "max_ms": 2.961,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          2.961,
+          1.969,
+          1.866,
+          1.876,
+          1.887,
+          1.962,
+          1.788,
+          1.844
+        ]
+      },
+      "total_span": {
+        "median_ms": 5.205,
+        "p95_ms": 8.895,
+        "max_ms": 8.895,
+        "over_16_67ms": 0,
+        "over_8_33ms": 1,
+        "samples_ms": [
+          8.895,
+          5.226,
+          5.205,
+          4.945,
+          5.048,
+          5.277,
+          4.88,
+          4.908
+        ]
+      }
+    },
+    {
+      "trial": 3,
+      "backend": "rust",
+      "layout_mode": "sliver",
+      "prefill_utf16_units": 435200,
+      "publications": 8,
+      "initial_wall_us_including_90ms_pacing": 182770,
+      "all_frame_timings": 119,
+      "content_build_timestamps_us": [
+        174846053658,
+        174846153597,
+        174846253646,
+        174846353636,
+        174846453689,
+        174846553662,
+        174846653723,
+        174846753622
+      ],
+      "content_frames": 8,
+      "build_layout": {
+        "median_ms": 5.029,
+        "p95_ms": 6.567,
+        "max_ms": 6.567,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.029,
+          2.484,
+          5.832,
+          5.058,
+          5.005,
+          4.982,
+          6.567,
+          4.673
+        ]
+      },
+      "raster": {
+        "median_ms": 0.831,
+        "p95_ms": 1.305,
+        "max_ms": 1.305,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          0.644,
+          0.405,
+          0.638,
+          0.715,
+          0.877,
+          0.831,
+          0.912,
+          1.305
+        ]
+      },
+      "total_span": {
+        "median_ms": 6.097,
+        "p95_ms": 7.759,
+        "max_ms": 7.759,
+        "over_16_67ms": 0,
+        "over_8_33ms": 0,
+        "samples_ms": [
+          5.914,
+          3.04,
+          6.668,
+          6.017,
+          6.097,
+          6.018,
+          7.759,
+          6.196
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "profile_mode": true,
+    "platform": "macos",
+    "os": "Version 27.2 (Build 26B123)",
+    "physical_size": [
+      1600.0,
+      1200.0
+    ],
+    "device_pixel_ratio": 2.0,
+    "same_incremental_ranges_and_retention_verified": true,
+    "same_inactive_ai_registry": true,
+    "same_highlighter_and_committed_widget_cache": true,
+    "content_frame_selection": "dirty stream element at engine draw-frame entry, inside build interval",
+    "publication_pacing_ms_after_layout": 90,
+    "prefill_and_three_warmup_updates_excluded": true,
+    "trials_per_backend_per_size": 3,
+    "scroll_position": "top; legacy/paged external box scroll, sliver parent-owned viewport",
+    "no_parser_only_timings_in_frame_comparison": true
+  }
+}

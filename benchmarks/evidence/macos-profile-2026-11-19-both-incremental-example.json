@@ -1,0 +1,271 @@
+{
+  "frames_legacyDart": {
+    "frame_count": 40,
+    "median_build_ms": 3.805,
+    "p95_build_ms": 5.713,
+    "average_build_ms": 3.71415,
+    "median_raster_ms": 0.725,
+    "p95_raster_ms": 1.453,
+    "average_raster_ms": 0.8196999999999999,
+    "build_over_16_7ms": 0
+  },
+  "frames_rust": {
+    "frame_count": 40,
+    "median_build_ms": 3.696,
+    "p95_build_ms": 7.196,
+    "average_build_ms": 3.862375,
+    "median_raster_ms": 0.702,
+    "p95_raster_ms": 1.886,
+    "average_raster_ms": 1.007025,
+    "build_over_16_7ms": 0
+  },
+  "stream_frames_legacyDart": {
+    "frame_count": 40,
+    "median_build_ms": 2.166,
+    "p95_build_ms": 3.721,
+    "average_build_ms": 2.351925,
+    "median_raster_ms": 1.299,
+    "p95_raster_ms": 1.917,
+    "publications": 40,
+    "ai_registry": true
+  },
+  "stream_frames_rust": {
+    "frame_count": 40,
+    "median_build_ms": 3.072,
+    "p95_build_ms": 4.098,
+    "average_build_ms": 2.7072750000000005,
+    "median_raster_ms": 1.606,
+    "p95_raster_ms": 2.166,
+    "publications": 40,
+    "ai_registry": true
+  },
+  "metadata": {
+    "profile_mode": true,
+    "physical_size": [
+      646.0,
+      1200.0
+    ],
+    "device_pixel_ratio": 2.0,
+    "transport": "direct-flutter-ast",
+    "rust_opt_level": "3",
+    "stream_widget_backends_incremental": [
+      "legacyDart",
+      "rust"
+    ],
+    "stream_widget_cache_policy": "same identity cache and invalidation for both backends",
+    "platform": "macos",
+    "os": "Version 27.2 (Build 26B123)",
+    "render_utf16_units": 3264,
+    "note": "Single device, warm parses, no cache; parse includes FFI/decoding/Flutter adaptation. Frame tests use the same highlighter."
+  },
+  "parses": {
+    "small_message": {
+      "utf16_units": 60,
+      "rust_ffi_decode_adapt": {
+        "median_us": 3.75,
+        "p90_us": 8.826,
+        "iterations": 500,
+        "samples": [
+          3.568,
+          3.57,
+          3.604,
+          3.694,
+          3.75,
+          3.804,
+          3.812,
+          5.998,
+          8.826
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 3.498,
+        "p90_us": 3.828,
+        "iterations": 500,
+        "samples": [
+          3.422,
+          3.452,
+          3.46,
+          3.48,
+          3.498,
+          3.532,
+          3.674,
+          3.752,
+          3.828
+        ]
+      }
+    },
+    "mixed_document_12k": {
+      "utf16_units": 10880,
+      "rust_ffi_decode_adapt": {
+        "median_us": 615.25,
+        "p90_us": 623.75,
+        "iterations": 12,
+        "samples": [
+          609.9166666666666,
+          611.3333333333334,
+          613.5,
+          615.0833333333334,
+          615.25,
+          620.4166666666666,
+          621.9166666666666,
+          623.5,
+          623.75
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 626.5833333333334,
+        "p90_us": 638.5,
+        "iterations": 12,
+        "samples": [
+          618.9166666666666,
+          621.8333333333334,
+          624.0833333333334,
+          625.8333333333334,
+          626.5833333333334,
+          626.8333333333334,
+          628.8333333333334,
+          638.1666666666666,
+          638.5
+        ]
+      }
+    },
+    "mixed_document_48k": {
+      "utf16_units": 43520,
+      "rust_ffi_decode_adapt": {
+        "median_us": 2639.1666666666665,
+        "p90_us": 2689.0833333333335,
+        "iterations": 12,
+        "samples": [
+          2478.9166666666665,
+          2570.0833333333335,
+          2608.5,
+          2630.0,
+          2639.1666666666665,
+          2642.75,
+          2666.6666666666665,
+          2684.9166666666665,
+          2689.0833333333335
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 2577.9166666666665,
+        "p90_us": 2660.75,
+        "iterations": 12,
+        "samples": [
+          2539.25,
+          2557.0,
+          2566.0833333333335,
+          2577.5833333333335,
+          2577.9166666666665,
+          2585.75,
+          2614.5,
+          2633.9166666666665,
+          2660.75
+        ]
+      }
+    },
+    "single_paragraph_48k": {
+      "utf16_units": 50400,
+      "rust_ffi_decode_adapt": {
+        "median_us": 1916.5,
+        "p90_us": 2253.5833333333335,
+        "iterations": 12,
+        "samples": [
+          1834.4166666666667,
+          1842.4166666666667,
+          1845.3333333333333,
+          1878.4166666666667,
+          1916.5,
+          1945.75,
+          1948.1666666666667,
+          2056.0833333333335,
+          2253.5833333333335
+        ]
+      },
+      "legacy_dart": {
+        "median_us": 2194.25,
+        "p90_us": 2278.6666666666665,
+        "iterations": 12,
+        "samples": [
+          2129.0833333333335,
+          2131.1666666666665,
+          2134.25,
+          2154.8333333333335,
+          2194.25,
+          2201.5833333333335,
+          2204.5833333333335,
+          2259.0833333333335,
+          2278.6666666666665
+        ]
+      }
+    }
+  },
+  "streams": {
+    "utf16_units": 14800,
+    "publications": 58,
+    "rust_batch": {
+      "median_us": 22100.0,
+      "p90_us": 22147.5,
+      "iterations": 2,
+      "samples": [
+        22018.5,
+        22032.0,
+        22046.5,
+        22079.5,
+        22100.0,
+        22105.0,
+        22106.0,
+        22145.5,
+        22147.5
+      ]
+    },
+    "dart_batch": {
+      "median_us": 22442.5,
+      "p90_us": 22725.5,
+      "iterations": 2,
+      "samples": [
+        22269.5,
+        22280.0,
+        22371.0,
+        22391.0,
+        22442.5,
+        22482.5,
+        22501.0,
+        22508.0,
+        22725.5
+      ]
+    },
+    "dart_incremental": {
+      "median_us": 1489.0,
+      "p90_us": 1544.5,
+      "iterations": 2,
+      "samples": [
+        1471.0,
+        1472.5,
+        1480.5,
+        1487.0,
+        1489.0,
+        1496.0,
+        1523.0,
+        1523.5,
+        1544.5
+      ]
+    },
+    "rust_incremental": {
+      "median_us": 1718.5,
+      "p90_us": 1787.0,
+      "iterations": 2,
+      "samples": [
+        1699.0,
+        1703.0,
+        1706.0,
+        1713.0,
+        1718.5,
+        1721.5,
+        1734.5,
+        1747.0,
+        1787.0
+      ]
+    }
+  }
+}

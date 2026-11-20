@@ -1,0 +1,44 @@
+{
+  "stages": {
+    "sections_1": {
+      "prepare_us": 0,
+      "native_parse_and_wire_us": 20,
+      "copy_us": 0,
+      "decode_us": 10,
+      "adapt_us": 5,
+      "free_us": 0,
+      "total_us": 36,
+      "wire_bytes": 2984,
+      "wire_nodes": 46,
+      "flutter_blocks": 5,
+      "source_utf16_units": 272
+    },
+    "sections_40": {
+      "prepare_us": 24,
+      "native_parse_and_wire_us": 723,
+      "copy_us": 4,
+      "decode_us": 304,
+      "adapt_us": 134,
+      "free_us": 0,
+      "total_us": 1188,
+      "wire_bytes": 116864,
+      "wire_nodes": 1801,
+      "flutter_blocks": 200,
+      "source_utf16_units": 10880
+    },
+    "sections_160": {
+      "prepare_us": 99,
+      "native_parse_and_wire_us": 2894,
+      "copy_us": 35,
+      "decode_us": 1228,
+      "adapt_us": 537,
+      "free_us": 1,
+      "total_us": 4973,
+      "wire_bytes": 467264,
+      "wire_nodes": 7201,
+      "flutter_blocks": 800,
+      "source_utf16_units": 43520
+    }
+  },
+  "profile_mode": true
+}

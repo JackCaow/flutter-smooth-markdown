@@ -1,0 +1,1849 @@
+{
+  "metadata": {
+    "profile_mode": true,
+    "platform": "macos",
+    "os": "Version 27.2 (Build 26B123)",
+    "physical_size": [
+      1600.0,
+      1200.0
+    ],
+    "device_pixel_ratio": 2.0,
+    "same_incremental_ranges_and_retention_verified": true,
+    "same_inactive_ai_registry": true,
+    "same_highlighter_and_committed_widget_cache": true,
+    "content_frame_selection": "dirty stream element at engine draw-frame entry, inside build interval",
+    "publication_pacing_ms_after_layout": 90,
+    "prefill_and_three_warmup_updates_excluded": true,
+    "trials_per_backend_per_size": 3,
+    "scroll_position": "top; legacy/paged external box scroll, sliver parent-owned viewport",
+    "no_parser_only_timings_in_frame_comparison": true,
+    "aggregation": "median/min/max of all three per-trial distributions; none excluded",
+    "total_content_frames": 432,
+    "frozen_legacy_same_process": true,
+    "payload_sha256": {
+      "Contents/MacOS/flutter_smooth_markdown_example": "d494d887f3926bb9bb1e5494836e439c9914fe3844e4769071bdb1a327a3be7e",
+      "Contents/Frameworks/App.framework/Versions/A/App": "f58511fa98d9d2ee0256a628ea8f85d6e23881e22d140a4d74515fd51e9d8d6a",
+      "Contents/Frameworks/smooth_markdown_rust.framework/smooth_markdown_rust": "7a610a193a96871c810dc304b389e84fa2a0829cae10d76e3c8f018e951b6e08"
+    }
+  },
+  "scenarios": {
+    "3264": {
+      "legacyDart": {
+        "legacy": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 2.738,
+              "min": 2.081,
+              "max": 2.876,
+              "trial_values": [
+                2.738,
+                2.081,
+                2.876
+              ]
+            },
+            "p95_ms": {
+              "median": 3.165,
+              "min": 3.054,
+              "max": 3.337,
+              "trial_values": [
+                3.337,
+                3.054,
+                3.165
+              ]
+            },
+            "max_ms": {
+              "median": 3.165,
+              "min": 3.054,
+              "max": 3.337,
+              "trial_values": [
+                3.337,
+                3.054,
+                3.165
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 1.478,
+              "min": 1.206,
+              "max": 2.135,
+              "trial_values": [
+                2.135,
+                1.206,
+                1.478
+              ]
+            },
+            "p95_ms": {
+              "median": 4.666,
+              "min": 4.519,
+              "max": 5.006,
+              "trial_values": [
+                5.006,
+                4.666,
+                4.519
+              ]
+            },
+            "max_ms": {
+              "median": 4.666,
+              "min": 4.519,
+              "max": 5.006,
+              "trial_values": [
+                5.006,
+                4.666,
+                4.519
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 4.523,
+              "min": 3.481,
+              "max": 5.632,
+              "trial_values": [
+                5.632,
+                3.481,
+                4.523
+              ]
+            },
+            "p95_ms": {
+              "median": 7.767,
+              "min": 7.547,
+              "max": 8.561,
+              "trial_values": [
+                8.561,
+                7.767,
+                7.547
+              ]
+            },
+            "max_ms": {
+              "median": 7.767,
+              "min": 7.547,
+              "max": 8.561,
+              "trial_values": [
+                8.561,
+                7.767,
+                7.547
+              ]
+            }
+          }
+        },
+        "paged": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 0.954,
+              "min": 0.571,
+              "max": 1.27,
+              "trial_values": [
+                0.954,
+                1.27,
+                0.571
+              ]
+            },
+            "p95_ms": {
+              "median": 2.038,
+              "min": 1.783,
+              "max": 15.649,
+              "trial_values": [
+                1.783,
+                2.038,
+                15.649
+              ]
+            },
+            "max_ms": {
+              "median": 2.038,
+              "min": 1.783,
+              "max": 15.649,
+              "trial_values": [
+                1.783,
+                2.038,
+                15.649
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 0.873,
+              "min": 0.615,
+              "max": 1.413,
+              "trial_values": [
+                0.873,
+                1.413,
+                0.615
+              ]
+            },
+            "p95_ms": {
+              "median": 1.186,
+              "min": 1.065,
+              "max": 1.498,
+              "trial_values": [
+                1.065,
+                1.498,
+                1.186
+              ]
+            },
+            "max_ms": {
+              "median": 1.186,
+              "min": 1.065,
+              "max": 1.498,
+              "trial_values": [
+                1.065,
+                1.498,
+                1.186
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 1.945,
+              "min": 1.402,
+              "max": 3.012,
+              "trial_values": [
+                1.945,
+                3.012,
+                1.402
+              ]
+            },
+            "p95_ms": {
+              "median": 3.256,
+              "min": 2.966,
+              "max": 73.197,
+              "trial_values": [
+                2.966,
+                3.256,
+                73.197
+              ]
+            },
+            "max_ms": {
+              "median": 3.256,
+              "min": 2.966,
+              "max": 73.197,
+              "trial_values": [
+                2.966,
+                3.256,
+                73.197
+              ]
+            }
+          }
+        },
+        "sliver": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 0.37,
+              "min": 0.307,
+              "max": 0.485,
+              "trial_values": [
+                0.485,
+                0.37,
+                0.307
+              ]
+            },
+            "p95_ms": {
+              "median": 0.613,
+              "min": 0.447,
+              "max": 0.678,
+              "trial_values": [
+                0.613,
+                0.678,
+                0.447
+              ]
+            },
+            "max_ms": {
+              "median": 0.613,
+              "min": 0.447,
+              "max": 0.678,
+              "trial_values": [
+                0.613,
+                0.678,
+                0.447
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 0.818,
+              "min": 0.599,
+              "max": 0.946,
+              "trial_values": [
+                0.946,
+                0.818,
+                0.599
+              ]
+            },
+            "p95_ms": {
+              "median": 1.061,
+              "min": 1.033,
+              "max": 1.099,
+              "trial_values": [
+                1.099,
+                1.033,
+                1.061
+              ]
+            },
+            "max_ms": {
+              "median": 1.061,
+              "min": 1.033,
+              "max": 1.099,
+              "trial_values": [
+                1.099,
+                1.033,
+                1.061
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 1.401,
+              "min": 1.138,
+              "max": 1.832,
+              "trial_values": [
+                1.832,
+                1.401,
+                1.138
+              ]
+            },
+            "p95_ms": {
+              "median": 1.737,
+              "min": 1.654,
+              "max": 2.073,
+              "trial_values": [
+                2.073,
+                1.737,
+                1.654
+              ]
+            },
+            "max_ms": {
+              "median": 1.737,
+              "min": 1.654,
+              "max": 2.073,
+              "trial_values": [
+                2.073,
+                1.737,
+                1.654
+              ]
+            }
+          }
+        }
+      },
+      "rust": {
+        "legacy": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 3.359,
+              "min": 2.853,
+              "max": 3.555,
+              "trial_values": [
+                2.853,
+                3.359,
+                3.555
+              ]
+            },
+            "p95_ms": {
+              "median": 4.082,
+              "min": 3.789,
+              "max": 4.183,
+              "trial_values": [
+                3.789,
+                4.183,
+                4.082
+              ]
+            },
+            "max_ms": {
+              "median": 4.082,
+              "min": 3.789,
+              "max": 4.183,
+              "trial_values": [
+                3.789,
+                4.183,
+                4.082
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 1.891,
+              "min": 1.884,
+              "max": 2.049,
+              "trial_values": [
+                2.049,
+                1.891,
+                1.884
+              ]
+            },
+            "p95_ms": {
+              "median": 5.024,
+              "min": 4.545,
+              "max": 5.112,
+              "trial_values": [
+                5.024,
+                4.545,
+                5.112
+              ]
+            },
+            "max_ms": {
+              "median": 5.024,
+              "min": 4.545,
+              "max": 5.112,
+              "trial_values": [
+                5.024,
+                4.545,
+                5.112
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 5.838,
+              "min": 5.816,
+              "max": 5.851,
+              "trial_values": [
+                5.851,
+                5.838,
+                5.816
+              ]
+            },
+            "p95_ms": {
+              "median": 8.655,
+              "min": 7.095,
+              "max": 8.953,
+              "trial_values": [
+                8.655,
+                7.095,
+                8.953
+              ]
+            },
+            "max_ms": {
+              "median": 8.655,
+              "min": 7.095,
+              "max": 8.953,
+              "trial_values": [
+                8.655,
+                7.095,
+                8.953
+              ]
+            }
+          }
+        },
+        "paged": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 0.989,
+              "min": 0.599,
+              "max": 1.039,
+              "trial_values": [
+                0.989,
+                1.039,
+                0.599
+              ]
+            },
+            "p95_ms": {
+              "median": 1.715,
+              "min": 1.213,
+              "max": 2.275,
+              "trial_values": [
+                2.275,
+                1.715,
+                1.213
+              ]
+            },
+            "max_ms": {
+              "median": 1.715,
+              "min": 1.213,
+              "max": 2.275,
+              "trial_values": [
+                2.275,
+                1.715,
+                1.213
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 0.932,
+              "min": 0.533,
+              "max": 1.081,
+              "trial_values": [
+                1.081,
+                0.932,
+                0.533
+              ]
+            },
+            "p95_ms": {
+              "median": 1.399,
+              "min": 0.738,
+              "max": 1.399,
+              "trial_values": [
+                1.399,
+                1.399,
+                0.738
+              ]
+            },
+            "max_ms": {
+              "median": 1.399,
+              "min": 0.738,
+              "max": 1.399,
+              "trial_values": [
+                1.399,
+                1.399,
+                0.738
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 2.248,
+              "min": 1.4,
+              "max": 2.266,
+              "trial_values": [
+                2.266,
+                2.248,
+                1.4
+              ]
+            },
+            "p95_ms": {
+              "median": 2.936,
+              "min": 2.046,
+              "max": 3.904,
+              "trial_values": [
+                3.904,
+                2.936,
+                2.046
+              ]
+            },
+            "max_ms": {
+              "median": 2.936,
+              "min": 2.046,
+              "max": 3.904,
+              "trial_values": [
+                3.904,
+                2.936,
+                2.046
+              ]
+            }
+          }
+        },
+        "sliver": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 0.514,
+              "min": 0.482,
+              "max": 0.59,
+              "trial_values": [
+                0.482,
+                0.59,
+                0.514
+              ]
+            },
+            "p95_ms": {
+              "median": 0.647,
+              "min": 0.637,
+              "max": 0.729,
+              "trial_values": [
+                0.647,
+                0.729,
+                0.637
+              ]
+            },
+            "max_ms": {
+              "median": 0.647,
+              "min": 0.637,
+              "max": 0.729,
+              "trial_values": [
+                0.647,
+                0.729,
+                0.637
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 0.987,
+              "min": 0.801,
+              "max": 1.141,
+              "trial_values": [
+                0.987,
+                1.141,
+                0.801
+              ]
+            },
+            "p95_ms": {
+              "median": 1.371,
+              "min": 1.168,
+              "max": 1.468,
+              "trial_values": [
+                1.468,
+                1.371,
+                1.168
+              ]
+            },
+            "max_ms": {
+              "median": 1.371,
+              "min": 1.168,
+              "max": 1.468,
+              "trial_values": [
+                1.468,
+                1.371,
+                1.168
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 1.904,
+              "min": 1.523,
+              "max": 1.916,
+              "trial_values": [
+                1.904,
+                1.916,
+                1.523
+              ]
+            },
+            "p95_ms": {
+              "median": 2.24,
+              "min": 1.993,
+              "max": 2.981,
+              "trial_values": [
+                2.981,
+                2.24,
+                1.993
+              ]
+            },
+            "max_ms": {
+              "median": 2.24,
+              "min": 1.993,
+              "max": 2.981,
+              "trial_values": [
+                2.981,
+                2.24,
+                1.993
+              ]
+            }
+          }
+        }
+      }
+    },
+    "43520": {
+      "legacyDart": {
+        "legacy": {
+          "frames": 24,
+          "ui_over_16_67ms": 2,
+          "build_layout": {
+            "median_ms": {
+              "median": 7.855,
+              "min": 7.778,
+              "max": 7.928,
+              "trial_values": [
+                7.855,
+                7.928,
+                7.778
+              ]
+            },
+            "p95_ms": {
+              "median": 17.989,
+              "min": 10.262,
+              "max": 20.14,
+              "trial_values": [
+                20.14,
+                10.262,
+                17.989
+              ]
+            },
+            "max_ms": {
+              "median": 17.989,
+              "min": 10.262,
+              "max": 20.14,
+              "trial_values": [
+                20.14,
+                10.262,
+                17.989
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 1.239,
+              "min": 1.165,
+              "max": 1.335,
+              "trial_values": [
+                1.335,
+                1.239,
+                1.165
+              ]
+            },
+            "p95_ms": {
+              "median": 3.461,
+              "min": 3.321,
+              "max": 6.913,
+              "trial_values": [
+                6.913,
+                3.321,
+                3.461
+              ]
+            },
+            "max_ms": {
+              "median": 3.461,
+              "min": 3.321,
+              "max": 6.913,
+              "trial_values": [
+                6.913,
+                3.321,
+                3.461
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 9.264,
+              "min": 8.978,
+              "max": 9.293,
+              "trial_values": [
+                9.264,
+                9.293,
+                8.978
+              ]
+            },
+            "p95_ms": {
+              "median": 21.596,
+              "min": 11.496,
+              "max": 27.174,
+              "trial_values": [
+                27.174,
+                11.496,
+                21.596
+              ]
+            },
+            "max_ms": {
+              "median": 21.596,
+              "min": 11.496,
+              "max": 27.174,
+              "trial_values": [
+                27.174,
+                11.496,
+                21.596
+              ]
+            }
+          }
+        },
+        "paged": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 0.769,
+              "min": 0.741,
+              "max": 0.788,
+              "trial_values": [
+                0.788,
+                0.741,
+                0.769
+              ]
+            },
+            "p95_ms": {
+              "median": 1.906,
+              "min": 1.697,
+              "max": 2.549,
+              "trial_values": [
+                1.906,
+                1.697,
+                2.549
+              ]
+            },
+            "max_ms": {
+              "median": 1.906,
+              "min": 1.697,
+              "max": 2.549,
+              "trial_values": [
+                1.906,
+                1.697,
+                2.549
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 0.529,
+              "min": 0.526,
+              "max": 0.533,
+              "trial_values": [
+                0.533,
+                0.526,
+                0.529
+              ]
+            },
+            "p95_ms": {
+              "median": 1.695,
+              "min": 1.604,
+              "max": 1.956,
+              "trial_values": [
+                1.956,
+                1.695,
+                1.604
+              ]
+            },
+            "max_ms": {
+              "median": 1.695,
+              "min": 1.604,
+              "max": 1.956,
+              "trial_values": [
+                1.956,
+                1.695,
+                1.604
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 1.466,
+              "min": 1.406,
+              "max": 1.49,
+              "trial_values": [
+                1.466,
+                1.49,
+                1.406
+              ]
+            },
+            "p95_ms": {
+              "median": 4.037,
+              "min": 3.506,
+              "max": 4.407,
+              "trial_values": [
+                4.037,
+                3.506,
+                4.407
+              ]
+            },
+            "max_ms": {
+              "median": 4.037,
+              "min": 3.506,
+              "max": 4.407,
+              "trial_values": [
+                4.037,
+                3.506,
+                4.407
+              ]
+            }
+          }
+        },
+        "sliver": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 1.023,
+              "min": 1.013,
+              "max": 1.585,
+              "trial_values": [
+                1.013,
+                1.023,
+                1.585
+              ]
+            },
+            "p95_ms": {
+              "median": 1.741,
+              "min": 1.508,
+              "max": 2.632,
+              "trial_values": [
+                1.508,
+                2.632,
+                1.741
+              ]
+            },
+            "max_ms": {
+              "median": 1.741,
+              "min": 1.508,
+              "max": 2.632,
+              "trial_values": [
+                1.508,
+                2.632,
+                1.741
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 0.937,
+              "min": 0.82,
+              "max": 0.945,
+              "trial_values": [
+                0.945,
+                0.82,
+                0.937
+              ]
+            },
+            "p95_ms": {
+              "median": 1.395,
+              "min": 1.179,
+              "max": 1.504,
+              "trial_values": [
+                1.179,
+                1.395,
+                1.504
+              ]
+            },
+            "max_ms": {
+              "median": 1.395,
+              "min": 1.179,
+              "max": 1.504,
+              "trial_values": [
+                1.179,
+                1.395,
+                1.504
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 2.094,
+              "min": 2.031,
+              "max": 2.64,
+              "trial_values": [
+                2.094,
+                2.031,
+                2.64
+              ]
+            },
+            "p95_ms": {
+              "median": 2.851,
+              "min": 2.707,
+              "max": 4.03,
+              "trial_values": [
+                2.707,
+                4.03,
+                2.851
+              ]
+            },
+            "max_ms": {
+              "median": 2.851,
+              "min": 2.707,
+              "max": 4.03,
+              "trial_values": [
+                2.707,
+                4.03,
+                2.851
+              ]
+            }
+          }
+        }
+      },
+      "rust": {
+        "legacy": {
+          "frames": 24,
+          "ui_over_16_67ms": 2,
+          "build_layout": {
+            "median_ms": {
+              "median": 7.8,
+              "min": 6.94,
+              "max": 8.324,
+              "trial_values": [
+                8.324,
+                7.8,
+                6.94
+              ]
+            },
+            "p95_ms": {
+              "median": 19.313,
+              "min": 12.803,
+              "max": 23.129,
+              "trial_values": [
+                19.313,
+                12.803,
+                23.129
+              ]
+            },
+            "max_ms": {
+              "median": 19.313,
+              "min": 12.803,
+              "max": 23.129,
+              "trial_values": [
+                19.313,
+                12.803,
+                23.129
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 1.278,
+              "min": 1.185,
+              "max": 1.321,
+              "trial_values": [
+                1.321,
+                1.278,
+                1.185
+              ]
+            },
+            "p95_ms": {
+              "median": 4.676,
+              "min": 2.655,
+              "max": 5.751,
+              "trial_values": [
+                2.655,
+                5.751,
+                4.676
+              ]
+            },
+            "max_ms": {
+              "median": 4.676,
+              "min": 2.655,
+              "max": 5.751,
+              "trial_values": [
+                2.655,
+                5.751,
+                4.676
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 9.174,
+              "min": 8.281,
+              "max": 9.846,
+              "trial_values": [
+                9.846,
+                9.174,
+                8.281
+              ]
+            },
+            "p95_ms": {
+              "median": 22.09,
+              "min": 18.721,
+              "max": 27.966,
+              "trial_values": [
+                22.09,
+                18.721,
+                27.966
+              ]
+            },
+            "max_ms": {
+              "median": 22.09,
+              "min": 18.721,
+              "max": 27.966,
+              "trial_values": [
+                22.09,
+                18.721,
+                27.966
+              ]
+            }
+          }
+        },
+        "paged": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 0.706,
+              "min": 0.703,
+              "max": 0.787,
+              "trial_values": [
+                0.787,
+                0.706,
+                0.703
+              ]
+            },
+            "p95_ms": {
+              "median": 2.32,
+              "min": 1.565,
+              "max": 2.464,
+              "trial_values": [
+                2.32,
+                2.464,
+                1.565
+              ]
+            },
+            "max_ms": {
+              "median": 2.32,
+              "min": 1.565,
+              "max": 2.464,
+              "trial_values": [
+                2.32,
+                2.464,
+                1.565
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 0.438,
+              "min": 0.384,
+              "max": 0.486,
+              "trial_values": [
+                0.486,
+                0.384,
+                0.438
+              ]
+            },
+            "p95_ms": {
+              "median": 1.944,
+              "min": 1.631,
+              "max": 1.959,
+              "trial_values": [
+                1.631,
+                1.959,
+                1.944
+              ]
+            },
+            "max_ms": {
+              "median": 1.944,
+              "min": 1.631,
+              "max": 1.959,
+              "trial_values": [
+                1.631,
+                1.959,
+                1.944
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 1.329,
+              "min": 1.184,
+              "max": 1.359,
+              "trial_values": [
+                1.359,
+                1.184,
+                1.329
+              ]
+            },
+            "p95_ms": {
+              "median": 4.237,
+              "min": 3.682,
+              "max": 4.614,
+              "trial_values": [
+                4.237,
+                4.614,
+                3.682
+              ]
+            },
+            "max_ms": {
+              "median": 4.237,
+              "min": 3.682,
+              "max": 4.614,
+              "trial_values": [
+                4.237,
+                4.614,
+                3.682
+              ]
+            }
+          }
+        },
+        "sliver": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 1.015,
+              "min": 0.828,
+              "max": 1.16,
+              "trial_values": [
+                0.828,
+                1.16,
+                1.015
+              ]
+            },
+            "p95_ms": {
+              "median": 1.728,
+              "min": 1.652,
+              "max": 1.751,
+              "trial_values": [
+                1.652,
+                1.751,
+                1.728
+              ]
+            },
+            "max_ms": {
+              "median": 1.728,
+              "min": 1.652,
+              "max": 1.751,
+              "trial_values": [
+                1.652,
+                1.751,
+                1.728
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 1.068,
+              "min": 1.001,
+              "max": 1.077,
+              "trial_values": [
+                1.001,
+                1.077,
+                1.068
+              ]
+            },
+            "p95_ms": {
+              "median": 1.403,
+              "min": 1.37,
+              "max": 1.45,
+              "trial_values": [
+                1.403,
+                1.45,
+                1.37
+              ]
+            },
+            "max_ms": {
+              "median": 1.403,
+              "min": 1.37,
+              "max": 1.45,
+              "trial_values": [
+                1.403,
+                1.45,
+                1.37
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 2.216,
+              "min": 1.994,
+              "max": 2.386,
+              "trial_values": [
+                1.994,
+                2.386,
+                2.216
+              ]
+            },
+            "p95_ms": {
+              "median": 3.403,
+              "min": 3.013,
+              "max": 3.576,
+              "trial_values": [
+                3.013,
+                3.576,
+                3.403
+              ]
+            },
+            "max_ms": {
+              "median": 3.403,
+              "min": 3.013,
+              "max": 3.576,
+              "trial_values": [
+                3.013,
+                3.576,
+                3.403
+              ]
+            }
+          }
+        }
+      }
+    },
+    "435200": {
+      "legacyDart": {
+        "legacy": {
+          "frames": 24,
+          "ui_over_16_67ms": 24,
+          "build_layout": {
+            "median_ms": {
+              "median": 62.8,
+              "min": 62.096,
+              "max": 69.814,
+              "trial_values": [
+                62.096,
+                69.814,
+                62.8
+              ]
+            },
+            "p95_ms": {
+              "median": 86.951,
+              "min": 83.382,
+              "max": 93.79,
+              "trial_values": [
+                83.382,
+                86.951,
+                93.79
+              ]
+            },
+            "max_ms": {
+              "median": 86.951,
+              "min": 83.382,
+              "max": 93.79,
+              "trial_values": [
+                83.382,
+                86.951,
+                93.79
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 5.4,
+              "min": 5.213,
+              "max": 5.461,
+              "trial_values": [
+                5.4,
+                5.461,
+                5.213
+              ]
+            },
+            "p95_ms": {
+              "median": 8.596,
+              "min": 6.201,
+              "max": 10.222,
+              "trial_values": [
+                6.201,
+                8.596,
+                10.222
+              ]
+            },
+            "max_ms": {
+              "median": 8.596,
+              "min": 6.201,
+              "max": 10.222,
+              "trial_values": [
+                6.201,
+                8.596,
+                10.222
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 68.561,
+              "min": 68.443,
+              "max": 74.976,
+              "trial_values": [
+                68.443,
+                74.976,
+                68.561
+              ]
+            },
+            "p95_ms": {
+              "median": 95.638,
+              "min": 88.871,
+              "max": 104.111,
+              "trial_values": [
+                88.871,
+                95.638,
+                104.111
+              ]
+            },
+            "max_ms": {
+              "median": 95.638,
+              "min": 88.871,
+              "max": 104.111,
+              "trial_values": [
+                88.871,
+                95.638,
+                104.111
+              ]
+            }
+          }
+        },
+        "paged": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 3.281,
+              "min": 3.187,
+              "max": 3.741,
+              "trial_values": [
+                3.281,
+                3.741,
+                3.187
+              ]
+            },
+            "p95_ms": {
+              "median": 7.589,
+              "min": 6.758,
+              "max": 7.758,
+              "trial_values": [
+                6.758,
+                7.758,
+                7.589
+              ]
+            },
+            "max_ms": {
+              "median": 7.589,
+              "min": 6.758,
+              "max": 7.758,
+              "trial_values": [
+                6.758,
+                7.758,
+                7.589
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 1.958,
+              "min": 1.794,
+              "max": 1.969,
+              "trial_values": [
+                1.794,
+                1.969,
+                1.958
+              ]
+            },
+            "p95_ms": {
+              "median": 4.116,
+              "min": 3.009,
+              "max": 4.45,
+              "trial_values": [
+                3.009,
+                4.45,
+                4.116
+              ]
+            },
+            "max_ms": {
+              "median": 4.116,
+              "min": 3.009,
+              "max": 4.45,
+              "trial_values": [
+                3.009,
+                4.45,
+                4.116
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 5.367,
+              "min": 5.175,
+              "max": 5.948,
+              "trial_values": [
+                5.175,
+                5.948,
+                5.367
+              ]
+            },
+            "p95_ms": {
+              "median": 11.824,
+              "min": 9.976,
+              "max": 12.352,
+              "trial_values": [
+                9.976,
+                12.352,
+                11.824
+              ]
+            },
+            "max_ms": {
+              "median": 11.824,
+              "min": 9.976,
+              "max": 12.352,
+              "trial_values": [
+                9.976,
+                12.352,
+                11.824
+              ]
+            }
+          }
+        },
+        "sliver": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 5.427,
+              "min": 5.217,
+              "max": 6.073,
+              "trial_values": [
+                6.073,
+                5.217,
+                5.427
+              ]
+            },
+            "p95_ms": {
+              "median": 7.3,
+              "min": 5.736,
+              "max": 7.911,
+              "trial_values": [
+                7.911,
+                5.736,
+                7.3
+              ]
+            },
+            "max_ms": {
+              "median": 7.3,
+              "min": 5.736,
+              "max": 7.911,
+              "trial_values": [
+                7.911,
+                5.736,
+                7.3
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 0.846,
+              "min": 0.446,
+              "max": 0.977,
+              "trial_values": [
+                0.977,
+                0.846,
+                0.446
+              ]
+            },
+            "p95_ms": {
+              "median": 1.035,
+              "min": 1.009,
+              "max": 1.077,
+              "trial_values": [
+                1.009,
+                1.035,
+                1.077
+              ]
+            },
+            "max_ms": {
+              "median": 1.035,
+              "min": 1.009,
+              "max": 1.077,
+              "trial_values": [
+                1.009,
+                1.035,
+                1.077
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 6.226,
+              "min": 6.063,
+              "max": 7.327,
+              "trial_values": [
+                7.327,
+                6.226,
+                6.063
+              ]
+            },
+            "p95_ms": {
+              "median": 8.661,
+              "min": 6.881,
+              "max": 9.128,
+              "trial_values": [
+                9.128,
+                6.881,
+                8.661
+              ]
+            },
+            "max_ms": {
+              "median": 8.661,
+              "min": 6.881,
+              "max": 9.128,
+              "trial_values": [
+                9.128,
+                6.881,
+                8.661
+              ]
+            }
+          }
+        }
+      },
+      "rust": {
+        "legacy": {
+          "frames": 24,
+          "ui_over_16_67ms": 24,
+          "build_layout": {
+            "median_ms": {
+              "median": 73.338,
+              "min": 72.688,
+              "max": 73.53,
+              "trial_values": [
+                73.338,
+                72.688,
+                73.53
+              ]
+            },
+            "p95_ms": {
+              "median": 98.345,
+              "min": 84.13,
+              "max": 104.414,
+              "trial_values": [
+                104.414,
+                84.13,
+                98.345
+              ]
+            },
+            "max_ms": {
+              "median": 98.345,
+              "min": 84.13,
+              "max": 104.414,
+              "trial_values": [
+                104.414,
+                84.13,
+                98.345
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 5.183,
+              "min": 5.125,
+              "max": 5.245,
+              "trial_values": [
+                5.183,
+                5.125,
+                5.245
+              ]
+            },
+            "p95_ms": {
+              "median": 8.142,
+              "min": 7.789,
+              "max": 8.783,
+              "trial_values": [
+                7.789,
+                8.142,
+                8.783
+              ]
+            },
+            "max_ms": {
+              "median": 8.142,
+              "min": 7.789,
+              "max": 8.783,
+              "trial_values": [
+                7.789,
+                8.142,
+                8.783
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 78.451,
+              "min": 77.903,
+              "max": 78.738,
+              "trial_values": [
+                78.451,
+                77.903,
+                78.738
+              ]
+            },
+            "p95_ms": {
+              "median": 107.249,
+              "min": 92.375,
+              "max": 112.351,
+              "trial_values": [
+                112.351,
+                92.375,
+                107.249
+              ]
+            },
+            "max_ms": {
+              "median": 107.249,
+              "min": 92.375,
+              "max": 112.351,
+              "trial_values": [
+                112.351,
+                92.375,
+                107.249
+              ]
+            }
+          }
+        },
+        "paged": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 3.104,
+              "min": 3.018,
+              "max": 3.286,
+              "trial_values": [
+                3.018,
+                3.286,
+                3.104
+              ]
+            },
+            "p95_ms": {
+              "median": 4.472,
+              "min": 3.437,
+              "max": 5.829,
+              "trial_values": [
+                4.472,
+                3.437,
+                5.829
+              ]
+            },
+            "max_ms": {
+              "median": 4.472,
+              "min": 3.437,
+              "max": 5.829,
+              "trial_values": [
+                4.472,
+                3.437,
+                5.829
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 1.858,
+              "min": 1.851,
+              "max": 1.887,
+              "trial_values": [
+                1.851,
+                1.858,
+                1.887
+              ]
+            },
+            "p95_ms": {
+              "median": 2.791,
+              "min": 2.183,
+              "max": 2.961,
+              "trial_values": [
+                2.791,
+                2.183,
+                2.961
+              ]
+            },
+            "max_ms": {
+              "median": 2.791,
+              "min": 2.183,
+              "max": 2.961,
+              "trial_values": [
+                2.791,
+                2.183,
+                2.961
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 5.205,
+              "min": 5.002,
+              "max": 5.345,
+              "trial_values": [
+                5.002,
+                5.345,
+                5.205
+              ]
+            },
+            "p95_ms": {
+              "median": 7.376,
+              "min": 5.659,
+              "max": 8.895,
+              "trial_values": [
+                7.376,
+                5.659,
+                8.895
+              ]
+            },
+            "max_ms": {
+              "median": 7.376,
+              "min": 5.659,
+              "max": 8.895,
+              "trial_values": [
+                7.376,
+                5.659,
+                8.895
+              ]
+            }
+          }
+        },
+        "sliver": {
+          "frames": 24,
+          "ui_over_16_67ms": 0,
+          "build_layout": {
+            "median_ms": {
+              "median": 5.029,
+              "min": 5.005,
+              "max": 5.312,
+              "trial_values": [
+                5.005,
+                5.312,
+                5.029
+              ]
+            },
+            "p95_ms": {
+              "median": 6.25,
+              "min": 5.586,
+              "max": 6.567,
+              "trial_values": [
+                5.586,
+                6.25,
+                6.567
+              ]
+            },
+            "max_ms": {
+              "median": 6.25,
+              "min": 5.586,
+              "max": 6.567,
+              "trial_values": [
+                5.586,
+                6.25,
+                6.567
+              ]
+            }
+          },
+          "raster": {
+            "median_ms": {
+              "median": 0.831,
+              "min": 0.612,
+              "max": 0.847,
+              "trial_values": [
+                0.847,
+                0.612,
+                0.831
+              ]
+            },
+            "p95_ms": {
+              "median": 1.045,
+              "min": 0.981,
+              "max": 1.305,
+              "trial_values": [
+                0.981,
+                1.045,
+                1.305
+              ]
+            },
+            "max_ms": {
+              "median": 1.045,
+              "min": 0.981,
+              "max": 1.305,
+              "trial_values": [
+                0.981,
+                1.045,
+                1.305
+              ]
+            }
+          },
+          "total_span": {
+            "median_ms": {
+              "median": 6.097,
+              "min": 6.083,
+              "max": 6.189,
+              "trial_values": [
+                6.083,
+                6.189,
+                6.097
+              ]
+            },
+            "p95_ms": {
+              "median": 7.566,
+              "min": 6.723,
+              "max": 7.759,
+              "trial_values": [
+                6.723,
+                7.566,
+                7.759
+              ]
+            },
+            "max_ms": {
+              "median": 7.566,
+              "min": 6.723,
+              "max": 7.759,
+              "trial_values": [
+                6.723,
+                7.566,
+                7.759
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

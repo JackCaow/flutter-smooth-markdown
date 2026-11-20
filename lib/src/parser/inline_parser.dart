@@ -215,20 +215,26 @@ class InlineParser {
       );
     }
 
-    if (text[start] != ' ') return null;
-
-    var index = start;
-    while (index < text.length && text[index] == ' ') {
-      index++;
+    if (text.codeUnitAt(start) != 0x20 ||
+        start + 1 >= text.length ||
+        text.codeUnitAt(start + 1) != 0x20) {
+      return null;
     }
-    if (index - start < 2) return null;
 
+    final index = _spaceRunEnd(text, start + 2);
     final newlineLength = _newlineLengthAt(text, index);
     if (newlineLength == 0) return null;
     return _InlineParseResult(
       node: const HardBreakNode(),
       consumed: index - start + newlineLength,
     );
+  }
+
+  int _spaceRunEnd(String text, int index) {
+    while (index < text.length && text.codeUnitAt(index) == 0x20) {
+      index++;
+    }
+    return index;
   }
 
   int _newlineLengthAt(String text, int index) {
@@ -582,9 +588,19 @@ class InlineParser {
         break;
       }
 
-      // Stop at a potential hard line break.
-      if (code == 0x20 && _tryParseHardBreak(text, i) != null) {
-        break;
+      // Only the first space in a run can start a hard break here. Checking
+      // every suffix of a long padding run makes an ordinary paragraph
+      // quadratic. Plugin trigger checks still visit each character.
+      if (code == 0x20 &&
+          (i == start || text.codeUnitAt(i - 1) != 0x20) &&
+          i + 1 < text.length &&
+          text.codeUnitAt(i + 1) == 0x20) {
+        final end = _spaceRunEnd(text, i + 2);
+        if (_newlineLengthAt(text, end) != 0) break;
+        if (plugins == null) {
+          i = end;
+          continue;
+        }
       }
 
       // Stop at plugin trigger characters
