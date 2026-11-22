@@ -103,11 +103,20 @@ List<_LinePair> _pairRows(List<MarkdownDiffRow> rows) {
     while (i < rows.length && rows[i].kind == MarkdownDiffKind.removed) {
       i++;
     }
+    final removedCount = i - removedStart;
+    // Git can annotate the last removed line before emitting its replacement.
+    // Keep that annotation attached to the old line without ending the pair.
+    MarkdownDiffRow? oldEndNote;
+    if (removedCount > 0 &&
+        i + 1 < rows.length &&
+        rows[i].kind == MarkdownDiffKind.note &&
+        rows[i + 1].kind == MarkdownDiffKind.added) {
+      oldEndNote = rows[i++];
+    }
     final addedStart = i;
     while (i < rows.length && rows[i].kind == MarkdownDiffKind.added) {
       i++;
     }
-    final removedCount = addedStart - removedStart;
     final addedCount = i - addedStart;
     for (
       var offset = 0;
@@ -118,6 +127,9 @@ List<_LinePair> _pairRows(List<MarkdownDiffRow> rows) {
         original: offset < removedCount ? rows[removedStart + offset] : null,
         modified: offset < addedCount ? rows[addedStart + offset] : null,
       ));
+      if (oldEndNote != null && offset + 1 == removedCount) {
+        pairs.add((original: oldEndNote, modified: oldEndNote));
+      }
     }
   }
   return pairs;

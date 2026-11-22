@@ -9346,6 +9346,26 @@ void main() {
       );
     });
 
+    testWidgets('formatted find counts and highlights the same Unicode matches',
+        (tester) async {
+      await tester.pumpWidget(_wrap(const SmoothMarkdownEditor(
+        data: '🍀 Σ İ',
+        height: 320,
+      )));
+      await _tapToolbarIcon(tester, Icons.search);
+      await tester.pump();
+      final field = find.byType(TextField).first;
+      await tester.enterText(field, 'ς');
+      await tester.pumpAndSettle();
+      expect(find.text('1/1'), findsOneWidget);
+      expect(_highlightedRichTextContaining('Σ'), findsOneWidget);
+
+      await tester.enterText(field, 'i');
+      await tester.pumpAndSettle();
+      expect(find.text('Not found'), findsOneWidget);
+      expect(_highlightedRichTextContaining('İ'), findsNothing);
+    });
+
     testWidgets('find highlights rendered matches', (tester) async {
       await tester.pumpWidget(
         _wrap(

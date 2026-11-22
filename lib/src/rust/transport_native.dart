@@ -6,6 +6,7 @@ import 'package:ffi/ffi.dart';
 
 import '../parser/ast/markdown_node.dart';
 import '../parser/parser_plugin.dart';
+import '../parser/plugins/citation_plugin.dart';
 import '../parser/stream_snapshot.dart';
 import 'bindings.dart' as ffi;
 import 'core_types.dart';
@@ -64,7 +65,13 @@ List<MarkdownNode>? parseNative(
   nativeAvailable;
   final input = _source(source);
   final hooks = plugins == null ? null : _HostHooks(plugins);
-  try {
+  // Only the native block parser knows which definitions are real, including
+  // inside lists/quotes and outside code fences. Its wire includes those labels.
+  final collectDefinitions =
+      !inline && isCitationStreamRegistry(plugins) && source.contains(']:');
+  final definitions = collectDefinitions ? <String>{} : null;
+
+  List<MarkdownNode> parse(Set<String>? labels) {
     return _readResult(
       inline ? 'parseInline' : 'parse',
       (buffer) {
@@ -93,8 +100,25 @@ List<MarkdownNode>? parseNative(
       (bytes) => CoreWireReader(
         bytes,
         'SMR1',
+        referenceLabels: labels,
       ).markdown(source, hooks?.nodes ?? const {}),
     );
+  }
+
+  try {
+    final result = parse(definitions);
+    if (definitions != null &&
+        definitions.isNotEmpty &&
+        hooks!.nodes.values.whereType<MarkdownCitationNode>().any(
+          (node) => definitions.contains(node.number.toString()),
+        )) {
+      // A numeric shortcut resolves like any other Markdown link. Only rerun
+      // for an actual collision; every other source uses the first result.
+      hooks.nodes.clear();
+      hooks.referenceLabels = definitions;
+      return parse(null);
+    }
+    return result;
   } finally {
     hooks?.dispose();
     calloc.free(input);
@@ -127,6 +151,7 @@ class _HostHooks {
   final ParserPluginRegistry plugins;
   final pointer = calloc<ffi.SmrHooks>();
   final nodes = <int, MarkdownNode>{};
+  Set<String> referenceLabels = const {};
   late final NativeCallable<ffi.InlineCallback> inline;
   late final NativeCallable<ffi.BlockCallback> block;
   late final NativeCallable<ffi.InlineContext> inlineContext;
@@ -164,7 +189,13 @@ class _HostHooks {
         if (match != null &&
             match.consumed > 0 &&
             match.consumed <= length - index) {
-          return _remember(match.node, match.consumed, result);
+          final node = match.node;
+          if (node is MarkdownCitationNode &&
+              referenceLabels.isNotEmpty &&
+              referenceLabels.contains(node.number.toString())) {
+            continue;
+          }
+          return _remember(node, match.consumed, result);
         }
       }
       return 0;

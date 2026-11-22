@@ -6,6 +6,7 @@ import '../parser/parser_plugin.dart';
 import 'document/markdown_document.dart';
 import 'document/markdown_document_codec.dart';
 import 'document/markdown_document_editor.dart';
+import 'editor_search.dart';
 import 'markdown_editor_command.dart';
 
 export 'markdown_editor_command.dart';
@@ -608,8 +609,7 @@ class MarkdownEditorController extends ChangeNotifier {
 
   Iterable<Match> _sourceMatches(String query, {required bool caseSensitive}) {
     if (query.isEmpty) return const <Match>[];
-    return RegExp(RegExp.escape(query),
-            caseSensitive: caseSensitive, unicode: true)
+    return editorSearchPattern(query, caseSensitive: caseSensitive)
         .allMatches(text);
   }
 

@@ -432,6 +432,10 @@ extension MarkdownWireDecoder on CoreWireReader {
           ),
         );
       case 24:
+        referenceLabels?.add(label.trim());
+        if (childrenCount != 0) {
+          _markdownChildren(source, custom, depth, childrenCount, childPlain);
+        }
       case 32:
         if (childrenCount != 0) {
           _markdownChildren(source, custom, depth, childrenCount, childPlain);
