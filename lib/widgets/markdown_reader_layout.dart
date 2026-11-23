@@ -23,14 +23,35 @@ class _NavigableDocumentState extends State<_NavigableDocument> {
   Future<void> get ready => (_ready ??= Completer<void>()).future;
   int _request = 0;
   bool _framePending = false;
+  bool _activeInTree = true;
   MarkdownReaderController get reader => widget.document.readerController!;
 
   @override
   void initState() {
     super.initState();
+    _attachAndIndex();
+  }
+
+  void _attachAndIndex() {
+    final retainMatch =
+        reader._view?.widget.document.data == widget.document.data;
     reader
       .._attach(this)
-      .._index(widget.nodes, widget.complete);
+      .._index(widget.nodes, widget.complete, retainMatch: retainMatch);
+  }
+
+  @override
+  void deactivate() {
+    _activeInTree = false;
+    _request++;
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _activeInTree = true;
+    if (reader._view != this) _attachAndIndex();
   }
 
   @override
@@ -136,9 +157,32 @@ class _NavigableDocumentState extends State<_NavigableDocument> {
       box = _blocks[index];
     }
     if (box == null || !box.attached || !box.hasSize) return false;
-    final viewport = RenderAbstractViewport.maybeOf(box);
+    if (hit != null && reader._disclosures.containsKey(index)) {
+      final bodies = {
+        for (final range in reader._disclosures[index]!)
+          if (range.start < hit.end && hit.start < range.end) range.node,
+      };
+      // Opening an outer disclosure may mount a nested one on the next frame.
+      while (bodies.isNotEmpty && box!.expandDisclosures(bodies)) {
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted || request != _request || _position != pos) return false;
+        box = _blocks[index];
+        if (box == null || !box.attached || !box.hasSize) return false;
+      }
+    }
+    final viewport = RenderAbstractViewport.maybeOf(box!);
     if (viewport == null) return false;
-    final rect = hit == null ? null : box.firstRect(hit);
+    final glyph = hit == null ? null : box.firstGlyph(hit);
+    Rect? rect;
+    if (glyph != null) {
+      // A code line may have its own horizontal viewport inside this block.
+      glyph.owner.showOnScreen(rect: glyph.rect);
+      rect = MatrixUtils.transformRect(
+        glyph.owner.getTransformTo(box),
+        glyph.rect,
+      );
+      box.markNeedsPaint();
+    }
     final alignment = pos.axisDirection == AxisDirection.up ? 1.0 : 0.0;
     final offset = viewport
         .getOffsetToReveal(box, alignment, rect: rect)
@@ -234,7 +278,7 @@ class _ReaderBlock extends SingleChildRenderObjectWidget {
   final int index;
   @override
   _RenderReaderBlock createRenderObject(BuildContext context) =>
-      _RenderReaderBlock(owner, index);
+      _RenderReaderBlock(context, owner, index);
   @override
   void updateRenderObject(
     BuildContext context,
@@ -245,7 +289,26 @@ class _ReaderBlock extends SingleChildRenderObjectWidget {
 }
 
 class _RenderReaderBlock extends RenderProxyBox {
-  _RenderReaderBlock(this.viewState, this.index);
+  _RenderReaderBlock(this.blockContext, this.viewState, this.index);
+  final BuildContext blockContext;
+
+  bool expandDisclosures(Set<DetailsNode> bodies) {
+    var expanded = false;
+    void visit(Element element) {
+      if (element is StatefulElement && element.state is ReaderDisclosure) {
+        final disclosure = element.state as ReaderDisclosure;
+        if (bodies.contains(disclosure.details) &&
+            disclosure.expandForReader()) {
+          expanded = true;
+        }
+      }
+      element.visitChildElements(visit);
+    }
+
+    blockContext.visitChildElements(visit);
+    return expanded;
+  }
+
   _NavigableDocumentState viewState;
   int index;
   MarkdownReaderController get reader => viewState.reader;
@@ -280,7 +343,9 @@ class _RenderReaderBlock extends RenderProxyBox {
 
   // Map the index's logical text to shaped glyph boxes. Paint decorations after
   // the child so custom fonts, links, recognizers and selection stay intact.
-  void _visitHits(void Function(MarkdownSearchMatch, Rect) visit) {
+  void _visitHits(
+    void Function(MarkdownSearchMatch, RenderObject, Rect) visit,
+  ) {
     final hits = reader._byBlock[index];
     if (hits == null) return;
     final text = reader._texts![index];
@@ -326,12 +391,8 @@ class _RenderReaderBlock extends RenderProxyBox {
                 extentOffset:
                     glyphOffset + (hit.end - start).clamp(0, piece.length),
               );
-              final transform = object.getTransformTo(this);
               for (final glyph in boxes(selected)) {
-                visit(
-                  hit,
-                  MatrixUtils.transformRect(transform, glyph.toRect()),
-                );
+                visit(hit, object, glyph.toRect());
               }
             }
             cursor = end;
@@ -345,10 +406,10 @@ class _RenderReaderBlock extends RenderProxyBox {
     if (child != null) walk(child!);
   }
 
-  Rect? firstRect(MarkdownSearchMatch match) {
-    Rect? result;
-    _visitHits((hit, rect) {
-      if (hit == match) result ??= rect;
+  ({RenderObject owner, Rect rect})? firstGlyph(MarkdownSearchMatch match) {
+    ({RenderObject owner, Rect rect})? result;
+    _visitHits((hit, owner, rect) {
+      if (hit == match) result ??= (owner: owner, rect: rect);
     });
     return result;
   }
@@ -360,7 +421,8 @@ class _RenderReaderBlock extends RenderProxyBox {
     final active = reader._active < 0 ? null : reader._matches[reader._active];
     final paint = Paint();
     var painted = false;
-    _visitHits((hit, rect) {
+    _visitHits((hit, owner, glyph) {
+      final rect = MatrixUtils.transformRect(owner.getTransformTo(this), glyph);
       painted = true;
       paint.color = identical(hit, active)
           ? const Color(0x88ff9300)

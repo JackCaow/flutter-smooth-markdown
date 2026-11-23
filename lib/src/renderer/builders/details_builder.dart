@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../config/style_sheet.dart';
 import '../../parser/ast/markdown_node.dart';
+import '../reader_disclosure.dart';
 import '../widget_builder.dart';
 
 /// Builder for details/summary collapsible blocks
@@ -39,7 +40,7 @@ class DetailsBuilder extends MarkdownWidgetBuilder {
 
     return _DetailsWidget(
       summary: summaryWidget,
-      isOpen: detailsNode.isOpen,
+      node: detailsNode,
       styleSheet: styleSheet,
       children: childrenWidget,
     );
@@ -68,26 +69,37 @@ class _DetailsWidget extends StatefulWidget {
   const _DetailsWidget({
     required this.summary,
     required this.styleSheet,
+    required this.node,
     this.children,
-    this.isOpen = false,
   });
 
   final Widget summary;
   final Widget? children;
-  final bool isOpen;
+  final DetailsNode node;
   final MarkdownStyleSheet styleSheet;
 
   @override
   State<_DetailsWidget> createState() => _DetailsWidgetState();
 }
 
-class _DetailsWidgetState extends State<_DetailsWidget> {
+class _DetailsWidgetState extends State<_DetailsWidget>
+    implements ReaderDisclosure {
   late bool _isExpanded;
 
   @override
   void initState() {
     super.initState();
-    _isExpanded = widget.isOpen;
+    _isExpanded = widget.node.isOpen;
+  }
+
+  @override
+  DetailsNode get details => widget.node;
+
+  @override
+  bool expandForReader() {
+    if (_isExpanded) return false;
+    setState(() => _isExpanded = true);
+    return true;
   }
 
   void _toggleExpanded() {

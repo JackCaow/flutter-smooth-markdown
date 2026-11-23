@@ -63,6 +63,8 @@ Future<MarkdownClipboardContent?> readMarkdownClipboard([
         if (bytes.isNotEmpty) {
           return MarkdownClipboardContent(
             image: MarkdownClipboardImage(bytes, mimeType: mime),
+            html: html,
+            plainText: plain,
           );
         }
       }
@@ -88,7 +90,17 @@ bool _onlyImage(String html) {
 Future<String?> clipboardContentToMarkdown(
   MarkdownClipboardContent content, {
   MarkdownPasteImageCallback? onPasteImage,
+  bool preferPlainText = false,
 }) async {
+  if (preferPlainText) {
+    final plain = content.plainText;
+    if (plain != null) return plain;
+    final html = content.html;
+    if (html != null && html.isNotEmpty) {
+      final literal = _literalHtmlText(html);
+      if (literal.isNotEmpty || content.image == null) return literal;
+    }
+  }
   final image = content.image;
   if (image != null) {
     final target = onPasteImage == null
@@ -114,13 +126,58 @@ String _destination(String value) => value
 
 /// Converts common clipboard HTML into editable Markdown without executing markup.
 String htmlToPastedMarkdown(String html) {
+  return _children(_clipboardFragment(html)).trim();
+}
+
+DocumentFragment _clipboardFragment(String html) {
   final fragment = html_parser.parseFragment(html);
   for (final element in fragment.querySelectorAll(
     'script,style,head,noscript,template,iframe,object',
   )) {
     element.remove();
   }
-  return _children(fragment).trim();
+  return fragment;
+}
+
+// Keep whitespace from highlighted code spans, and recover lines from editors
+// that copy a div per line or use br instead of newlines.
+String _literalHtmlText(String html) {
+  final result = StringBuffer();
+  var pendingBreak = false;
+  var endsInNewline = true;
+  void write(String text) {
+    if (text.isEmpty) return;
+    if (pendingBreak && !endsInNewline && !text.startsWith('\n')) {
+      result.write('\n');
+    }
+    result.write(text);
+    pendingBreak = false;
+    endsInNewline = text.endsWith('\n');
+  }
+
+  void visit(Node node) {
+    if (node is Text) {
+      write(node.data);
+      return;
+    }
+    if (node is! Element) return;
+    if (node.localName == 'br') {
+      if (pendingBreak && !endsInNewline) result.write('\n');
+      write('\n');
+      return;
+    }
+    final block = const {'div', 'p', 'pre', 'li'}.contains(node.localName);
+    if (block) pendingBreak = true;
+    for (final child in node.nodes) {
+      visit(child);
+    }
+    if (block) pendingBreak = true;
+  }
+
+  for (final child in _clipboardFragment(html).nodes) {
+    visit(child);
+  }
+  return result.toString();
 }
 
 String _children(Node node) {

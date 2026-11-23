@@ -40,6 +40,7 @@ class MarkdownReaderController extends ChangeNotifier {
   _NavigableDocumentState? _view;
   List<MarkdownNode> _nodes = const [];
   List<String>? _texts;
+  final _disclosures = <int, List<({DetailsNode node, int start, int end})>>{};
   List<MarkdownHeading> _headings = const [];
   Map<String, MarkdownHeading> _byAnchor = const {};
   List<MarkdownSearchMatch> _matches = const [];
@@ -63,7 +64,9 @@ class MarkdownReaderController extends ChangeNotifier {
   static final _spaces = RegExp(r'\s+');
 
   void _attach(_NavigableDocumentState view) {
-    if (_view != null && _view != view) {
+    // Switching a sliver to its selectable box mounts the replacement before
+    // Flutter disposes the old inactive element at the end of the frame.
+    if (_view != null && _view != view && _view!._activeInTree) {
       throw StateError(
         'A MarkdownReaderController can serve one reader at a time.',
       );
@@ -85,6 +88,7 @@ class MarkdownReaderController extends ChangeNotifier {
     final selectedIndex = retainMatch ? _active : -1;
     _nodes = nodes;
     _texts = null;
+    _disclosures.clear();
     _complete = complete;
     final anchors = <String, MarkdownHeading>{};
     final suffixes = <String, int>{};
@@ -198,7 +202,18 @@ class MarkdownReaderController extends ChangeNotifier {
     final found = <MarkdownSearchMatch>[];
     final byBlock = <int, List<MarkdownSearchMatch>>{};
     if (_query.isNotEmpty) {
-      final text = _texts ??= _nodes.map(_text).toList(growable: false);
+      final text = _texts ??= List.generate(
+        _nodes.length,
+        (i) => _text(
+          _nodes[i],
+          onDisclosure: (node, start, end) => (_disclosures[i] ??= []).add((
+            node: node,
+            start: start,
+            end: end,
+          )),
+        ),
+        growable: false,
+      );
       final pattern = RegExp(
         RegExp.escape(_query),
         caseSensitive: _caseSensitive,
@@ -275,62 +290,106 @@ class MarkdownReaderController extends ChangeNotifier {
     }
   }
 
-  String _children(Iterable<MarkdownNode> nodes, [String separator = '']) =>
-      nodes.map(_text).join(separator);
+  // Collect disclosure body ranges in exactly the same UTF-16 coordinate space
+  // as matches, including nested blocks and duplicate text in nearby sections.
+  String _text(
+    MarkdownNode root, {
+    void Function(DetailsNode, int, int)? onDisclosure,
+  }) {
+    final text = StringBuffer();
+    void writeNode(MarkdownNode n) {
+      void children(Iterable<MarkdownNode> nodes, [String separator = '']) {
+        var first = true;
+        for (final node in nodes) {
+          if (!first) text.write(separator);
+          writeNode(node);
+          first = false;
+        }
+      }
 
-  String _text(MarkdownNode n) {
-    final custom = textForNode?.call(n);
-    if (custom != null) return custom;
-    return switch (n) {
-      HeaderNode(:final children) =>
-        children == null ? n.content : _children(children),
-      TextNode() => n.content,
-      InlineCodeNode() => n.code,
-      CodeBlockNode() => n.code,
-      InlineMathNode() => n.latex,
-      BlockMathNode() => n.latex,
-      HardBreakNode() => '\n',
-      ImageNode() => n.alt,
-      ParagraphNode(:final children) ||
-      BoldNode(:final children) ||
-      ItalicNode(:final children) ||
-      StrikethroughNode(:final children) ||
-      LinkNode(:final children) ||
-      ListItemNode(:final children) ||
-      StyledSpanNode(:final children) ||
-      HighlightNode(:final children) ||
-      KbdNode(:final children) ||
-      UnderlineNode(:final children) ||
-      SubscriptNode(:final children) ||
-      SuperscriptNode(:final children) => _children(children),
-      BlockquoteNode(:final children) ||
-      HtmlBlockNode(:final children) => _children(children, '\n'),
-      ListNode() => _children(n.items, '\n'),
-      TableNode() => [
-        n.headers,
-        ...n.rows.map((row) => row.cells),
-      ].map((row) => row.map((cell) => _children(cell)).join('\t')).join('\n'),
-      FootnoteReferenceNode() => '[${n.label}]',
-      FootnoteDefinitionNode() => '[${n.label}]: ${_children(n.children)}',
-      DetailsNode() =>
-        '${_children(n.summary)}\n${_children(n.children, '\n')}',
-      AdmonitionNode() => '${n.title}\n${_children(n.children, '\n')}',
-      WikilinkNode() => n.label,
-      MermaidDiagramNode() => n.code,
-      ThinkingNode() => n.content,
-      ArtifactNode() => [n.title, n.content].nonNulls.join('\n'),
-      ToolCallNode() => [
-        n.toolName,
-        n.parameters?.toString(),
-        n.result,
-        n.errorMessage,
-      ].nonNulls.join('\n'),
-      MarkdownCitationNode() => '[${n.number}]',
-      MentionNode() => '@${n.username}',
-      HashtagNode() => '#${n.tag}',
-      EmojiNode() => n.emoji,
-      _ => '',
-    };
+      final custom = textForNode?.call(n);
+      if (custom != null) {
+        text.write(custom);
+        return;
+      }
+      switch (n) {
+        case HeaderNode(:final children?) ||
+            ParagraphNode(:final children) ||
+            BoldNode(:final children) ||
+            ItalicNode(:final children) ||
+            StrikethroughNode(:final children) ||
+            LinkNode(:final children) ||
+            ListItemNode(:final children) ||
+            StyledSpanNode(:final children) ||
+            HighlightNode(:final children) ||
+            KbdNode(:final children) ||
+            UnderlineNode(:final children) ||
+            SubscriptNode(:final children) ||
+            SuperscriptNode(:final children):
+          for (final child in children) {
+            writeNode(child);
+          }
+        case BlockquoteNode(children: final nodes) ||
+            HtmlBlockNode(children: final nodes):
+          children(nodes, '\n');
+        case ListNode():
+          children(n.items, '\n');
+        case TableNode():
+          void cells(List<List<MarkdownNode>> cells) {
+            for (var i = 0; i < cells.length; i++) {
+              if (i != 0) text.write('\t');
+              children(cells[i]);
+            }
+          }
+          cells(n.headers);
+          for (final row in n.rows) {
+            text.write('\n');
+            cells(row.cells);
+          }
+        case DetailsNode():
+          children(n.summary);
+          text.write('\n');
+          final start = text.length;
+          children(n.children, '\n');
+          onDisclosure?.call(n, start, text.length);
+        case AdmonitionNode():
+          text.write('${n.title}\n');
+          children(n.children, '\n');
+        case FootnoteDefinitionNode():
+          text.write('[${n.label}]: ');
+          children(n.children);
+        default:
+          text.write(switch (n) {
+            HeaderNode() => n.content,
+            TextNode() => n.content,
+            InlineCodeNode() => n.code,
+            CodeBlockNode() => n.code,
+            InlineMathNode() => n.latex,
+            BlockMathNode() => n.latex,
+            HardBreakNode() => '\n',
+            ImageNode() => n.alt,
+            FootnoteReferenceNode() => '[${n.label}]',
+            WikilinkNode() => n.label,
+            MermaidDiagramNode() => n.code,
+            ThinkingNode() => n.content,
+            ArtifactNode() => [n.title, n.content].nonNulls.join('\n'),
+            ToolCallNode() => [
+              n.toolName,
+              n.parameters?.toString(),
+              n.result,
+              n.errorMessage,
+            ].nonNulls.join('\n'),
+            MarkdownCitationNode() => '[${n.number}]',
+            MentionNode() => '@${n.username}',
+            HashtagNode() => '#${n.tag}',
+            EmojiNode() => n.emoji,
+            _ => '',
+          });
+      }
+    }
+
+    writeNode(root);
+    return text.toString();
   }
 
   @override

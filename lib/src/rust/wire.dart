@@ -32,7 +32,7 @@ class CoreNode {
 
 /// Bounds-checked decoder. Nothing here retains a pointer into native memory.
 class CoreWireReader {
-  CoreWireReader(Uint8List bytes, String magic)
+  CoreWireReader(Uint8List bytes, String magic, {this.referenceLabels})
     : _data = ByteData.sublistView(bytes) {
     if (bytes.length > 64 * 1024 * 1024 ||
         bytes.length < 8 ||
@@ -41,6 +41,7 @@ class CoreWireReader {
     }
   }
   final ByteData _data;
+  final Set<String>? referenceLabels;
   // A single checked view for every string; range decoding avoids allocating a
   // new typed-data view for each nonempty field in a large tree.
   late final Uint16List? _units =

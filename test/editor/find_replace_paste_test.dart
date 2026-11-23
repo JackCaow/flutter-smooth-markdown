@@ -244,6 +244,49 @@ void main() {
     expect(controller.text, 'left old right');
   });
 
+  for (final (language, clipboard, expected) in [
+    (
+      'dart',
+      const MarkdownClipboardContent(
+        html: '<pre><code>a * b</code></pre>',
+        plainText: '  a * b',
+      ),
+      '  a * b',
+    ),
+    (
+      'mermaid',
+      const MarkdownClipboardContent(
+        html: '<div><span>graph TD</span></div>'
+            '<div>  A --&gt; B<br>  B --&gt; C</div>',
+      ),
+      'graph TD\n  A --> B\n  B --> C',
+    ),
+  ]) {
+    testWidgets('paste keeps literal source in a formatted $language fence', (
+      tester,
+    ) async {
+      final controller = MarkdownEditorController(
+        text: '```$language\nold\n```',
+      );
+      await tester.pumpWidget(wrap(SmoothMarkdownEditor(
+        controller: controller,
+        height: 320,
+        readClipboard: () async => clipboard,
+      )));
+      await tester.tap(find.byTooltip('Edit code'));
+      await tester.pumpAndSettle();
+      final active = tester.widget<TextField>(find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
+      ));
+      active.controller!.selection =
+          const TextSelection(baseOffset: 0, extentOffset: 3);
+      await hotkey(tester, LogicalKeyboardKey.keyV);
+      expect(controller.text, '```$language\n$expected\n```');
+      expect(controller.undo(), isTrue);
+      expect(controller.text, '```$language\nold\n```');
+    });
+  }
+
   testWidgets('image paste menu embeds a bitmap renderable by the reader', (
     tester,
   ) async {
@@ -315,7 +358,10 @@ void main() {
             controller: controller,
             height: 320,
             readClipboard: () async =>
-                const MarkdownClipboardContent(html: '<i>new</i>'),
+                const MarkdownClipboardContent(
+                  html: '<i>new</i>',
+                  plainText: 'new',
+                ),
           ),
         ),
       );

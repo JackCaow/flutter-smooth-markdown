@@ -2,6 +2,7 @@ import '../parser/parser_compatibility.dart';
 import '../parser/parser_plugin.dart';
 import '../parser/plugins/admonition_plugin.dart';
 import '../parser/plugins/artifact_plugin.dart';
+import '../parser/plugins/citation_plugin.dart';
 import '../parser/plugins/emoji_plugin.dart';
 import '../parser/plugins/hashtag_plugin.dart';
 import '../parser/plugins/mention_plugin.dart';
@@ -14,6 +15,9 @@ import '../parser/plugins/tool_call_plugin.dart';
 bool usesCompatiblePluginOrder(ParserPluginRegistry? plugins) {
   if (plugins == null) return true;
   if (plugins.runtimeType != ParserPluginRegistry) return false;
+  // A reference collision may replay the citation hook. Keep all mixed
+  // citation registries on their established single-pass host callback path.
+  if (isCitationStreamRegistry(plugins)) return true;
   return plugins.blockPlugins.every(
         (p) => const {
           ThinkingPlugin,

@@ -111,6 +111,94 @@ void main() {
   );
 
   testWidgets(
+    'toggling selection keeps one reader controller and its active match',
+    (tester) async {
+      final reader = MarkdownReaderController();
+      Widget page(bool selectable) => MaterialApp(
+        home: CustomScrollView(
+          slivers: [
+            SmoothMarkdown.sliver(
+              data: '# One\n\nsame and same',
+              config: _config,
+              readerController: reader,
+              selectable: selectable,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(page(false));
+      reader.search('same');
+      expect(await reader.jumpToMatch(1), isTrue);
+
+      for (final selectable in [true, false]) {
+        await tester.pumpWidget(page(selectable));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(reader.headings.single.anchor, 'one');
+        expect(reader.activeMatchIndex, 1);
+        expect(await reader.jumpToAnchor('one'), isTrue);
+      }
+      await tester.pumpWidget(const SizedBox());
+      expect(reader.headings, isEmpty);
+      reader.dispose();
+    },
+  );
+
+  testWidgets(
+    'search reveals the occurrence inside its collapsed disclosure only',
+    (tester) async {
+      final reader = MarkdownReaderController();
+      const source =
+          '<details>\n<summary>Summary A</summary>\nshared phrase Alpha\n</details>'
+          '\n\n<details>\n<summary>Summary B</summary>\nshared phrase Bravo\n</details>';
+      await tester.pumpWidget(_page(reader, source, box: true));
+      reader.search('Summary B');
+      expect(await reader.jumpToMatch(0), isTrue);
+      expect(find.textContaining('Bravo', findRichText: true), findsNothing);
+
+      reader.search('shared phrase');
+      expect(reader.matches, hasLength(2));
+      final jump = reader.jumpToMatch(1);
+      await tester.pumpAndSettle();
+      expect(await jump, isTrue);
+      expect(
+        find.textContaining('Bravo', findRichText: true).hitTestable(),
+        findsWidgets,
+      );
+      expect(find.textContaining('Alpha', findRichText: true), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      reader.dispose();
+    },
+  );
+
+  testWidgets('search scrolls long code lines horizontally to the active hit', (
+    tester,
+  ) async {
+    final reader = MarkdownReaderController();
+    await tester.pumpWidget(
+      _page(reader, '~~~\nneedle ${'x' * 300} needle\n~~~', box: true),
+    );
+    final horizontal = tester
+        .stateList<ScrollableState>(find.byType(Scrollable))
+        .singleWhere(
+          (s) =>
+              axisDirectionToAxis(s.position.axisDirection) == Axis.horizontal,
+        )
+        .position;
+    expect(horizontal.maxScrollExtent, greaterThan(800));
+    reader.search('needle');
+    expect(reader.matches, hasLength(2));
+    expect(await reader.jumpToMatch(1), isTrue);
+    await tester.pumpAndSettle();
+    expect(horizontal.pixels, greaterThan(800));
+    expect(await reader.jumpToMatch(0), isTrue);
+    await tester.pumpAndSettle();
+    expect(horizontal.pixels, lessThan(10));
+    await tester.pumpWidget(const SizedBox());
+    reader.dispose();
+  });
+
+  testWidgets(
     '435k document seeks directly to a far unmounted heading and search hit',
     (tester) async {
       final c = MarkdownReaderController();
