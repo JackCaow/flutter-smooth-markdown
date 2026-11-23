@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Unified diffs preserve word-level changes and multiline syntax highlighting when Git inserts a missing-newline annotation between removed and added lines.
+
 ## [0.12.0] - 2026-11-20
 
 ### Added

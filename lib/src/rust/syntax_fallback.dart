@@ -234,17 +234,31 @@ List<MarkdownDiffRow> fallbackDiff(
   var begin = 0;
   while (begin < rows.length) {
     var end = begin + 1;
-    while (end < rows.length && rows[end].kind != MarkdownDiffKind.hunk) {
+    while (end < rows.length) {
+      final row = rows[end];
+      if (row.kind == MarkdownDiffKind.hunk ||
+          (row.kind == MarkdownDiffKind.note &&
+              !row.line.text.startsWith(r'\ '))) {
+        break;
+      }
       end++;
     }
+    // EOF annotations stay in the display but belong to neither source file.
+    final code = [
+      for (var i = begin; i < end; i++)
+        if (rows[i].kind != MarkdownDiffKind.hunk &&
+            rows[i].kind != MarkdownDiffKind.note)
+          i,
+    ];
     for (final oldSide in [false, true]) {
       final indices = [
-        for (var i = begin; i < end; i++)
+        for (final i in code)
           if (rows[i].kind == MarkdownDiffKind.context ||
               rows[i].kind ==
                   (oldSide ? MarkdownDiffKind.removed : MarkdownDiffKind.added))
             i,
       ];
+      if (indices.isEmpty) continue;
       final lines = fallbackLines(
         '${indices.map((i) => rows[i].line.text).join('\n')}\n',
         language,
@@ -261,24 +275,26 @@ List<MarkdownDiffRow> fallbackDiff(
         );
       }
     }
+    _markWordChanges(rows, code);
     begin = end;
   }
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i].kind != MarkdownDiffKind.removed ||
-        (i > 0 && rows[i - 1].kind == MarkdownDiffKind.removed)) {
-      continue;
+  return List.unmodifiable(rows);
+}
+
+void _markWordChanges(List<MarkdownDiffRow> rows, List<int> code) {
+  var i = 0;
+  while (i < code.length) {
+    final removed = i;
+    while (i < code.length && rows[code[i]].kind == MarkdownDiffKind.removed) {
+      i++;
     }
-    var added = i;
-    while (added < rows.length &&
-        rows[added].kind == MarkdownDiffKind.removed) {
-      added++;
+    final added = i;
+    while (i < code.length && rows[code[i]].kind == MarkdownDiffKind.added) {
+      i++;
     }
-    var end = added;
-    while (end < rows.length && rows[end].kind == MarkdownDiffKind.added) {
-      end++;
-    }
-    for (var n = 0; n < added - i && n < end - added; n++) {
-      final a = rows[i + n].line.text, b = rows[added + n].line.text;
+    for (var n = 0; n < added - removed && n < i - added; n++) {
+      final oldIndex = code[removed + n], newIndex = code[added + n];
+      final a = rows[oldIndex].line.text, b = rows[newIndex].line.text;
       var start = 0, suffix = 0;
       while (start < a.length &&
           start < b.length &&
@@ -291,7 +307,7 @@ List<MarkdownDiffRow> fallbackDiff(
               b.codeUnitAt(b.length - suffix - 1)) {
         suffix++;
       }
-      for (final index in [i + n, added + n]) {
+      for (final index in [oldIndex, newIndex]) {
         final row = rows[index];
         rows[index] = MarkdownDiffRow(
           kind: row.kind,
@@ -303,6 +319,6 @@ List<MarkdownDiffRow> fallbackDiff(
         );
       }
     }
+    if (i == removed) i++; // Context row.
   }
-  return List.unmodifiable(rows);
 }

@@ -325,3 +325,50 @@ fn diff_word_change_is_minimal_for_small_edits() {
     let (s, l) = rows[2].changed.unwrap();
     assert_eq!(String::from_utf16_lossy(&rows[2].line.text[s as usize..(s + l) as usize]), "3");
 }
+
+#[test]
+fn eof_notes_preserve_diff_ranges_tokens_and_row_order() {
+    use super::RowKind::*;
+    let header = "@@ -1,2 +1,2 @@\n /* comment\n";
+    let baseline = super::parse_diff(&utf16(&format!("{header}-old */\n+new */\n")), "swift", 4);
+    assert_eq!(baseline[2].changed, Some((0, 3)));
+    assert_eq!(baseline[3].changed, Some((0, 3)));
+    assert_eq!(line_kind(&baseline[3].line, "new"), Some(Kind::Comment));
+
+    for (old_missing, new_missing) in [(true, false), (false, true), (true, true)] {
+        let mut patch = format!("{header}-old */\n");
+        let mut expected = vec![Hunk, Context, Removed];
+        if old_missing {
+            patch.push_str("\\ No newline at end of file\n");
+            expected.push(Note);
+        }
+        patch.push_str("+new */\n");
+        expected.push(Added);
+        if new_missing {
+            patch.push_str("\\ No newline at end of file\n");
+            expected.push(Note);
+        }
+        let rows = super::parse_diff(&utf16(&patch), "swift", 4);
+        assert_eq!(rows.iter().map(|r| r.kind).collect::<Vec<_>>(), expected);
+        assert!(rows.iter().filter(|r| r.kind != Note).eq(baseline.iter()));
+        for note in rows.iter().filter(|r| r.kind == Note) {
+            assert_eq!(line_text(&note.line), "No newline at end of file");
+            assert_eq!((note.number, note.changed), (None, None));
+        }
+    }
+}
+
+#[test]
+fn eof_notes_do_not_join_different_hunks_or_files() {
+    use super::RowKind::*;
+    for separator in ["", "diff --git a/b.swift b/b.swift\n--- a/b.swift\n+++ b/b.swift\n"] {
+        let patch = format!("@@ -1,2 +1 @@\n /* comment\n-old */\n\\ No newline at end of file\n{separator}@@ -8,0 +8 @@\n+new */\n");
+        let rows = super::parse_diff(&utf16(&patch), "swift", 4);
+        assert_eq!(rows.iter().map(|r| r.kind).collect::<Vec<_>>(),
+                   [Hunk, Context, Removed, Note, Hunk, Added]);
+        assert_eq!(rows[2].changed, None);
+        assert_eq!(rows[5].changed, None);
+        assert_eq!(rows[5].number, Some(8));
+        assert_eq!(line_kind(&rows[5].line, "new"), Some(Kind::Variable));
+    }
+}
