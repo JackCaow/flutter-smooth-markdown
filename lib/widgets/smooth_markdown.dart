@@ -47,6 +47,7 @@ import '../src/renderer/builders/text_style_builder.dart';
 import '../src/renderer/builders/thinking_builder.dart';
 import '../src/renderer/builders/tool_call_builder.dart';
 import '../src/renderer/markdown_renderer.dart';
+import '../src/renderer/reader_disclosure.dart';
 import '../src/renderer/widget_builder.dart';
 import '../src/rust/stream_eligibility.dart';
 import 'markdown_citations.dart';

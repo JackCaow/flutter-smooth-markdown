@@ -115,7 +115,7 @@ Building a native app? See the [iOS and Android API map](https://github.com/Jack
 
 ```yaml
 dependencies:
-  flutter_smooth_markdown: ^0.12.0
+  flutter_smooth_markdown: ^0.12.1
 ```
 
 ```bash

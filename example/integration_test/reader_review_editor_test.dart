@@ -132,6 +132,61 @@ void main() {
     scroll.dispose();
   });
 
+  testWidgets(
+    'reader keeps navigation through selection and reveals hidden hits',
+    (tester) async {
+      final reader = MarkdownReaderController();
+      final line = 'start ${'x' * 300} farRightNeedle';
+      final source =
+          '# Report\n\n<details>\n<summary>Summary</summary>\n'
+          'hiddenNeedle\n</details>\n\n~~~\n$line\n~~~';
+      Widget page(bool selectable) => MaterialApp(
+        home: Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              SmoothMarkdown.sliver(
+                data: source,
+                readerController: reader,
+                selectable: selectable,
+                useEnhancedComponents: true,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpWidget(page(false));
+      await tester.pumpWidget(page(true));
+      await tester.pumpWidget(page(false));
+      await tester.pumpAndSettle();
+      expect(reader.headings.single.title, 'Report');
+      for (final query in ['hiddenNeedle', 'farRightNeedle']) {
+        reader.search(query);
+        expect(reader.matches, hasLength(1));
+        final revealed = reader.jumpToMatch(0);
+        await tester.pumpAndSettle();
+        expect(await revealed, isTrue);
+        if (query == 'hiddenNeedle') {
+          expect(
+            find.textContaining(query, findRichText: true).hitTestable(),
+            findsWidgets,
+          );
+        } else {
+          final scroll = tester
+              .stateList<ScrollableState>(find.byType(Scrollable))
+              .singleWhere(
+                (s) =>
+                    axisDirectionToAxis(s.position.axisDirection) ==
+                    Axis.horizontal,
+              );
+          expect(scroll.position.pixels, greaterThan(0));
+          evidence['codeSearchOffset'] = scroll.position.pixels;
+        }
+      }
+      await tester.pumpWidget(const SizedBox());
+      reader.dispose();
+    },
+  );
+
   testWidgets('split source marker resolves a late source', (tester) async {
     final stream = StreamController<String>();
     addTearDown(stream.close);
@@ -139,8 +194,9 @@ void main() {
       title: 'Device source',
       excerpt: 'Test evidence',
     );
-    final plugins = ParserPluginRegistry()
+    final originalRegistry = ParserPluginRegistry()
       ..register(const MarkdownCitationPlugin());
+    var plugins = originalRegistry;
     var sources = <int, MarkdownSource>{};
     MarkdownSource? tapped;
     late StateSetter update;
@@ -176,6 +232,30 @@ void main() {
     await tester.pump();
     await tester.tap(find.byTooltip(source.title));
     expect(tapped, same(source));
+    update(
+      () =>
+          plugins = ParserPluginRegistry()
+            ..register(const MarkdownCitationPlugin()),
+    );
+    await tester.pump();
+    originalRegistry.unregisterInline('citation');
+    stream.add('\n\nRead [guide][doc] and [1].\n\n[doc]: /manual');
+    await _until(
+      tester,
+      () => find.byTooltip(source.title).evaluate().length == 2,
+    );
+    final nodes = MarkdownParser(
+      plugins: plugins,
+      backend: MarkdownParserBackend.rust,
+    ).parse('Read [guide][doc].\n\n[doc]: /manual');
+    expect(
+      nodes
+          .whereType<ParagraphNode>()
+          .expand((p) => p.children)
+          .whereType<LinkNode>()
+          .map((link) => link.url),
+      ['/manual'],
+    );
     evidence['source'] = tapped!.title;
     await tester.pumpWidget(const SizedBox());
   });
@@ -239,6 +319,32 @@ void main() {
       scroll.dispose();
     });
   }
+
+  testWidgets('split diff aligns a replacement with a missing newline', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              MarkdownDiffView.sliver(
+                patch:
+                    '@@ -1 +1 @@\n-old value\n\\ No newline at end of file\n+new value',
+                language: 'text',
+                layout: MarkdownDiffLayout.sideBySide,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final left = tester.getTopLeft(find.text('old value', findRichText: true));
+    final right = tester.getTopLeft(find.text('new value', findRichText: true));
+    expect(left.dy, right.dy);
+    expect(left.dx, lessThan(right.dx));
+    evidence['eofReplacementY'] = left.dy;
+  });
 
   testWidgets('source editor replaces and undoes changes', (tester) async {
     final editor = MarkdownEditorController(text: 'North north North');
@@ -314,7 +420,7 @@ void main() {
       // Start a new insertion so a genuine long-press on the phone need
       // not programmatically select a specific word.
       editor.text = '';
-      await tester.pump();
+      await tester.pumpAndSettle();
       await paste(clip.DataWriterItem()..add(clip.Formats.png(png)));
       await _until(tester, () => editor.text == '![Image](assets/device.png)');
       expect(pasted!.mimeType, 'image/png');
@@ -327,8 +433,42 @@ void main() {
         'mimeType': pasted!.mimeType,
         'action': 'long-press Paste menu',
       };
+      final code = MarkdownEditorController(text: '```dart\nseed\n```');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SmoothMarkdownEditor(
+              key: const ValueKey('code-editor'),
+              controller: code,
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byTooltip('Edit code'));
+      await tester.pumpAndSettle();
+      final codeField = find.byKey(
+        const ValueKey('smooth_markdown_editor_formatted_active_0'),
+      );
+      await system.write([
+        clip.DataWriterItem()
+          ..add(clip.Formats.htmlText('<pre><code>a * b</code></pre>'))
+          ..add(clip.Formats.plainText('a * b')),
+      ]);
+      await tester.longPress(codeField);
+      final pasteCode = find.text('Paste').hitTestable();
+      await _until(tester, () => pasteCode.evaluate().isNotEmpty);
+      await tester.tap(pasteCode.first);
+      await _until(tester, () => code.text.contains('a * b'));
+      final literal = code.document.blocks
+          .whereType<MarkdownCodeBlock>()
+          .single
+          .code;
+      expect(literal, contains('a * b'));
+      expect(literal, isNot(contains('```')));
+      evidence['codePaste'] = literal;
       await tester.pumpWidget(const SizedBox());
       editor.dispose();
+      code.dispose();
     },
     skip:
         !(Platform.isAndroid || Platform.isIOS) ||

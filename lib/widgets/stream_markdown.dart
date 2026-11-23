@@ -352,7 +352,7 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
   Timer? _throttleTimer;
   Object? _error;
   CoreStream? _parserStream;
-  bool _citationSession = false;
+  ParserPluginRegistry? _citationRegistry;
   final _eligibility = StreamEligibility();
   final _blockWidgets = StreamBlockCache();
   String? _parsedSource;
@@ -668,8 +668,9 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
     // a retained Dart session; arbitrary host plugins still use the full gate.
     final registry = widget.plugins;
     final citationOnly = isCitationStreamRegistry(registry);
-    if (_citationSession != citationOnly) {
-      _citationSession = citationOnly;
+    final citationRegistry = citationOnly ? registry : null;
+    if (!identical(_citationRegistry, citationRegistry)) {
+      _citationRegistry = citationRegistry;
       _parserStream?.dispose();
       _parserStream = null;
       _parsedNodes = null;
@@ -689,7 +690,8 @@ class _StreamMarkdownState extends State<StreamMarkdown> {
         // Start the Dart session from the current complete source once.
         _parserStream?.dispose();
         _parserStream = DartStreamParser(
-          plugins: citationOnly ? registry : null,
+          plugins: citationRegistry,
+          referenceBackend: backend,
         );
         _parsedNodes = null;
       }

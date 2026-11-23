@@ -13,6 +13,7 @@ import '../src/editor/document/markdown_document.dart';
 import '../src/editor/document/markdown_document_codec.dart';
 import '../src/editor/document/markdown_document_editor.dart';
 import '../src/editor/editor_clipboard_field.dart';
+import '../src/editor/editor_search.dart';
 import '../src/editor/markdown_editor_clipboard.dart';
 import '../src/editor/markdown_editor_controller.dart';
 import '../src/editor/markdown_editor_export.dart';
@@ -2506,6 +2507,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             contentPadding: EdgeInsets.all(12),
           ),
         ),
+        preferPlainText: segment.block is MarkdownCodeBlock ||
+            segment.block is MarkdownMermaidBlock,
         insertRichMarkdown: _pasteIntoFormattedBlock);
   }
 
@@ -5652,8 +5655,10 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   Widget _clipboardField(
     TextField field, {
     bool Function(TextSelection, String)? insertRichMarkdown,
+    bool preferPlainText = false,
   }) =>
       EditorClipboardField(
+        preferPlainText: preferPlainText,
         insertRichMarkdown: insertRichMarkdown,
         readClipboard: widget.readClipboard,
         onPasteImage: widget.onPasteImage,
@@ -10634,20 +10639,22 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     }
 
     final matches = <TextRange>[];
+    final pattern = editorSearchPattern(query);
     for (final segment in _documentBlockSegments()) {
       final block = segment.block;
       if (block == null) {
-        _addSourceSearchMatches(
+        _addPlainTextSearchMatches(
           matches,
           segment.source,
-          query,
-          sourceBaseOffset: segment.range.start,
+          pattern,
+          sourceOffsetForPlainTextOffset: (offset) =>
+              segment.range.start + offset,
         );
       } else {
         _addSemanticBlockSearchMatches(
           matches,
           block,
-          query,
+          pattern,
           sourceBaseOffset: segment.range.start,
           source: segment.source,
         );
@@ -10663,7 +10670,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   void _addSemanticBlockSearchMatches(
     List<TextRange> matches,
     MarkdownBlock block,
-    String query, {
+    RegExp pattern, {
     required int sourceBaseOffset,
     required String source,
   }) {
@@ -10674,7 +10681,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
         _addPlainTextSearchMatches(
           matches,
           block.plainText,
-          query,
+          pattern,
           sourceOffsetForPlainTextOffset: (offset) =>
               sourceBaseOffset +
               _sourceOffsetForPlainTextOffset(block, source, offset),
@@ -10685,7 +10692,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           _addSemanticBlockSearchMatches(
             matches,
             child,
-            query,
+            pattern,
             sourceBaseOffset:
                 sourceBaseOffset + _blockquoteChildSourceOffset(block, index),
             source: child.toMarkdown(),
@@ -10702,7 +10709,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
             _addSemanticBlockSearchMatches(
               matches,
               child,
-              query,
+              pattern,
               sourceBaseOffset: sourceBaseOffset +
                   _listItemChildBlockSourceOffset(
                     block,
@@ -10723,7 +10730,7 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
           matches,
           block.plainText,
           source,
-          query,
+          pattern,
           sourceBaseOffset: sourceBaseOffset,
         );
     }
@@ -10732,22 +10739,16 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
   void _addPlainTextSearchMatches(
     List<TextRange> matches,
     String text,
-    String query, {
+    RegExp pattern, {
     required int Function(int offset) sourceOffsetForPlainTextOffset,
   }) {
-    if (text.isEmpty || query.isEmpty) return;
-
-    final haystack = text.toLowerCase();
-    final needle = query.toLowerCase();
-    var index = haystack.indexOf(needle);
-    while (index != -1 && matches.length < 500) {
+    for (final match in pattern.allMatches(text).take(500 - matches.length)) {
       matches.add(
         TextRange(
-          start: sourceOffsetForPlainTextOffset(index),
-          end: sourceOffsetForPlainTextOffset(index + query.length),
+          start: sourceOffsetForPlainTextOffset(match.start),
+          end: sourceOffsetForPlainTextOffset(match.end),
         ),
       );
-      index = haystack.indexOf(needle, index + needle.length);
     }
   }
 
@@ -10755,54 +10756,19 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
     List<TextRange> matches,
     String text,
     String source,
-    String query, {
+    RegExp pattern, {
     required int sourceBaseOffset,
   }) {
-    if (text.isEmpty || source.isEmpty || query.isEmpty) return;
-
-    final plainHaystack = text.toLowerCase();
-    final sourceHaystack = source.toLowerCase();
-    final needle = query.toLowerCase();
-    var plainIndex = plainHaystack.indexOf(needle);
-    var sourceCursor = 0;
-    while (plainIndex != -1 && matches.length < 500) {
-      final matchedText = text.substring(plainIndex, plainIndex + query.length);
-      final sourceIndex = sourceHaystack.indexOf(
-        matchedText.toLowerCase(),
-        sourceCursor,
-      );
-      if (sourceIndex == -1) break;
-
+    final sourceMatches = pattern.allMatches(source).iterator;
+    for (final _ in pattern.allMatches(text).take(500 - matches.length)) {
+      if (!sourceMatches.moveNext()) break;
+      final match = sourceMatches.current;
       matches.add(
         TextRange(
-          start: sourceBaseOffset + sourceIndex,
-          end: sourceBaseOffset + sourceIndex + matchedText.length,
+          start: sourceBaseOffset + match.start,
+          end: sourceBaseOffset + match.end,
         ),
       );
-      sourceCursor = sourceIndex + matchedText.length;
-      plainIndex = plainHaystack.indexOf(needle, plainIndex + needle.length);
-    }
-  }
-
-  void _addSourceSearchMatches(
-    List<TextRange> matches,
-    String source,
-    String query, {
-    required int sourceBaseOffset,
-  }) {
-    if (source.isEmpty || query.isEmpty) return;
-
-    final haystack = source.toLowerCase();
-    final needle = query.toLowerCase();
-    var index = haystack.indexOf(needle);
-    while (index != -1 && matches.length < 500) {
-      matches.add(
-        TextRange(
-          start: sourceBaseOffset + index,
-          end: sourceBaseOffset + index + query.length,
-        ),
-      );
-      index = haystack.indexOf(needle, index + needle.length);
     }
   }
 
@@ -11594,8 +11560,8 @@ class _SmoothMarkdownEditorState extends State<SmoothMarkdownEditor> {
       registry.register(
         'text',
         _SearchHighlightTextBuilder(
-          query: searchQuery,
-          caseSensitive: _replaceOpen && _replaceMatchCase,
+          pattern: editorSearchPattern(searchQuery,
+              caseSensitive: _replaceOpen && _replaceMatchCase),
           backgroundColor:
               Theme.of(context).colorScheme.primary.withOpacity(0.22),
         ),
@@ -11685,13 +11651,11 @@ class _FrontmatterEditorState extends State<_FrontmatterEditor> {
 
 class _SearchHighlightTextBuilder extends MarkdownWidgetBuilder {
   const _SearchHighlightTextBuilder({
-    required this.query,
-    required this.caseSensitive,
+    required this.pattern,
     required this.backgroundColor,
   });
 
-  final String query;
-  final bool caseSensitive;
+  final RegExp pattern;
   final Color backgroundColor;
 
   @override
@@ -11704,16 +11668,13 @@ class _SearchHighlightTextBuilder extends MarkdownWidgetBuilder {
     MarkdownRenderContext context,
   ) {
     final text = (node as TextNode).content;
-    if (query.isEmpty || text.isEmpty) {
+    if (text.isEmpty) {
       return Text(text);
     }
 
-    final matches = RegExp(RegExp.escape(query),
-            caseSensitive: caseSensitive, unicode: true)
-        .allMatches(text);
     final spans = <TextSpan>[];
     var cursor = 0;
-    for (final match in matches) {
+    for (final match in pattern.allMatches(text)) {
       if (match.start > cursor) {
         spans.add(TextSpan(text: text.substring(cursor, match.start)));
       }

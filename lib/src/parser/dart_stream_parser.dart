@@ -4,13 +4,22 @@ part of 'markdown_parser.dart';
 /// Callers use the shared eligibility gate before bypassing host plugins/HTML.
 /// Keeps the existing Dart grammar; it does not emulate Rust's AST semantics.
 class DartStreamParser implements RetainedCoreStream {
-  DartStreamParser({ParserPluginRegistry? plugins})
-    : _parser = MarkdownParser(
-        backend: MarkdownParserBackend.legacyDart,
-        plugins: plugins,
-      );
+  DartStreamParser({
+    ParserPluginRegistry? plugins,
+    MarkdownParserBackend referenceBackend = MarkdownParserBackend.legacyDart,
+  }) : _parser = MarkdownParser(
+         backend: MarkdownParserBackend.legacyDart,
+         plugins: plugins,
+       ),
+       _referenceParser =
+           plugins == null ||
+               referenceBackend == MarkdownParserBackend.legacyDart
+           ? null
+           : MarkdownParser(backend: referenceBackend, plugins: plugins);
 
   final MarkdownParser _parser;
+  final MarkdownParser? _referenceParser;
+  List<MarkdownNode>? _referenceSnapshot;
   final _blocks = <({int start, MarkdownNode node})>[];
   String _source = '';
   bool _definitions = false;
@@ -28,6 +37,11 @@ class DartStreamParser implements RetainedCoreStream {
     final append = source.startsWith(_source);
     if (append && source.length == _source.length) {
       lastParsedUnits = 0;
+      final referenceSnapshot = _referenceSnapshot;
+      if (referenceSnapshot != null) {
+        lastRetainedBlocks = referenceSnapshot.length;
+        return referenceSnapshot;
+      }
       lastRetainedBlocks = _blocks.length;
       return List.unmodifiable(_blocks.map((block) => block.node));
     }
@@ -41,6 +55,21 @@ class DartStreamParser implements RetainedCoreStream {
         : 0;
     final start = retained == 0 ? 0 : _blocks[retained].start;
     try {
+      // The established reference invalidation already reparses the full text.
+      // Use the configured batch grammar for a citation stream at this point
+      // so late definitions resolve earlier links. The renderer stays lazy.
+      if (definitions && _referenceParser != null) {
+        final snapshot = List<MarkdownNode>.unmodifiable(
+          _referenceParser.parse(source),
+        );
+        _blocks.clear();
+        _source = source;
+        _definitions = true;
+        lastParsedUnits = source.length;
+        lastRetainedBlocks = 0;
+        return _referenceSnapshot = snapshot;
+      }
+      _referenceSnapshot = null;
       final starts = <int>[];
       final tail = _parser._blockParser.parseWithBlockStarts(
         source.substring(start),
@@ -58,6 +87,7 @@ class DartStreamParser implements RetainedCoreStream {
       return List.unmodifiable(_blocks.map((block) => block.node));
     } catch (_) {
       _source = '';
+      _referenceSnapshot = null;
       _blocks.clear();
       _definitions = false;
       lastParsedUnits = 0;
@@ -71,6 +101,7 @@ class DartStreamParser implements RetainedCoreStream {
     if (_disposed) return;
     _disposed = true;
     _source = '';
+    _referenceSnapshot = null;
     _blocks.clear();
   }
 }

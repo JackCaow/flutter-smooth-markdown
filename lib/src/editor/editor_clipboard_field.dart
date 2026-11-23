@@ -13,12 +13,14 @@ class EditorClipboardField extends StatefulWidget {
     this.readClipboard,
     this.onPasteImage,
     this.insertRichMarkdown,
+    this.preferPlainText = false,
     super.key,
   });
 
   final TextField child;
   final Future<MarkdownClipboardContent?> Function()? readClipboard;
   final MarkdownPasteImageCallback? onPasteImage;
+  final bool preferPlainText;
 
   final bool Function(TextSelection selection, String markdown)?
   insertRichMarkdown;
@@ -91,11 +93,13 @@ class _EditorClipboardFieldState extends State<EditorClipboardField> {
     final original = controller.value;
     final read = widget.readClipboard;
     final saveImage = widget.onPasteImage;
+    final preferPlainText = widget.preferPlainText;
     bool stillCurrent() =>
         mounted &&
         _canPaste &&
         widget.child.key == field.key &&
         widget.child.controller == controller &&
+        widget.preferPlainText == preferPlainText &&
         controller.value == original;
     final content = read == null
         ? await readMarkdownClipboard(await event)
@@ -104,6 +108,7 @@ class _EditorClipboardFieldState extends State<EditorClipboardField> {
     final markdown = await clipboardContentToMarkdown(
       content,
       onPasteImage: saveImage,
+      preferPlainText: preferPlainText,
     );
     if (markdown == null || markdown.isEmpty || !stillCurrent()) return;
     final selection = original.selection.isValid

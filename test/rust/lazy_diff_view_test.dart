@@ -157,6 +157,42 @@ void main() {
   });
 
   testWidgets(
+    'EOF annotations preserve replacement alignment and hunk boundaries',
+    (tester) async {
+      const note = r'\ No newline at end of file';
+      const patch =
+          '@@ -1,2 +1,2 @@\n-first\n-last\n$note\n+one\n+two\n$note\n'
+          '@@ -9 +10 @@\n-later\n+newer';
+      Future<void> show(MarkdownDiffLayout layout) => tester.pumpWidget(
+        _app(
+          CustomScrollView(
+            slivers: [
+              MarkdownDiffView.sliver(
+                patch: patch,
+                language: 'text',
+                layout: layout,
+              ),
+            ],
+          ),
+        ),
+      );
+      double top(String text) =>
+          tester.getTopLeft(find.text(text, findRichText: true)).dy;
+      await show(MarkdownDiffLayout.sideBySide);
+      expect(top('first'), top('one'));
+      expect(top('last'), top('two'));
+      expect(top('later'), top('newer'));
+      final notes = find.textContaining('No newline', findRichText: true);
+      expect(notes, findsNWidgets(2));
+      expect(tester.getTopLeft(notes.first).dy, greaterThan(top('last')));
+      expect(tester.getTopLeft(notes.last).dy, lessThan(top('later')));
+      await show(MarkdownDiffLayout.unified);
+      expect(tester.getTopLeft(notes.first).dy, lessThan(top('one')));
+      expect(tester.getTopLeft(notes.last).dy, greaterThan(top('two')));
+    },
+  );
+
+  testWidgets(
     'lazy split preserves raw snippets and updates source and layout',
     (tester) async {
       Future<void> show(String patch, MarkdownDiffLayout layout) =>

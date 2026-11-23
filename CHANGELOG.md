@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-23
+
 ### Fixed
 
+- Sliver readers keep their navigation controller when text selection changes. Search reveals matches inside collapsed details and horizontally scrolling code.
+- Numbered citations preserve reference links. A live stream uses the current citation registry after the host replaces it.
+- Formatted code and Mermaid editors paste literal text from rich clipboards. Unicode search highlights use the same matching rules as find and replace.
+- Side-by-side diffs align replacements even when Git inserts a missing-newline note between the removed and added lines.
 - Unified diffs preserve word-level changes and multiline syntax highlighting when Git inserts a missing-newline annotation between removed and added lines.
 
 ## [0.12.0] - 2026-11-20
@@ -598,7 +604,8 @@ None - All optimizations are opt-in or enabled by default without breaking exist
 - 87+ unit tests with comprehensive coverage
 - Flutter lints enabled for code quality
 
-[Unreleased]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/JackCaow/flutter-smooth-markdown/compare/v0.9.0...v0.10.0
