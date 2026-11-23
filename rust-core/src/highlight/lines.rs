@@ -94,12 +94,13 @@ pub fn diff(patch: &[u16], language: &str, tab_width: usize) -> Vec<DiffRow> {
     let mut rows: Vec<DiffRow> = Vec::new();
     let mut in_hunk = false;
     let (mut old_line, mut new_line) = (0u32, 0u32);
-    let mut code: Vec<(usize, Vec<u16>)> = Vec::new(); // (row index, raw text) of code rows
+    let mut hunk = Vec::new(); // (display row index, source text) for code in this hunk
     let patch = if patch.last() == Some(&('\n' as u16)) { &patch[..patch.len() - 1] } else { patch };
     for raw in patch.split(|&u| u == '\n' as u16) {
         let raw = if raw.last() == Some(&('\r' as u16)) { &raw[..raw.len() - 1] } else { raw };
         let starts = |s: &str| s.encode_utf16().enumerate().all(|(k, u)| raw.get(k) == Some(&u));
         if let Some((old, new, header)) = parse_hunk_header(raw) {
+            finish_hunk(&mut rows, &mut hunk, language, tab_width);
             old_line = old;
             new_line = new;
             in_hunk = true;
@@ -108,6 +109,7 @@ pub fn diff(patch: &[u16], language: &str, tab_width: usize) -> Vec<DiffRow> {
             if !context.is_empty() { text.push(' ' as u16); text.extend(context) }
             rows.push(DiffRow { kind: RowKind::Hunk, number: None, line: Line { text, tokens: Vec::new() }, changed: None });
         } else if starts("diff --git ") {
+            finish_hunk(&mut rows, &mut hunk, language, tab_width);
             in_hunk = false;
         } else if in_hunk && (starts("+") || starts("-") || starts(" ") || raw.is_empty()) {
             let (kind, number) = match raw.first().copied() {
@@ -116,16 +118,16 @@ pub fn diff(patch: &[u16], language: &str, tab_width: usize) -> Vec<DiffRow> {
                 _ => { new_line += 1; old_line += 1; (RowKind::Context, new_line - 1) }
             };
             let body = if raw.is_empty() { &raw[..] } else { &raw[1..] };
-            code.push((rows.len(), body.to_vec()));
+            hunk.push((rows.len(), body));
             rows.push(DiffRow { kind, number: Some(number), line: Line { text: Vec::new(), tokens: Vec::new() }, changed: None });
         } else if starts("\\ ") {
             rows.push(note(&raw[2..]));
         } else if starts("Binary files ") || starts("new file mode 120000") || starts("deleted file mode 120000") {
+            finish_hunk(&mut rows, &mut hunk, language, tab_width);
             rows.push(note(raw));
         }
     }
-    highlight_sides(&mut rows, &code, language, tab_width);
-    mark_word_changes(&mut rows, &code, tab_width);
+    finish_hunk(&mut rows, &mut hunk, language, tab_width);
     rows
 }
 
@@ -133,52 +135,38 @@ fn note(text: &[u16]) -> DiffRow {
     DiffRow { kind: RowKind::Note, number: None, line: Line { text: text.to_vec(), tokens: Vec::new() }, changed: None }
 }
 
-/// Highlights each hunk's new side (context + added) and old side (context + removed)
-/// as continuous text; context rows take the new side's tokens.
-fn highlight_sides(rows: &mut [DiffRow], code: &[(usize, Vec<u16>)], language: &str, tab_width: usize) {
-    let mut k = 0;
-    while k < code.len() {
-        // A hunk is a run of consecutive code rows.
-        let start = k;
-        while k + 1 < code.len() && code[k + 1].0 == code[k].0 + 1 { k += 1 }
-        let hunk = &code[start..=k];
-        k += 1;
-        for (keep_added, keep) in [(true, [RowKind::Context, RowKind::Added]), (false, [RowKind::Removed, RowKind::Removed])] {
-            let side: Vec<&(usize, Vec<u16>)> = hunk.iter().filter(|(row, _)| {
-                let kind = rows[*row].kind;
-                if keep_added { kind != RowKind::Removed } else { kind != RowKind::Added }
-            }).collect();
-            if !keep_added && !side.iter().any(|(row, _)| rows[*row].kind == RowKind::Removed) { continue }
-            let mut joined: Vec<u16> = Vec::new();
-            for (n, (_, text)) in side.iter().enumerate() {
-                if n > 0 { joined.push('\n' as u16) }
-                joined.extend_from_slice(text);
-            }
-            let lines = split(&joined, &highlight(&joined, language), tab_width);
-            for ((row, _), line) in side.iter().zip(lines) {
-                if keep.contains(&rows[*row].kind) { rows[*row].line = line }
-            }
+/// EOF notes are display rows only. Highlight and compare both sides using just this hunk's code.
+fn finish_hunk(rows: &mut [DiffRow], hunk: &mut Vec<(usize, &[u16])>, language: &str, tab_width: usize) {
+    if hunk.is_empty() { return }
+    for old_side in [false, true] {
+        let other_side = if old_side { RowKind::Added } else { RowKind::Removed };
+        let code: Vec<_> = hunk.iter().copied()
+            .filter(|(row, _)| rows[*row].kind != other_side).collect();
+        if code.is_empty() || (old_side && !code.iter().any(|(row, _)| rows[*row].kind == RowKind::Removed)) { continue }
+        let mut joined = Vec::new();
+        for (n, (_, text)) in code.iter().enumerate() {
+            if n > 0 { joined.push('\n' as u16) }
+            joined.extend_from_slice(text);
+        }
+        let lines = split(&joined, &highlight(&joined, language), tab_width);
+        for ((row, _), line) in code.into_iter().zip(lines) {
+            // Context rows display the new side's tokens.
+            if !old_side || rows[row].kind == RowKind::Removed { rows[row].line = line }
         }
     }
-    // Rows that never received a line (empty hunks) still need their text.
-    for (row, text) in code {
-        if rows[*row].line.text.is_empty() && !text.is_empty() { rows[*row].line = expand_tabs(text, Vec::new(), tab_width) }
-    }
+    mark_word_changes(rows, hunk, tab_width);
+    hunk.clear();
 }
 
-/// Pairs each removed run with the added run after it and marks the differing middle of each pair.
-fn mark_word_changes(rows: &mut [DiffRow], code: &[(usize, Vec<u16>)], tab_width: usize) {
-    let raw: std::collections::HashMap<usize, &Vec<u16>> = code.iter().map(|(row, text)| (*row, text)).collect();
+/// Pair consecutive removals and additions within one hunk, ignoring display annotations.
+fn mark_word_changes(rows: &mut [DiffRow], code: &[(usize, &[u16])], tab_width: usize) {
     let mut i = 0;
-    while i < rows.len() {
+    while i < code.len() {
         let removed_start = i;
-        while i < rows.len() && rows[i].kind == RowKind::Removed { i += 1 }
+        while i < code.len() && rows[code[i].0].kind == RowKind::Removed { i += 1 }
         let added_start = i;
-        while i < rows.len() && rows[i].kind == RowKind::Added { i += 1 }
-        let pairs = (added_start - removed_start).min(i - added_start);
-        for offset in 0..pairs {
-            let (r, a) = (removed_start + offset, added_start + offset);
-            let (old, new) = (raw[&r], raw[&a]);
+        while i < code.len() && rows[code[i].0].kind == RowKind::Added { i += 1 }
+        for (&(r, old), &(a, new)) in code[removed_start..added_start].iter().zip(&code[added_start..i]) {
             let prefix = old.iter().zip(new.iter()).take_while(|(x, y)| x == y).count();
             let suffix = old[prefix..].iter().rev().zip(new[prefix..].iter().rev()).take_while(|(x, y)| x == y).count();
             // Lines that share nothing are rewrites; highlighting the whole line adds nothing.

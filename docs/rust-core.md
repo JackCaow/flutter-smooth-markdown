@@ -1,7 +1,8 @@
 # Shared Rust core and stable Flutter APIs
 
-Flutter vendors `smooth-rust-core` 0.2.0 at commit
-`3e89ac88a49696bf9a45814b39ea06bd3703d692`, the same owned C ABI used by
+Flutter vendors `smooth-rust-core` at commit
+`7ecb0fc97efbde39c37165829234b69f583f428f`, which includes the diff EOF
+annotation fix on top of 0.2.0. It uses the same owned C ABI as
 [Android](https://github.com/JackCaow/android-smooth-markdown) and
 [iOS](https://github.com/JackCaow/ios-smooth-markdown).
 The upstream base revision, applied local patches and resulting SHA-256 source

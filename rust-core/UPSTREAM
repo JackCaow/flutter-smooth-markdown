@@ -1,4 +1,4 @@
 https://github.com/JackCaow/smooth-rust-core
-3e89ac88a49696bf9a45814b39ea06bd3703d692
+7ecb0fc97efbde39c37165829234b69f583f428f
 patch: tools/rust-core-patches/0001-inline-allocation.patch
 patch: tools/rust-core-patches/0002-bridge-memory.patch

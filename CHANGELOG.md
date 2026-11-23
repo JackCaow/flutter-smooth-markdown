@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.12.1] - 2026-11-22
+## [0.12.1] - 2026-11-23
 
 ### Fixed
 
@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Numbered citations preserve reference links. A live stream uses the current citation registry after the host replaces it.
 - Formatted code and Mermaid editors paste literal text from rich clipboards. Unicode search highlights use the same matching rules as find and replace.
 - Side-by-side diffs align replacements even when Git inserts a missing-newline note between the removed and added lines.
+- Unified diffs preserve word-level changes and multiline syntax highlighting when Git inserts a missing-newline annotation between removed and added lines.
 
 ## [0.12.0] - 2026-11-20
 
