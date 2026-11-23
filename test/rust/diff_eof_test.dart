@@ -97,6 +97,27 @@ void main() {
     },
   );
 
+  test(
+    'symlink metadata text in a code row keeps its multiline lexer state',
+    () {
+      final rows = MarkdownCore.highlightedDiff(
+        [
+          '@@ -1,3 +1,3 @@',
+          ' /* comment',
+          ' file mode 120000',
+          '-old */',
+          '+new */',
+        ].join('\n'),
+        language: 'dart',
+      );
+      expect(rows[2].kind, MarkdownDiffKind.context);
+      expect(rows[2].line.text, 'file mode 120000');
+      for (final row in rows.skip(2)) {
+        expect(row.line.tokens.single.kind, MarkdownHighlightKind.comment);
+      }
+    },
+  );
+
   test('EOF notes keep replacements and lexer state within their own hunk', () {
     final rows = MarkdownCore.highlightedDiff(
       [

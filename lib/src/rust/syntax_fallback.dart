@@ -196,7 +196,8 @@ List<MarkdownDiffRow> fallbackDiff(
       );
     } else if (raw.startsWith(r'\ ') ||
         raw.startsWith('Binary files ') ||
-        raw.contains('file mode 120000')) {
+        raw.startsWith('new file mode 120000') ||
+        raw.startsWith('deleted file mode 120000')) {
       rows.add(
         MarkdownDiffRow(
           kind: MarkdownDiffKind.note,
